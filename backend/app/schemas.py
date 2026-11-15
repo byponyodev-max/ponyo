@@ -363,6 +363,25 @@ class SupplierAccountRequest(BaseModel):
     customerId: UUID
 
 
+class AdminProductPublicationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    published: bool
+
+
+class AdminSupplierStatusRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    active: bool
+
+
+class SupplierOfferUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    onHand: int = Field(ge=0, strict=True)
+    costAmount: int = Field(ge=0, strict=True)
+    minimumOrderQuantity: int = Field(gt=0, strict=True)
+    leadTimeDays: int = Field(ge=0, strict=True)
+
+
 class CheckoutSessionOut(BaseModel):
     checkoutUrl: str
     orderId: UUID

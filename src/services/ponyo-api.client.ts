@@ -53,6 +53,196 @@ export type CustomerProfile = {
 	email: string;
 };
 
+export type SupplierIdentity = {
+	user: Pick<CustomerProfile, "id" | "firstName" | "lastName" | "email">;
+	supplier: { id: string; code: string; name: string };
+};
+
+export type SupplierPurchaseOrderItem = {
+	id: string;
+	orderItemId?: string;
+	variantId?: string;
+	supplierSku: string;
+	productName: string;
+	quantity: number;
+	unitCost: number;
+	routeAttempt?: number;
+};
+
+export type SupplierPurchaseOrder = {
+	id: string;
+	purchaseOrderNumber: string;
+	orderId: string;
+	supplierId: string;
+	status: string;
+	generation: number;
+	supplierOrderId: string | null;
+	currency: string;
+	totalCost: number;
+	attempts: number;
+	lastError: string | null;
+	rejectionReason: string | null;
+	nextAttemptAt: string | null;
+	createdAt: string;
+	items: SupplierPurchaseOrderItem[];
+	shippingAddress?: Record<string, string> | null;
+};
+
+export type SupplierListing = {
+	offerId: string;
+	productId: string;
+	variantId: string;
+	productName: string;
+	variantTitle: string;
+	variantSku: string;
+	retailPriceAmount: number;
+	currency: string;
+	supplierSku: string;
+	costAmount: number;
+	minimumOrderQuantity: number;
+	leadTimeDays: number;
+	onHand: number;
+	reserved: number;
+	availableQuantity: number;
+	active: boolean;
+};
+
+export type SupplierListingUpdate = {
+	onHand: number;
+	costAmount: number;
+	minimumOrderQuantity: number;
+	leadTimeDays: number;
+};
+
+export type AdminIdentity = Pick<
+	CustomerProfile,
+	"id" | "firstName" | "lastName" | "email"
+> & { role: "admin" };
+
+export type AdminOrder = {
+	id: string;
+	orderNumber: string;
+	createdAt: string;
+	status: string;
+	paymentStatus: string;
+	fulfillmentStatus: string;
+	supplierFulfillmentStatus: string;
+	customerEmail: string;
+	totalAmount: number;
+	currency: string;
+	itemsCount: number;
+	shipmentCount: number;
+	deliveryAddress?: Record<string, string>;
+};
+
+export type AdminOrderDetail = AdminOrder & {
+	subtotalAmount: number;
+	discountAmount: number;
+	shippingAmount: number;
+	taxAmount: number;
+	capturedAmount: number;
+	refundedAmount: number;
+	items: Array<{
+		id: string;
+		name: string;
+		quantity: number;
+		unitPrice: number;
+		currency: string;
+		supplierOfferId: string | null;
+		productSnapshot: Record<string, unknown>;
+	}>;
+	shipments: Array<{
+		id: string;
+		number: string;
+		status: string;
+		carrier: string;
+		trackingNumber: string;
+		trackingUrl: string | null;
+		estimatedDeliveryAt: string | null;
+	}>;
+	supplierFulfillments: Array<{
+		purchaseOrderId: string;
+		purchaseOrderNumber: string;
+		supplier: string;
+		status: string;
+		supplierOrderId: string | null;
+		items: Array<{
+			productName: string;
+			supplierSku: string;
+			quantity: number;
+			unitCost: number;
+		}>;
+	}>;
+};
+
+export type AdminProduct = {
+	id: string;
+	sku: string;
+	slug: string;
+	name: string;
+	description: string;
+	priceAmount: number;
+	currency: string;
+	categoryName: string;
+	brandName: string;
+	published: boolean;
+	createdAt: string;
+	image: string;
+	variantCount: number;
+	stockQuantity: number;
+	availability: string;
+};
+
+export type AdminSupplier = {
+	id: string;
+	code: string;
+	name: string;
+	contactEmail: string | null;
+	active: boolean;
+	isDemo: boolean;
+	accountCount: number;
+	offerCount: number;
+};
+
+export type AdminBrand = {
+	id: string;
+	slug: string;
+	name: string;
+	isDemo: boolean;
+	productCount: number;
+};
+
+export type AdminCustomer = {
+	id: string;
+	firstName: string;
+	lastName: string;
+	email: string;
+	emailVerified: boolean;
+	createdAt: string;
+};
+
+export type AdminDashboard = {
+	metrics: {
+		totalOrders: number;
+		paidOrders: number;
+		activeSuppliers: number;
+		activeProducts: number;
+		unpublishedProducts: number;
+		ordersAwaitingFulfillment: number;
+		lowAvailabilityVariants: number;
+		customers: number;
+		brands: number;
+	};
+	revenueByCurrency: Array<{ currency: string; amount: number }>;
+	ordersByStatus: Array<{ status: string; count: number }>;
+	recentOrders: AdminOrder[];
+	unpublishedProducts: AdminProduct[];
+	suppliers: Array<
+		Pick<AdminSupplier, "id" | "code" | "name" | "active" | "accountCount">
+	>;
+	notice: string;
+};
+
 export type CustomerAddress = {
 	id: string;
 	firstName: string;
@@ -518,6 +708,175 @@ export const ponyoApi = {
 	},
 	getOrder: (id: string) =>
 		apiRequest<BackendOrder>(`/orders/${encodeURIComponent(id)}`),
+	loginSupplier: (email: string, password: string) =>
+		apiRequest<SupplierIdentity>("/supplier-auth/login", {
+			method: "POST",
+			body: JSON.stringify({ email, password }),
+		}),
+	getSupplierMe: () => apiRequest<SupplierIdentity>("/supplier-auth/me"),
+	logoutSupplier: async () => {
+		const result = await apiRequest<{ accepted: boolean }>(
+			"/supplier-auth/logout",
+			{ method: "POST" },
+		);
+		cachedCsrfToken = "";
+		return result;
+	},
+	listSupplierPurchaseOrders: (limit = 50, offset = 0) =>
+		apiRequest<SupplierPurchaseOrder[]>(
+			`/supplier-orders?limit=${limit}&offset=${offset}`,
+		),
+	getSupplierPurchaseOrder: (id: string) =>
+		apiRequest<SupplierPurchaseOrder>(
+			`/supplier-orders/${encodeURIComponent(id)}`,
+		),
+	decideSupplierPurchaseOrder: (
+		id: string,
+		input: {
+			eventId: string;
+			decision: "confirmed" | "rejected";
+			supplierOrderId?: string;
+			reason?: string;
+		},
+	) =>
+		apiRequest<SupplierPurchaseOrder>(
+			`/supplier-orders/${encodeURIComponent(id)}/confirmation`,
+			{ method: "POST", body: JSON.stringify(input) },
+		),
+	listSupplierListings: (limit = 100) =>
+		apiRequest<SupplierListing[]>(`/supplier-catalog/offers?limit=${limit}`),
+	updateSupplierListing: (offerId: string, input: SupplierListingUpdate) =>
+		apiRequest<SupplierListing>(
+			`/supplier-catalog/offers/${encodeURIComponent(offerId)}`,
+			{ method: "PATCH", body: JSON.stringify(input) },
+		),
+	loginAdmin: async (email: string, password: string) => {
+		const response = await apiRequest<{ user: AdminIdentity }>(
+			"/admin-auth/login",
+			{
+				method: "POST",
+				body: JSON.stringify({ email, password }),
+			},
+		);
+		return response.user;
+	},
+	getAdminMe: async () => {
+		const response = await apiRequest<{ user: AdminIdentity }>(
+			"/admin-auth/me",
+		);
+		return response.user;
+	},
+	logoutAdmin: async () => {
+		const result = await apiRequest<{ accepted: boolean }>(
+			"/admin-auth/logout",
+			{ method: "POST" },
+		);
+		cachedCsrfToken = "";
+		return result;
+	},
+	getAdminDashboard: () => apiRequest<AdminDashboard>("/admin/dashboard"),
+	listAdminOrders: (
+		query = "",
+		limit = 50,
+		filters: { paymentStatus?: string; fulfillmentStatus?: string } = {},
+	) => {
+		const params = new URLSearchParams({ q: query, limit: String(limit) });
+		if (filters.paymentStatus)
+			params.set("payment_status", filters.paymentStatus);
+		if (filters.fulfillmentStatus)
+			params.set("fulfillment_status", filters.fulfillmentStatus);
+		return apiRequest<{
+			items: AdminOrder[];
+			total: number;
+			limit: number;
+			offset: number;
+		}>(`/admin/orders?${params.toString()}`);
+	},
+	getAdminOrder: (id: string) =>
+		apiRequest<AdminOrderDetail>(`/admin/orders/${encodeURIComponent(id)}`),
+	listAdminProducts: (query = "", published?: boolean, limit = 100) => {
+		const params = new URLSearchParams({ q: query, limit: String(limit) });
+		if (published !== undefined) params.set("published", String(published));
+		return apiRequest<{
+			items: AdminProduct[];
+			total: number;
+			limit: number;
+			offset: number;
+		}>(`/admin/products?${params.toString()}`);
+	},
+	setAdminProductPublication: (id: string, published: boolean) =>
+		apiRequest<AdminProduct>(
+			`/admin/products/${encodeURIComponent(id)}/publication`,
+			{
+				method: "PATCH",
+				body: JSON.stringify({ published }),
+			},
+		),
+	listAdminSuppliers: () => apiRequest<AdminSupplier[]>("/admin/suppliers"),
+	listAdminBrands: () => apiRequest<AdminBrand[]>("/admin/brands"),
+	setAdminSupplierActive: (id: string, active: boolean) =>
+		apiRequest<{
+			id: string;
+			code: string;
+			name: string;
+			active: boolean;
+			isDemo: boolean;
+		}>(`/admin/suppliers/${encodeURIComponent(id)}/status`, {
+			method: "PATCH",
+			body: JSON.stringify({ active }),
+		}),
+	listAdminCustomers: (query = "") =>
+		apiRequest<AdminCustomer[]>(
+			`/admin/customers?${new URLSearchParams({ q: query }).toString()}`,
+		),
+	planAdminSupplierOrders: (orderId: string) =>
+		apiRequest<{
+			orderId: string;
+			fulfillmentStatus: string;
+			createdPurchaseOrders: SupplierPurchaseOrder[];
+		}>(`/supplier-orders/orders/${encodeURIComponent(orderId)}/plan`, {
+			method: "POST",
+			body: JSON.stringify({}),
+		}),
+	createAdminShipment: (
+		orderId: string,
+		input: {
+			carrier: string;
+			trackingNumber: string;
+			trackingUrl?: string;
+			estimatedDeliveryAt?: string;
+			items: Array<{ orderItemId: string; quantity: number }>;
+		},
+	) =>
+		apiRequest<{
+			id: string;
+			shipmentNumber: string;
+			status: string;
+			carrier: string;
+			trackingNumber: string;
+			trackingUrl: string | null;
+		}>(`/orders/${encodeURIComponent(orderId)}/shipments`, {
+			method: "POST",
+			body: JSON.stringify(input),
+		}),
+	updateAdminShipmentStatus: (
+		orderId: string,
+		shipmentId: string,
+		input: {
+			status:
+				| "in_transit"
+				| "out_for_delivery"
+				| "delivered"
+				| "exception"
+				| "returned";
+			eventId: string;
+			note?: string;
+		},
+	) =>
+		apiRequest<{ id: string; status: string }>(
+			`/orders/${encodeURIComponent(orderId)}/shipments/${encodeURIComponent(shipmentId)}/status`,
+			{ method: "POST", body: JSON.stringify(input) },
+		),
 	getPaymentStatus: (id: string) =>
 		apiRequest<PaymentStatus>(`/payments/orders/${encodeURIComponent(id)}`),
 	syncPaymentStatus: (id: string) =>

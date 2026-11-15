@@ -143,6 +143,7 @@ function PartnerPage() {
         </div>
         <PartnerInquiryForm />
       </section>
+      <p className="partner-portal-sign-in">Already working with Ponyo? <Link href="/supplier-portal">Open your supplier studio ↗</Link></p>
     </div>
   );
 }

@@ -16,7 +16,7 @@ from app.email_queue import transactional_email_worker
 from app.outbox import publish_outbox_events
 from app.reservation_expiry import recover_expired_reservations
 from app.supplier_forwarding import supplier_order_worker
-from app.routers import auth, cart, catalog, checkout, content, localization, orders, payments, products, shipments, supplier_orders, webhooks
+from app.routers import admin, admin_auth, auth, cart, catalog, checkout, content, localization, orders, payments, products, shipments, supplier_auth, supplier_catalog, supplier_orders, webhooks
 
 logger = logging.getLogger("ponyo.api")
 
@@ -118,6 +118,8 @@ async def internal_error_handler(request: Request, _error: Exception):
 
 
 app.include_router(auth.router, prefix="/v1")
+app.include_router(admin_auth.router, prefix="/v1")
+app.include_router(admin.router, prefix="/v1")
 app.include_router(cart.router, prefix="/v1")
 app.include_router(products.router, prefix="/v1")
 app.include_router(catalog.router, prefix="/v1")
@@ -126,6 +128,8 @@ app.include_router(orders.router, prefix="/v1")
 app.include_router(checkout.router, prefix="/v1")
 app.include_router(payments.router, prefix="/v1")
 app.include_router(supplier_orders.router, prefix="/v1")
+app.include_router(supplier_auth.router, prefix="/v1")
+app.include_router(supplier_catalog.router, prefix="/v1")
 app.include_router(shipments.router, prefix="/v1")
 app.include_router(content.router, prefix="/v1")
 app.include_router(webhooks.router, prefix="/v1")
