@@ -764,7 +764,7 @@ async def test_supplier_contact_request_is_saved_queued_and_notified(test_client
     assert response.status_code == 200
     assert response.json()["data"]["accepted"] is True
     assert response.json()["data"]["emailNotificationSent"] is True
-    assert response.json()["data"]["notificationEmail"] == settings.contact_notification_email
+    assert response.json()["data"]["notificationEmail"] == settings.partners_notification_email
     async with session_factory() as db:
         inquiry = await db.scalar(select(ContactRequestModel))
         event = await db.scalar(select(OutboxEvent).where(OutboxEvent.event_type == "contact.request_received"))
@@ -1243,7 +1243,7 @@ async def test_verification_sender_uses_public_storefront_logo(smtp_transport, m
     smtp = smtp_transport.return_value.__enter__.return_value
     message = smtp.send_message.call_args.args[0]
     html = message.get_body(preferencelist=("html",)).get_content()
-    assert 'src="https://shop.example.test/ponyo-email-jellyfish.png"' in html
+    assert 'src="https://shop.example.test/profile.png"' in html
     assert f'href="{url}"' in html
     assert "cid:" not in html
 

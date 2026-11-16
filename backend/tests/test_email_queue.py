@@ -97,7 +97,7 @@ def test_contact_request_email_is_branded_and_escapes_customer_message(monkeypat
         "smtp_host": "smtp.example.test", "smtp_port": 587,
         "smtp_username": "smtp-user", "smtp_password": "smtp-password-test",
         "smtp_from_email": "noreply@example.test", "smtp_starttls": True,
-        "smtp_timeout_seconds": 5, "contact_notification_email": "ponyo@example.test",
+        "smtp_timeout_seconds": 5, "support_notification_email": "ponyo@example.test",
     }.items():
         monkeypatch.setattr(settings, name, value)
     transport = MagicMock()

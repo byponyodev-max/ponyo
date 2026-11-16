@@ -64,7 +64,9 @@ class Settings(BaseSettings):
     supplier_retry_base_seconds: int = 60
     supplier_confirmation_timeout_seconds: int = 86400
 
-    contact_notification_email: str = "febryola0402@gmail.com"
+    contact_notification_email: str = "hello@byponyo.com"
+    support_notification_email: str = "support@byponyo.com"
+    partners_notification_email: str = "partners@byponyo.com"
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None

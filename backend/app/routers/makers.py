@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db import get_db
+from app.email_notifications import send_partner_application_notification
 from app.models import Brand, MakerApplication, Product
 from app.rate_limit import enforce_rate_limit
 from app.routers.products import product_response
@@ -76,4 +77,18 @@ async def create_maker_application(
     db.add(application)
     await db.commit()
     await db.refresh(application)
+    details = "\n".join((
+        f"Location: {application.city}, {application.country}",
+        f"Website: {application.website or 'Not provided'}",
+        f"Social media: {application.social_media or 'Not provided'}",
+        f"Product: {application.product_url}",
+        f"Description: {application.product_description}",
+        f"Demand evidence: {application.proven_desire_evidence}",
+        f"Materials: {application.materials}",
+        f"Price range: {application.price_range}",
+        f"Ponyo exclusivity: {application.ponyo_exclusivity}",
+    ))
+    await send_partner_application_notification(
+        application.maker_name, application.contact_person, application.email, details,
+    )
     return {"data": {"id": str(application.id), "status": application.status}}

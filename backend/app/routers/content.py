@@ -3,9 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.db import get_db
-from app.email_notifications import send_contact_notification
+from app.email_notifications import contact_notification_recipient, send_contact_notification
 from app.models import ContactRequest as ContactRequestModel
 from app.models import NewsletterSubscription, OutboxEvent
 from app.rate_limit import enforce_rate_limit
@@ -59,5 +58,5 @@ async def create_contact_request(payload: ContactRequestIn, request: Request, db
     return {"data": {
         **AcceptedOut().model_dump(),
         "emailNotificationSent": notification_sent,
-        "notificationEmail": settings.contact_notification_email,
+        "notificationEmail": contact_notification_recipient(contact.request_type or "Storefront request"),
     }}

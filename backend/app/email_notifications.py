@@ -12,6 +12,24 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+SUPPORT_CONTACT_TYPES = frozenset({
+    "order question", "delivery question", "plush request", "reservation question",
+    "website assistance", "customer support",
+})
+PARTNER_CONTACT_TYPES = frozenset({
+    "maker application", "supplier communication", "supplier partnership",
+    "collaboration proposal", "partnership inquiry",
+})
+
+
+def contact_notification_recipient(request_type: str) -> str:
+    normalized_type = " ".join(request_type.casefold().split())
+    if normalized_type in SUPPORT_CONTACT_TYPES:
+        return settings.support_notification_email
+    if normalized_type in PARTNER_CONTACT_TYPES:
+        return settings.partners_notification_email
+    return settings.contact_notification_email
+
 
 def _smtp_ssl_context() -> ssl.SSLContext:
     context = ssl.create_default_context()
@@ -28,13 +46,13 @@ def ponyo_branded_email_html(
     """Shared, email-client-safe Ponyo layout for account and order messages."""
     storefront = urlsplit(settings.storefront_base_url)
     logo_url = (
-        f"{storefront.scheme}://{storefront.netloc}/ponyo-email-jellyfish.png"
+        f"{storefront.scheme}://{storefront.netloc}/profile.png"
         if storefront.scheme == "https" and storefront.netloc else None
     )
     logo = (
-        f'<img src="{escape(logo_url, quote=True)}" width="42" height="42" alt="" '
-        'style="display:block;width:42px;height:42px;border:0;border-radius:14px;">'
-        if logo_url else '<span style="font-size:23px;line-height:42px">🪼</span>'
+        f'<img src="{escape(logo_url, quote=True)}" width="56" height="56" alt="" '
+        'style="display:block;width:56px;height:56px;border:0;border-radius:12px;">'
+        if logo_url else '<span style="font-size:23px;line-height:56px">🪼</span>'
     )
     parsed_action = urlsplit(action_url or "")
     safe_action = bool(
@@ -141,16 +159,27 @@ def build_verification_message(sender: str, email: str, verification_url: str, *
     return message
 
 
-def _send_contact_email(name: str, email: str, request_type: str, message_text: str) -> None:
+def _send_smtp_message(message: EmailMessage) -> None:
     sender = settings.smtp_from_email or settings.smtp_username
     if not settings.smtp_host or not sender:
         raise RuntimeError("Contact email transport is not configured")
+    message["From"] = sender
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
+        smtp.ehlo()
+        if settings.smtp_starttls:
+            smtp.starttls(context=_smtp_ssl_context())
+            smtp.ehlo()
+        if settings.smtp_username:
+            smtp.login(settings.smtp_username, settings.smtp_password or "")
+        smtp.send_message(message)
+
+
+def _send_contact_email(name: str, email: str, request_type: str, message_text: str) -> None:
     safe_request_type = " ".join(request_type.splitlines()).strip() or "Storefront request"
 
     message = EmailMessage()
     message["Subject"] = f"Ponyo request received: {safe_request_type}"
-    message["From"] = sender
-    message["To"] = settings.contact_notification_email
+    message["To"] = contact_notification_recipient(safe_request_type)
     message["Reply-To"] = email
     message.set_content(
         "A new request was submitted through the Ponyo storefront.\n\n"
@@ -179,14 +208,7 @@ def _send_contact_email(name: str, email: str, request_type: str, message_text: 
         footnote="The original message remains available in the contact request record for follow-up.",
     ), subtype="html")
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
-        smtp.ehlo()
-        if settings.smtp_starttls:
-            smtp.starttls(context=_smtp_ssl_context())
-            smtp.ehlo()
-        if settings.smtp_username:
-            smtp.login(settings.smtp_username, settings.smtp_password or "")
-        smtp.send_message(message)
+    _send_smtp_message(message)
 
 
 async def send_contact_notification(name: str, email: str, request_type: str, message_text: str) -> bool:
@@ -202,6 +224,39 @@ async def send_contact_notification(name: str, email: str, request_type: str, me
         smtp_code = getattr(error, "smtp_code", None)
         logger.warning(
             "Ponyo contact notification email failed exception_type=%s smtp_status_code=%s",
+            type(error).__name__, smtp_code if isinstance(smtp_code, int) else None,
+        )
+        return False
+
+
+def _send_partner_application_email(maker_name: str, contact_person: str, email: str, details: str) -> None:
+    safe_maker_name = " ".join(maker_name.splitlines()).strip()[:160] or "New maker"
+    message = EmailMessage()
+    message["Subject"] = f"Ponyo maker application: {safe_maker_name}"
+    message["To"] = settings.partners_notification_email
+    message["Reply-To"] = email
+    message.set_content(
+        "A new maker application was submitted through the Ponyo storefront.\n\n"
+        f"Maker: {safe_maker_name}\nContact person: {contact_person}\nEmail: {email}\n\n"
+        f"{details}\n\nProduct photos are available in the maker application record."
+    )
+    _send_smtp_message(message)
+
+
+async def send_partner_application_notification(
+    maker_name: str, contact_person: str, email: str, details: str,
+) -> bool:
+    """Notify the partnerships inbox after an application has been persisted."""
+    if not settings.contact_email_configured:
+        logger.warning("Ponyo partner notification email skipped reason=transport_not_configured")
+        return False
+    try:
+        await asyncio.to_thread(_send_partner_application_email, maker_name, contact_person, email, details)
+        return True
+    except Exception as error:
+        smtp_code = getattr(error, "smtp_code", None)
+        logger.warning(
+            "Ponyo partner notification email failed exception_type=%s smtp_status_code=%s",
             type(error).__name__, smtp_code if isinstance(smtp_code, int) else None,
         )
         return False
@@ -268,8 +323,8 @@ def _send_verification_email(email: str, verification_url: str) -> None:
 
     storefront = urlsplit(settings.storefront_base_url)
     logo_url = (
-        f"{storefront.scheme}://{storefront.netloc}/ponyo-email-jellyfish.png"
-        if storefront.scheme == "https" else None
+        f"{storefront.scheme}://{storefront.netloc}/profile.png"
+        if storefront.scheme == "https" and storefront.netloc else None
     )
     message = build_verification_message(sender, email, verification_url, logo_url=logo_url)
 

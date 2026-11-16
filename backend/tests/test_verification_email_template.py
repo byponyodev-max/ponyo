@@ -57,7 +57,7 @@ def test_verification_email_has_branded_html_button_and_embedded_mascot():
 
 def test_public_email_uses_https_png_and_clickable_button():
     url = "https://shop.example.test/account/verify-email?token=secure-test"
-    logo_url = "https://shop.example.test/ponyo-email-jellyfish.png"
+    logo_url = "https://shop.example.test/profile.png"
     message = build_verification_message("accounts@example.test", "buyer@example.test", url, logo_url=logo_url)
     delivered = BytesParser(policy=policy.default).parsebytes(message.as_bytes())
     parsed = EmailHTML()

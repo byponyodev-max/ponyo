@@ -101,10 +101,15 @@ export function LocalContactForm() {
   const [submitting, setSubmitting] = useState(false);
   const [contactName, setContactName] = useState<string | null>(null);
   const [contactEmail, setContactEmail] = useState<string | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState("");
+  const [topicOpen, setTopicOpen] = useState(false);
+  const [activeTopicIndex, setActiveTopicIndex] = useState(0);
+  const [topicPlacement, setTopicPlacement] = useState<"above" | "below">("below");
   const { customer } = useCustomerSession();
   const { t } = useLocalization();
   const submitInFlight = useRef(false);
   const successCard = useRef<HTMLElement | null>(null);
+  const topicTrigger = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!sent) return;
@@ -127,6 +132,27 @@ export function LocalContactForm() {
     plush: "Plush request",
     general: "General inquiry",
   };
+  const topicOptions = [
+    { value: "order", label: t("contact.topic_order", "An order") },
+    { value: "delivery", label: t("contact.topic_delivery", "Delivery") },
+    { value: "plush", label: t("contact.topic_plush", "Finding a plush") },
+    { value: "general", label: t("contact.topic_general", "Something else") },
+  ] as const;
+
+  function chooseTopic(value: string) {
+    setSelectedTopic(value);
+    setTopicOpen(false);
+    topicTrigger.current?.focus();
+  }
+
+  function openTopicMenu() {
+    const bounds = topicTrigger.current?.getBoundingClientRect();
+    if (bounds) {
+      const spaceBelow = window.innerHeight - bounds.bottom;
+      setTopicPlacement(spaceBelow < 220 && bounds.top > spaceBelow ? "above" : "below");
+    }
+    setTopicOpen(true);
+  }
 
   if (sent) return (
     <section ref={successCard} tabIndex={-1} className="contact-form-card contact-success" role="status" aria-live="polite" aria-labelledby="contact-success-title" aria-describedby="contact-success-description">
@@ -180,13 +206,18 @@ export function LocalContactForm() {
         const name = String(data.get("name") ?? "");
         const phone = String(data.get("phone") ?? "").trim();
         const body = String(data.get("message") ?? "");
+        const topic = String(data.get("topic") ?? "");
         const message = phone ? `${body}\nPhone: ${phone}` : body;
+        if (!topic) {
+          setErrorMessage(t("contact.topic_required", "Please choose a topic before sending."));
+          topicTrigger.current?.focus();
+          return;
+        }
         if (name.length > 160 || phone.length > 60 || body.length > 4800 || message.length > 5000) {
           setErrorMessage(t("contact.error_length", "Please keep your name under 160 characters, phone under 60, and message under 4,800."));
           return;
         }
         if (PONYO_API_BASE_URL) {
-          const topic = String(data.get("topic") ?? "general");
           const result = await ponyoApi.submitContactRequest({
             name,
             email: String(data.get("email") ?? ""),
@@ -221,19 +252,88 @@ export function LocalContactForm() {
         <input id="contact-phone" name="phone" type="tel" autoComplete="tel" maxLength={60} />
       </div>
       <div className="contact-field">
-        <label htmlFor="contact-topic">{t("contact.topic", "What’s your note about?")}</label>
-        <select id="contact-topic" name="topic" defaultValue="general">
-          <option value="order">{t("contact.topic_order", "An order")}</option>
-          <option value="delivery">{t("contact.topic_delivery", "Delivery")}</option>
-          <option value="plush">{t("contact.topic_plush", "Finding a plush")}</option>
-          <option value="general">{t("contact.topic_general", "Something else")}</option>
-        </select>
+        <label id="contact-topic-label" htmlFor="contact-topic">{t("contact.topic", "What’s your note about?")} <span aria-hidden="true">*</span></label>
+        <div className="contact-topic-select">
+          <input type="hidden" name="topic" value={selectedTopic} />
+          <button
+            ref={topicTrigger}
+            id="contact-topic"
+            className="contact-topic-trigger"
+            type="button"
+            role="combobox"
+            aria-labelledby="contact-topic-label"
+            aria-haspopup="listbox"
+            aria-controls="contact-topic-listbox"
+            aria-expanded={topicOpen}
+            aria-required="true"
+            aria-invalid={!selectedTopic && errorMessage ? true : undefined}
+            aria-describedby={!selectedTopic && errorMessage ? "contact-form-error" : undefined}
+            aria-activedescendant={topicOpen ? `contact-topic-option-${activeTopicIndex}` : undefined}
+            disabled={submitting}
+            onBlur={(event) => {
+              if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setTopicOpen(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const direction = event.key === "ArrowDown" ? 1 : -1;
+                const selectedIndex = topicOptions.findIndex((option) => option.value === selectedTopic);
+                if (!topicOpen) setActiveTopicIndex(selectedIndex >= 0 ? selectedIndex : direction > 0 ? 0 : topicOptions.length - 1);
+                else setActiveTopicIndex((index) => (index + direction + topicOptions.length) % topicOptions.length);
+                openTopicMenu();
+                return;
+              }
+              if (event.key === "Escape" && topicOpen) {
+                event.preventDefault();
+                setTopicOpen(false);
+                return;
+              }
+              if (event.key === "Home" && topicOpen) {
+                event.preventDefault();
+                setActiveTopicIndex(0);
+                return;
+              }
+              if (event.key === "End" && topicOpen) {
+                event.preventDefault();
+                setActiveTopicIndex(topicOptions.length - 1);
+                return;
+              }
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                if (!topicOpen) openTopicMenu();
+                else chooseTopic(topicOptions[activeTopicIndex].value);
+              }
+            }}
+            onClick={() => {
+              if (topicOpen) setTopicOpen(false);
+              else openTopicMenu();
+            }}
+          >
+            <span>{topicOptions.find((option) => option.value === selectedTopic)?.label ?? t("contact.topic_placeholder", "Choose a topic")}</span>
+            <span className="contact-topic-chevron" aria-hidden="true" />
+          </button>
+          <div id="contact-topic-listbox" className={`contact-topic-menu contact-topic-menu--${topicPlacement}`} role="listbox" aria-labelledby="contact-topic-label" hidden={!topicOpen}>
+            {topicOptions.map((option, index) => <div
+              key={option.value}
+              id={`contact-topic-option-${index}`}
+              className={`contact-topic-option${index === activeTopicIndex ? " is-active" : ""}`}
+              role="option"
+              aria-selected={selectedTopic === option.value}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseMove={() => setActiveTopicIndex(index)}
+              onClick={() => chooseTopic(option.value)}
+            >
+              <span>{option.label}</span>
+              {selectedTopic === option.value && <span className="contact-topic-check" aria-hidden="true">✓</span>}
+            </div>)}
+          </div>
+        </div>
       </div>
       <div className="contact-field">
         <label htmlFor="contact-message">{t("contact.message", "Message")} <span aria-hidden="true">*</span></label>
         <textarea id="contact-message" name="message" rows={5} required maxLength={4800} placeholder={t("contact.message_placeholder", "Tell us a little about how we can help…")} />
       </div>
-      {errorMessage && <p className="api-form-error" role="alert">{errorMessage}</p>}
+      {errorMessage && <p id="contact-form-error" className="api-form-error" role="alert">{errorMessage}</p>}
       <div className="contact-form-footer">
         <p className="contact-privacy-note">{t("contact.privacy", "Please only share the details we need to help. Never include passwords or payment details.")}</p>
         <button className="shop-button shop-button-orange" type="submit" disabled={submitting}>

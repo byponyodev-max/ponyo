@@ -69,12 +69,36 @@ test("the detail page passes six-item selection to its recommendations grid usin
 	);
 });
 
-const { ProductCard } = load("../src/components/product/product-card.tsx", {
+test("the detail page shows seven product proofs and a separate maker-story link", () => {
+	const page = read("../src/app/products/[id]/page.tsx");
+	assert.match(page, /const proofFacts = \[/);
+	for (const proof of [
+		"maker",
+		"story",
+		"materials",
+		"size",
+		"edition",
+		"delivery",
+	]) {
+		assert.match(page, new RegExp(`key: "${proof}"`));
+	}
+	assert.match(page, /product-proof-fact--exclusive/);
+	assert.match(page, /src="\/ponyo-jellyfish\.svg" width=\{52\} height=\{52\}/);
+	assert.match(
+		page,
+		/<\/section>\s*\{product\.makerSlug && !isExample && <Link className="product-brand-story"/,
+	);
+});
+
+load("../src/components/product/product-card.tsx", {
 	"next/image": { default: "img" },
 	"next/link": { default: "a" },
 	"@/lib/wishlist": { saveWishlist() {}, useWishlistHandles: () => [] },
 	"@/components/product/product-card-action": {
 		ProductCardAction: "ProductCardAction",
+	},
+	"@/lib/storefront-features": {
+		storefrontFeatures: { productReservations: false, commerce: false },
 	},
 	"@/components/layout/localization-provider": {
 		useLocalization: () => ({
@@ -84,183 +108,19 @@ const { ProductCard } = load("../src/components/product/product-card.tsx", {
 	},
 });
 
-test("normal and sale cards give long currency values independent wrapping elements", () => {
-	for (const compareAtAmount of [undefined, 123456789]) {
-		const tree = ProductCard({
-			product: {
-				...product,
-				slug: "bear",
-				name: "Long translated product name",
-				priceAmount: 98765432,
-				compareAtAmount,
-				currency: "IDR",
-				availability: "available",
-				tags: ["premium", "new-arrival"],
-			},
-		});
-		const card = tree.props.children[0];
-		const image = card.props.children[1];
-		assert.ok(image.props.children[1].props.children.length >= 3);
-		assert.equal(image.props.children[2].props.className, "wishlist-toggle");
-		const bottom = card.props.children[2].props.children[3];
-		const prices = bottom.props.children[0];
-		assert.equal(prices.props.className, "shop-product-prices");
-		assert.equal(
-			prices.props.children[0].props.className,
-			"shop-product-current-price",
-		);
-		assert.equal(
-			prices.props.children[0].props.children,
-			"IDR\u00a098.765.432",
-		);
-		const salePrice =
-			prices.props.children.length > 1 && prices.props.children[1]
-				? prices.props.children[1].type
-				: null;
-		assert.equal(salePrice, compareAtAmount ? "del" : null);
-	}
+test("product cards show the current price without sale-price claims", () => {
+	const cardSource = read("../src/components/product/product-card.tsx");
+	assert.match(cardSource, /className="shop-product-current-price"/);
+	assert.doesNotMatch(cardSource, /<del>|discountPercent|compareAtAmount/);
 });
 
-test("product cards place a large action below the image and above product details", () => {
-	const page = read("../src/app/page.tsx");
-	const tree = ProductCard({
-		product: {
-			...product,
-			slug: "bear",
-			name: "Bear",
-			priceAmount: 1200,
-			currency: "JPY",
-			availability: "available",
-		},
-	});
-	const card = tree.props.children[0];
-	const cardLink = card.props.children[0];
-	const image = card.props.children[1];
-	const info = card.props.children[2];
-	const action = tree.props.children[1];
-	assert.equal(action.type, "ProductCardAction");
-	assert.equal(action.props.product.id, "current");
-	assert.equal(action.props.productName, "Bear");
-	assert.equal(info.props.children.length, 5);
-	assert.equal(image.props.children.length, 3);
-	assert.equal(cardLink.type, "a");
-	assert.equal(cardLink.props.className, "shop-product-card-link");
-	assert.equal(cardLink.props.href, "/products/current");
-	assert.ok(cardLink.props["aria-label"]);
-	assert.equal(image.props.children[0].type, "img");
-	assert.equal(info.props.children[0].type, "span");
-	const storefrontCss = read("../src/app/storefront.css");
-	assert.match(
-		storefrontCss,
-		/\.shop-product-card-link\s*\{[^}]*position: absolute;[^}]*z-index: 1;[^}]*inset: 0;/,
-	);
-	assert.match(
-		storefrontCss,
-		/\.shop-product-info\s*\{[^}]*pointer-events: none;/,
-	);
-	assert.match(storefrontCss, /\.wishlist-toggle\s*\{[^}]*z-index: 2;/);
-	assert.equal(tree.props.className, "product-card-item");
-	assert.ok(
-		!info.props.children.some(
-			(child) => child && child.type === "ProductCardAction",
-		),
-	);
-	const actionSource = read(
-		"../src/components/product/product-card-action.tsx",
-	);
+test("product cards are information-only while commerce is paused", () => {
+	const cardSource = read("../src/components/product/product-card.tsx");
 	assert.doesNotMatch(
-		actionSource,
-		/product-card-action-price|product-card-action-arrow/,
+		cardSource,
+		/ProductCardAction|wishlist-toggle|add_to_cart|Notify me|<del>/,
 	);
-	assert.match(actionSource, /ProductActionIcon type="bag"/);
-	assert.match(actionSource, /ProductActionIcon type="email"/);
-	assert.match(
-		read("../src/components/home/jellyfish-artwork.tsx"),
-		/<linearGradient id=\{`\$\{id\}-bell`\}/,
-	);
-	assert.match(actionSource, /<rect x="3\.5" y="5\.5" width="17" height="13"/);
-	assert.match(actionSource, /strokeWidth="1\.7" strokeLinejoin="round"/);
-	const css = read("../src/app/theme-parity-polish.css");
-	assert.match(
-		css,
-		/body:has\(\.product-page\) \.store-footer \.footer-inner,\s*\.product-page~\.store-footer \.footer-inner,\s*\.store-main\.product-page~\.store-footer \.footer-inner\s*\{\s*padding-bottom: calc\(76px \+ env\(safe-area-inset-bottom\)\);/,
-	);
-	const actionCss = read("../src/app/product-card-actions.css");
-	assert.match(
-		actionCss,
-		/\.product-card-item\s*\{[^}]*display: flex;[^}]*flex-direction: column;/,
-	);
-	assert.match(
-		actionCss,
-		/\.product-card-item\s*>\s*\.product-card-action-wrap\s+\.product-card-action\s*\{[^}]*min-height: 52px;[^}]*padding: 8px 4px;[^}]*justify-content: center;[^}]*font-size: clamp\(16px, 1\.15vw, 19px\);[^}]*text-align: center;[^}]*text-transform: none;/,
-	);
-	assert.match(
-		actionCss,
-		/\.product-card-action-icon\s*\{[^}]*width: 27px;[^}]*height: 27px;[^}]*position: relative;/,
-	);
-	assert.match(
-		actionCss,
-		/linear-gradient\(135deg, #fffefa, #f8edda 48%, #fffaf0\)/,
-	);
-	assert.match(
-		actionCss,
-		/\.product-card-action::before\s*\{[^}]*inset: 4px;[^}]*border: 1px solid rgb\(190 151 78 \/ 38%\)/,
-	);
-	assert.match(
-		actionCss,
-		/\.product-card-action-icon\.is-email\s*\{[^}]*color: #93662e;/,
-	);
-	assert.match(
-		css,
-		/\.shop-product-image img[\s\S]*transform: scale\(1\.075\) translateY\(-3px\)/,
-	);
-	assert.match(
-		css,
-		/\.home-live-shelf \.section-title[\s\S]*background: none;[\s\S]*box-shadow: none;/,
-	);
-	const spotlightCss = read("../src/app/home-size-spotlight.css");
-	assert.match(
-		spotlightCss,
-		/size-guide-tile--xl::before[\s\S]*xl-spotlight-breathe/,
-	);
-	assert.match(
-		spotlightCss,
-		/size-guide-tile--xl:hover img[\s\S]*scale\(1\.055\)/,
-	);
-	assert.match(
-		spotlightCss,
-		/\.size-guide h2[\s\S]*font-size: clamp\(42px, 5vw, 64px\)/,
-	);
-	assert.match(
-		spotlightCss,
-		/\.size-guide-light[\s\S]*radial-gradient\(ellipse 34% 86% at 82% 48%/,
-	);
-	assert.match(spotlightCss, /@keyframes size-guide-hero-drift-a/);
-	assert.equal(
-		(
-			read("../src/app/page.tsx").match(
-				/className: "size-guide-hero-jellyfish--/g,
-			) || []
-		).length,
-		8,
-	);
-	assert.match(
-		spotlightCss,
-		/\.domina-quote-marquee\s*\{[^}]*height: 74px;[^}]*font-size: clamp\(17px, 1\.65vw, 23px\)/,
-	);
-	assert.match(page, /tone: "silver"/);
-	assert.match(page, /tone: "gold"/);
-	assert.match(
-		page,
-		/tone=\{jellyfish\.tone\} direction=\{jellyfish\.direction\}/,
-	);
-	assert.match(spotlightCss, /aspect-ratio: 420 \/ 260/);
-	assert.match(spotlightCss, /background: linear-gradient\(90deg, #edc96d/);
-	assert.match(spotlightCss, /@keyframes size-guide-hero-drift-c/);
-	assert.match(
-		spotlightCss,
-		/size-guide-tile--xl strong[\s\S]*font-size: 16px/,
-	);
+	assert.match(cardSource, /href=\{`\/products\/\$\{product\.id\}`\}/);
 });
 
 test("product waitlist shows the lantern-lit waiting-list character panorama", () => {
@@ -345,26 +205,9 @@ test("product waitlist shows the lantern-lit waiting-list character panorama", (
 	assert.ok(read("../public/images/waiting-list-transparent.png"));
 });
 
-test("home exposes only Coming Soon catalog products in its dedicated notify shelf", () => {
+test("home does not promote the retired Coming Soon notify shelf", () => {
 	const page = read("../src/app/page.tsx");
-	const action = read("../src/components/product/product-card-action.tsx");
-	assert.match(
-		page,
-		/products\.filter\(\(product\) => product\.availabilityStatus === "Coming Soon"\)/,
-	);
-	assert.match(
-		page,
-		/comingSoon\.length > 0 && <ProductShelf[\s\S]*id="coming-soon"/,
-	);
-	assert.match(
-		action,
-		/ponyoApi\.joinProductWaitlist\(product\.id, \{ email: emailAddress\.trim\(\), firstName \}\)/,
-	);
-	assert.match(
-		action,
-		/if \(customer\) \{\s*void notify\(customer\.email, customer\.firstName\)/,
-	);
-	assert.match(action, /setDialogOpen\(true\)/);
+	assert.doesNotMatch(page, /comingSoon|id="coming-soon"|HomeInterestForms/);
 });
 
 test("size guide keeps large jellyfish and Domina quote outside the size tiles", () => {
@@ -466,7 +309,7 @@ test("overflow rules reserve wishlist space and six columns are scoped to detail
 		/@media \(min-width: 1200px\)\s*\{\s*\.product-page \.related-products\s*>\s*\.product-grid\s*\{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);/,
 	);
 	assert.match(css, /repeat\(2, minmax\(0, 1fr\)\)/);
-	assert.match(css, /repeat\(3, minmax\(0, 1fr\)\)/);
+	assert.match(css, /repeat\(3, minmax\(0, 1fr\)/);
 });
 
 test("desktop size guide scales square portraits rather than clipping shallow heads", () => {

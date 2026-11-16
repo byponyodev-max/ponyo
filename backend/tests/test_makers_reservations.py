@@ -46,8 +46,15 @@ async def test_closed_reservations_reject_submission_without_storing_email(test_
         assert await db.scalar(select(func.count()).select_from(ProductReservation)) == 0
 
 
-async def test_maker_application_is_saved_and_admin_can_manage_status(test_client):
+async def test_maker_application_is_saved_and_admin_can_manage_status(test_client, monkeypatch):
     client, factory = test_client
+    notifications = []
+
+    async def notify_partners(*args):
+        notifications.append(args)
+        return True
+
+    monkeypatch.setattr("app.routers.makers.send_partner_application_notification", notify_partners)
     payload = {
         "makerName": "Cloud Stitch Studio",
         "contactPerson": "Mika",
@@ -71,6 +78,8 @@ async def test_maker_application_is_saved_and_admin_can_manage_status(test_clien
     )
     assert response.status_code == 200
     assert response.json()["data"]["status"] == "pending"
+    assert notifications and notifications[0][0:3] == ("Cloud Stitch Studio", "Mika", "maker@example.com")
+    assert "Demand evidence: The last two releases sold out within a day." in notifications[0][3]
     assert (await client.get("/v1/admin/maker-applications")).status_code == 401
 
     customer_id = await seed_customer_session(client, factory, email="maker-admin@example.com")

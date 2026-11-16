@@ -7,6 +7,7 @@ import { AnimalTabs } from "@/components/home/animal-tabs";
 import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
 import { HomeInterestForms } from "@/components/layout/local-store-forms";
 import { ProductShelf } from "@/components/product/product-shelf";
+import { HomeBudgetLinks } from "@/components/home/home-budget-links";
 import { getLocalizedProducts } from "@/services/localized-products.server";
 import { LocalizedPrice, LocalizedText } from "@/components/layout/localization-provider";
 import type { Product } from "@/types/product";
@@ -109,11 +110,7 @@ export default async function Home() {
 
       <section className="budget-section store-container">
         <header><h2><LocalizedText translationKey="home.budget.title" fallback="Shop by budget" /></h2><p><LocalizedText translationKey="home.budget.sub" fallback="Find your next plush at the price that feels right." /></p></header>
-        <div className="budget-links">
-          <Link href="/collections/all?filter.v.price.lte=20000"><span><LocalizedText translationKey="home.budget.treats" fallback="Sweet treats" /></span><strong><LocalizedText translationKey="home.budget.under" fallback="Under ¥20,000" /></strong><i aria-hidden="true">→</i></Link>
-          <Link href="/collections/all?filter.v.price.gte=20000&filter.v.price.lte=30000"><span><LocalizedText translationKey="home.budget.favorites" fallback="Fan favourites" /></span><strong><LocalizedText translationKey="home.budget.middle" fallback="¥20,000–¥30,000" /></strong><i aria-hidden="true">→</i></Link>
-          <Link href="/collections/all?filter.v.price.gte=60000"><span><LocalizedText translationKey="home.budget.giant" fallback="Giant splurge" /></span><strong><LocalizedText translationKey="home.budget.over" fallback="¥60,000+" /></strong><i aria-hidden="true">→</i></Link>
-        </div>
+        <HomeBudgetLinks />
       </section>
 
       <ProductShelf className="home-live-shelf" id="new-arrivals" eyebrow="Just landed" title="Just landed" description="The newest plush on Ponyo. Swipe to see them all." products={arrivals} href="/collections/new-arrivals" linkLabel="See all →" rail compact />

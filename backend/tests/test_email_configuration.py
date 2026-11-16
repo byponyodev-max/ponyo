@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.config import BACKEND_ENV_FILES, Settings, settings
-from app.email_notifications import _smtp_ssl_context, send_contact_notification
+from app.email_notifications import contact_notification_recipient, _smtp_ssl_context, send_contact_notification
 
 
 @pytest.fixture
@@ -47,6 +47,25 @@ def test_default_env_paths_are_absolute_backend_files():
     assert all(path.is_absolute() for path in BACKEND_ENV_FILES)
     assert [path.name for path in BACKEND_ENV_FILES] == [".env", ".env.local"]
     assert all(path.parent.name == "backend" for path in BACKEND_ENV_FILES)
+
+
+@pytest.mark.parametrize(("request_type", "recipient_field"), [
+    ("General inquiry", "contact_notification_email"),
+    ("Order question", "support_notification_email"),
+    ("Delivery question", "support_notification_email"),
+    ("Plush request", "support_notification_email"),
+    ("Supplier partnership", "partners_notification_email"),
+    ("Maker application", "partners_notification_email"),
+])
+def test_contact_notifications_route_to_the_matching_team_inbox(monkeypatch, request_type, recipient_field):
+    recipients = {
+        "contact_notification_email": "hello@example.test",
+        "support_notification_email": "support@example.test",
+        "partners_notification_email": "partners@example.test",
+    }
+    for name, value in recipients.items():
+        monkeypatch.setattr(settings, name, value)
+    assert contact_notification_recipient(request_type) == recipients[recipient_field]
 
 
 def test_local_file_then_process_then_explicit_values_take_precedence(isolated_email_settings, monkeypatch):

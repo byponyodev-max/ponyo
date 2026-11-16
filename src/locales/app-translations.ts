@@ -64,9 +64,9 @@ export const appTranslations: AppTranslations = {
 		"home.budget.treats": "Pilihan manis",
 		"home.budget.favorites": "Favorit banyak orang",
 		"home.budget.giant": "Plush jumbo",
-		"home.budget.under": "Di bawah ¥20.000",
-		"home.budget.middle": "¥20.000–¥30.000",
-		"home.budget.over": "¥60.000 ke atas",
+		"home.budget.under": "atau kurang",
+		"home.budget.middle": "–",
+		"home.budget.over": "ke atas",
 		"home.rare.title": "Temuan Langka",
 		"home.rare.body":
 			"Plush pensiunan, edisi terbatas, dan favorit yang sulit ditemukan.",
@@ -433,9 +433,9 @@ export const appTranslations: AppTranslations = {
 		"home.budget.treats": "ちょっとしたご褒美",
 		"home.budget.favorites": "人気のアイテム",
 		"home.budget.giant": "特大ぬいぐるみ",
-		"home.budget.under": "¥20,000未満",
-		"home.budget.middle": "¥20,000～¥30,000",
-		"home.budget.over": "¥60,000以上",
+		"home.budget.under": "以下",
+		"home.budget.middle": "～",
+		"home.budget.over": "以上",
 		"home.rare.title": "レアな一品",
 		"home.rare.body": "生産終了品、限定品、見つけるのが難しい人気アイテム。",
 		"home.see_all": "すべて見る →",
@@ -740,10 +740,17 @@ export const appTranslations: AppTranslations = {
 		"product.reservation.status.collecting": "予約受付中",
 		"product.reservation.status.target_reached": "予約目標に到達しました",
 		"product.reservation.status.target_not_reached": "予約目標未達・予約受付中",
-		"product.reservation.target_not_set": "この商品の予約目標はまだ設定されていません。",
+		"product.reservation.target_not_set":
+			"この商品の予約目標はまだ設定されていません。",
 		"product.proof.eyebrow": "細部までご紹介",
 		"product.proof.title": "ぬいぐるみの背景にあるもの",
-		"product.proof.intro": "メーカーから提供された情報がある場合に掲載します。不明な情報を推測で補うことはありません。",
+		"product.proof.intro": "このぬいぐるみのポイントを、ひと目でご紹介。",
+		"product.proof.brand_spotlight": "ブランドスポットライト",
+		"product.proof.brand_spotlight_note":
+			"メーカーのプロフィールで、ものづくりのこだわりを見てみましょう。",
+		"product.proof.category": "カテゴリー",
+		"product.proof.type": "種類",
+		"product.proof.color": "カラー",
 		"product.proof.maker": "メーカー",
 		"product.proof.story": "メーカーのストーリー",
 		"product.proof.not_provided": "メーカーからの情報はまだありません。",
@@ -753,114 +760,168 @@ export const appTranslations: AppTranslations = {
 		"product.proof.edition": "生産数",
 		"product.proof.edition_count": "{{count}}点",
 		"product.proof.delivery": "お届け予定",
+		"product.proof.only_at_ponyo": "PONYOでしか出会えない",
 		"product.proof.exclusive": "Ponyo限定",
 		"product.proof.exclusive_value": "Ponyo限定商品",
-		"product.proof.exclusive_missing": "限定に関する情報はありません。",
-		"product.proof.sample_note": "カタログの参考表示です。メーカーおよび商品情報は未確認です。",
+		"product.proof.sample_note":
+			"カタログの参考表示です。メーカーおよび商品情報は未確認です。",
 		"product.proof.size_guide": "Ponyoサイズガイドを見る",
 		"product.reservation.closed": "この商品の予約受付はまだ開始していません。",
-		"product.reservation.service_unavailable": "現在、予約サービスを利用できません。",
+		"product.reservation.service_unavailable":
+			"現在、予約サービスを利用できません。",
 		"product.reservation.email": "メールアドレス",
 		"product.reservation.country": "国・地域",
 		"product.reservation.select_country": "国・地域を選択",
-		"product.reservation.success": "ご関心を登録しました。購入ではなく、お支払いも発生していません。",
+		"product.reservation.success":
+			"ご関心を登録しました。購入ではなく、お支払いも発生していません。",
 		"product.reservation.error": "予約希望を保存できませんでした。",
 		"product.reservation.saving": "登録中…",
 		"product.reservation.submit": "予約希望を登録",
-		"product.reservation.disclaimer": "{{product}}への登録は関心を記録するだけです。拘束力はなく、注文の成立やお支払いは発生しません。",
+		"product.reservation.disclaimer":
+			"{{product}}への登録は関心を記録するだけです。拘束力はなく、注文の成立やお支払いは発生しません。",
 		"legal.draft.eyebrow": "PONYO · ポリシー案",
-		"legal.draft.warning": "公開前の草案です。事業者情報を確認し、専門家による法務確認を受けてください。",
+		"legal.draft.warning":
+			"公開前の草案です。事業者情報を確認し、専門家による法務確認を受けてください。",
 		"legal.draft.questions": "ご質問はありますか？",
 		"legal.draft.contact": "Ponyoへお問い合わせ",
-		"legal.specified-commercial-transactions-act-disclosure.title": "特定商取引法に基づく表記",
-		"legal.specified-commercial-transactions-act-disclosure.subtitle": "事業情報および法務確認のための草案",
-		"legal.specified-commercial-transactions-act-disclosure.section.1.heading": "事業者",
-		"legal.specified-commercial-transactions-act-disclosure.section.1.body": "[事業者の正式名称 — 公開前に確認してください。] 本表記は草案です。公開前に確認済みの事業者情報を記載する必要があります。",
-		"legal.specified-commercial-transactions-act-disclosure.section.2.heading": "所在地・連絡先",
-		"legal.specified-commercial-transactions-act-disclosure.section.2.body": "事業所所在地：[公開前に確認。] 電話番号：[公開前に確認。] 連絡先：[取引を受け付ける前に、対応可能な連絡方法を掲載してください。]",
-		"legal.specified-commercial-transactions-act-disclosure.section.3.heading": "価格および追加費用",
-		"legal.specified-commercial-transactions-act-disclosure.section.3.body": "現在の製品予約は、購入を伴わない関心表明です。予約時に商品代金、送料、税金、その他の費用は請求されません。将来購入を受け付ける場合は、価格および追加費用を事前に表示する必要があります。",
-		"legal.specified-commercial-transactions-act-disclosure.section.4.heading": "支払い・配送",
-		"legal.specified-commercial-transactions-act-disclosure.section.4.body": "予約には支払い方法や配送日程は適用されません。将来販売を行う場合の支払い方法、配送時期、送料は未確定であり、チェックアウトを有効にする前に開示する必要があります。",
-		"legal.specified-commercial-transactions-act-disclosure.section.5.heading": "キャンセル・返品",
-		"legal.specified-commercial-transactions-act-disclosure.section.5.body": "予約によって注文が成立することはなく、支払いも必要ありません。予約のキャンセル方法、および将来の有料取引に関するキャンセル・返品・返金条件は、決済を開始する前に確認して公開する必要があります。",
+		"legal.specified-commercial-transactions-act-disclosure.title":
+			"特定商取引法に基づく表記",
+		"legal.specified-commercial-transactions-act-disclosure.subtitle":
+			"事業情報および法務確認のための草案",
+		"legal.specified-commercial-transactions-act-disclosure.section.1.heading":
+			"事業者",
+		"legal.specified-commercial-transactions-act-disclosure.section.1.body":
+			"[事業者の正式名称 — 公開前に確認してください。] 本表記は草案です。公開前に確認済みの事業者情報を記載する必要があります。",
+		"legal.specified-commercial-transactions-act-disclosure.section.2.heading":
+			"所在地・連絡先",
+		"legal.specified-commercial-transactions-act-disclosure.section.2.body":
+			"事業所所在地：[公開前に確認。] 電話番号：[公開前に確認。] 連絡先：[取引を受け付ける前に、対応可能な連絡方法を掲載してください。]",
+		"legal.specified-commercial-transactions-act-disclosure.section.3.heading":
+			"価格および追加費用",
+		"legal.specified-commercial-transactions-act-disclosure.section.3.body":
+			"現在の製品予約は、購入を伴わない関心表明です。予約時に商品代金、送料、税金、その他の費用は請求されません。将来購入を受け付ける場合は、価格および追加費用を事前に表示する必要があります。",
+		"legal.specified-commercial-transactions-act-disclosure.section.4.heading":
+			"支払い・配送",
+		"legal.specified-commercial-transactions-act-disclosure.section.4.body":
+			"予約には支払い方法や配送日程は適用されません。将来販売を行う場合の支払い方法、配送時期、送料は未確定であり、チェックアウトを有効にする前に開示する必要があります。",
+		"legal.specified-commercial-transactions-act-disclosure.section.5.heading":
+			"キャンセル・返品",
+		"legal.specified-commercial-transactions-act-disclosure.section.5.body":
+			"予約によって注文が成立することはなく、支払いも必要ありません。予約のキャンセル方法、および将来の有料取引に関するキャンセル・返品・返金条件は、決済を開始する前に確認して公開する必要があります。",
 		"legal.privacy-policy.title": "プライバシーポリシー",
-		"legal.privacy-policy.subtitle": "予約およびメーカー応募に関する情報の取扱い案",
+		"legal.privacy-policy.subtitle":
+			"予約およびメーカー応募に関する情報の取扱い案",
 		"legal.privacy-policy.section.1.heading": "収集する情報",
-		"legal.privacy-policy.section.1.body": "予約ではメールアドレス、国・地域、商品参照情報、予約日時を収集します。メーカー応募では、メーカーおよび担当者名、メールアドレス、国・都市、ウェブサイトやSNS、商品URLと説明、需要の証拠、素材と価格帯、商品写真、独占性に関する情報、応募状況を収集します。",
+		"legal.privacy-policy.section.1.body":
+			"予約ではメールアドレス、国・地域、商品参照情報、予約日時を収集します。メーカー応募では、メーカーおよび担当者名、メールアドレス、国・都市、ウェブサイトやSNS、商品URLと説明、需要の証拠、素材と価格帯、商品写真、独占性に関する情報、応募状況を収集します。",
 		"legal.privacy-policy.section.2.heading": "情報の利用目的",
-		"legal.privacy-policy.section.2.body": "Ponyoは、関心表明の記録・集計およびメーカー応募の管理に情報を使用します。応募内容はPonyoチームが審査します。応募によって採用や提携が保証されるものではありません。",
+		"legal.privacy-policy.section.2.body":
+			"Ponyoは、関心表明の記録・集計およびメーカー応募の管理に情報を使用します。応募内容はPonyoチームが審査します。応募によって採用や提携が保証されるものではありません。",
 		"legal.privacy-policy.section.3.heading": "保管と保存期間",
-		"legal.privacy-policy.section.3.body": "送信された情報はPonyoの応募データベースに保存されます。保存期間、ホスティング地域、バックアップ方法、削除予定は、草案を確定する前に確認し公開する必要があります。",
+		"legal.privacy-policy.section.3.body":
+			"送信された情報はPonyoの応募データベースに保存されます。保存期間、ホスティング地域、バックアップ方法、削除予定は、草案を確定する前に確認し公開する必要があります。",
 		"legal.privacy-policy.section.4.heading": "第三者への提供",
-		"legal.privacy-policy.section.4.body": "公開前に、情報を処理するホスティング、セキュリティ、メールその他のサービス提供者、その目的と所在地、および国外移転の有無を確認する必要があります。詳細が確認できるまで、この草案を公開しないでください。",
+		"legal.privacy-policy.section.4.body":
+			"公開前に、情報を処理するホスティング、セキュリティ、メールその他のサービス提供者、その目的と所在地、および国外移転の有無を確認する必要があります。詳細が確認できるまで、この草案を公開しないでください。",
 		"legal.privacy-policy.section.5.heading": "開示・訂正・削除のご依頼",
-		"legal.privacy-policy.section.5.body": "送信情報の開示、訂正、削除、その他のお問い合わせは、問い合わせページからPonyoへご連絡ください。公開前に、対応可能なプライバシー窓口と、依頼への対応手順・期間を確認する必要があります。",
+		"legal.privacy-policy.section.5.body":
+			"送信情報の開示、訂正、削除、その他のお問い合わせは、問い合わせページからPonyoへご連絡ください。公開前に、対応可能なプライバシー窓口と、依頼への対応手順・期間を確認する必要があります。",
 		"legal.terms-and-returns.title": "利用規約・返品について",
-		"legal.terms-and-returns.subtitle": "現在のお支払いを伴わない予約モデルに関する草案",
+		"legal.terms-and-returns.subtitle":
+			"現在のお支払いを伴わない予約モデルに関する草案",
 		"legal.terms-and-returns.section.1.heading": "ウェブサイトの利用",
-		"legal.terms-and-returns.section.1.body": "本サイトを適法に利用し、予約またはメーカー応募を送信する際は正確な情報を入力してください。メーカー情報の確認中は、商品情報が不完全な場合があります。",
+		"legal.terms-and-returns.section.1.body":
+			"本サイトを適法に利用し、予約またはメーカー応募を送信する際は正確な情報を入力してください。メーカー情報の確認中は、商品情報が不完全な場合があります。",
 		"legal.terms-and-returns.section.2.heading": "予約は購入ではありません",
-		"legal.terms-and-returns.section.2.body": "予約は商品の購入希望を記録するものです。拘束力はなく、注文の成立や在庫を保証せず、支払いも発生しません。表示される予約数は送信された希望の記録であり、購入の約束や製造の保証ではありません。",
+		"legal.terms-and-returns.section.2.body":
+			"予約は商品の購入希望を記録するものです。拘束力はなく、注文の成立や在庫を保証せず、支払いも発生しません。表示される予約数は送信された希望の記録であり、購入の約束や製造の保証ではありません。",
 		"legal.terms-and-returns.section.3.heading": "予約のキャンセル",
-		"legal.terms-and-returns.section.3.body": "商品名と予約時のメールアドレスを明記し、問い合わせページからPonyoへ連絡することでキャンセルを依頼できます。運用手順と対応可能な連絡先は公開前に確認が必要です。予約に対する支払いや返金はありません。",
+		"legal.terms-and-returns.section.3.body":
+			"商品名と予約時のメールアドレスを明記し、問い合わせページからPonyoへ連絡することでキャンセルを依頼できます。運用手順と対応可能な連絡先は公開前に確認が必要です。予約に対する支払いや返金はありません。",
 		"legal.terms-and-returns.section.4.heading": "将来の購入・返品・返金",
-		"legal.terms-and-returns.section.4.body": "有料取引、支払い方法、配送条件、法定表示、キャンセル権、返品、返金は現在の予約フローには含まれません。チェックアウトまたは決済を有効にする前に、Ponyoは最終条件を公開する必要があります。",
+		"legal.terms-and-returns.section.4.body":
+			"有料取引、支払い方法、配送条件、法定表示、キャンセル権、返品、返金は現在の予約フローには含まれません。チェックアウトまたは決済を有効にする前に、Ponyoは最終条件を公開する必要があります。",
 		"legal.terms-and-returns.section.5.heading": "草案について",
-		"legal.terms-and-returns.section.5.body": "本書は確定した法的助言ではありません。公開前に、日本および韓国の要件に詳しい法律専門家に確認し、準拠法と消費者向け表示を確定してください。",
+		"legal.terms-and-returns.section.5.body":
+			"本書は確定した法的助言ではありません。公開前に、日本および韓国の要件に詳しい法律専門家に確認し、準拠法と消費者向け表示を確定してください。",
 		"home.footer.commercial": "特定商取引法に基づく表記",
 		"maker.for_makers.hero.eyebrow": "なぜPonyoで販売するのか",
 		"maker.for_makers.hero.title_lead": "ものづくりに向き合う人へ",
 		"maker.for_makers.hero.title_accent": "やさしい作品を。",
-		"maker.for_makers.hero.body": "Ponyoは、個性豊かなぬいぐるみやキャラクターを手がけるメイカーのためのセレクトショップです。作品に込めた物語や丁寧な仕事を大切にする人へ届けます。",
+		"maker.for_makers.hero.body":
+			"Ponyoは、個性豊かなぬいぐるみやキャラクターを手がけるメイカーのためのセレクトショップです。作品に込めた物語や丁寧な仕事を大切にする人へ届けます。",
 		"maker.for_makers.hero.cta": "作品を紹介する",
 		"maker.for_makers.how.eyebrow": "PONYOの仕組み",
 		"maker.for_makers.how.title": "丁寧で、わかりやすい道のり。",
-		"maker.for_makers.how.intro": "すべての応募をPonyoチームが確認します。以下は選定を保証するものではなく、審査の流れをご案内するものです。",
+		"maker.for_makers.how.intro":
+			"すべての応募をPonyoチームが確認します。以下は選定を保証するものではなく、審査の流れをご案内するものです。",
 		"maker.for_makers.how.step1.title": "作品を紹介する",
-		"maker.for_makers.how.step1.body": "スタジオや作品、つくり手について教えてください。",
+		"maker.for_makers.how.step1.body":
+			"スタジオや作品、つくり手について教えてください。",
 		"maker.for_makers.how.step2.title": "品質と需要の根拠を共有する",
-		"maker.for_makers.how.step2.body": "確認できる素材、商品情報、お客様の関心、現在の販売先をお知らせください。",
+		"maker.for_makers.how.step2.body":
+			"確認できる素材、商品情報、お客様の関心、現在の販売先をお知らせください。",
 		"maker.for_makers.how.step3.title": "丁寧に審査",
-		"maker.for_makers.how.step3.body": "選定基準に沿って応募内容を確認します。将来の提携条件は別途相談します。",
+		"maker.for_makers.how.step3.body":
+			"選定基準に沿って応募内容を確認します。将来の提携条件は別途相談します。",
 		"maker.for_makers.tests.eyebrow": "確認する3つのこと",
 		"maker.for_makers.tests.title": "Ponyoの選定基準",
-		"maker.for_makers.tests.intro": "応募者や商品についての事実を示すものではなく、審査の基準です。",
+		"maker.for_makers.tests.intro":
+			"応募者や商品についての事実を示すものではなく、審査の基準です。",
 		"maker.for_makers.test.quality.title": "品質を確かめられること",
-		"maker.for_makers.test.quality.description": "誰がどのようにつくっているか確認できる情報をお寄せください。構造や素材、商品写真があれば、品質を正確に紹介できます。",
+		"maker.for_makers.test.quality.description":
+			"誰がどのようにつくっているか確認できる情報をお寄せください。構造や素材、商品写真があれば、品質を正確に紹介できます。",
 		"maker.for_makers.test.quality.evidence": "つくり手の情報 · 素材 · つくり",
 		"maker.for_makers.test.demand.title": "求められていること",
-		"maker.for_makers.test.demand.description": "コレクターが作品を求めている根拠をお知らせください。過去の完売、ウェイトリスト、定価を上回る二次販売の記録などが例です。",
-		"maker.for_makers.test.demand.evidence": "販売実績 · 需要の兆し · 裏付けリンク",
+		"maker.for_makers.test.demand.description":
+			"コレクターが作品を求めている根拠をお知らせください。過去の完売、ウェイトリスト、定価を上回る二次販売の記録などが例です。",
+		"maker.for_makers.test.demand.evidence":
+			"販売実績 · 需要の兆し · 裏付けリンク",
 		"maker.for_makers.test.discovery.title": "すぐには見つからないこと",
-		"maker.for_makers.test.discovery.description": "大手マーケットプレイスや一般的な代理購入ルートで簡単に見つからない作品を探しています。現在の販売先をお知らせください。",
-		"maker.for_makers.test.discovery.evidence": "現在の販売先 · 地域ごとの入手しやすさ",
+		"maker.for_makers.test.discovery.description":
+			"大手マーケットプレイスや一般的な代理購入ルートで簡単に見つからない作品を探しています。現在の販売先をお知らせください。",
+		"maker.for_makers.test.discovery.evidence":
+			"現在の販売先 · 地域ごとの入手しやすさ",
 		"maker.for_makers.offer.eyebrow": "メイカーへの提供",
 		"maker.for_makers.offer.title": "作品を丁寧に届ける場所。",
-		"maker.for_makers.offer.intro": "メイカーらしさを大切にし、商品に関する決定権を保てる関係を目指します。",
+		"maker.for_makers.offer.intro":
+			"メイカーらしさを大切にし、商品に関する決定権を保てる関係を目指します。",
 		"maker.for_makers.offer.discovery.title": "セレクトされた出会い",
-		"maker.for_makers.offer.discovery.body": "特別なぬいぐるみを探している人と、こだわりの作品をつなぐマーケットプレイスです。",
+		"maker.for_makers.offer.discovery.body":
+			"特別なぬいぐるみを探している人と、こだわりの作品をつなぐマーケットプレイスです。",
 		"maker.for_makers.offer.context.title": "作品の背景も紹介",
-		"maker.for_makers.offer.context.body": "スタジオや制作工程、作品らしさを伝える情報を紹介できます。",
+		"maker.for_makers.offer.context.body":
+			"スタジオや制作工程、作品らしさを伝える情報を紹介できます。",
 		"maker.for_makers.offer.fees.title": "掲載申請の初期費用なし",
-		"maker.for_makers.offer.fees.body": "作品を審査に提出するための初期費用はありません。",
+		"maker.for_makers.offer.fees.body":
+			"作品を審査に提出するための初期費用はありません。",
 		"maker.for_makers.offer.control.title": "商品管理はメイカーの手に",
-		"maker.for_makers.offer.control.body": "商品と価格はメイカーが管理します。将来の提携条件は別途合意します。",
+		"maker.for_makers.offer.control.body":
+			"商品と価格はメイカーが管理します。将来の提携条件は別途合意します。",
 		"maker.for_makers.application.eyebrow": "作品について聞かせてください",
 		"maker.for_makers.application.title": "まずはご紹介から。",
-		"maker.for_makers.application.intro": "応募内容はPonyoチームが確認します。応募だけで選定や提携が決まることはありません。",
+		"maker.for_makers.application.intro":
+			"応募内容はPonyoチームが確認します。応募だけで選定や提携が決まることはありません。",
 		"maker.application.success.eyebrow": "応募を受け付けました",
-		"maker.application.success.title": "作品をご紹介いただきありがとうございます。",
-		"maker.application.success.body": "応募内容をPonyoチームが確認します。応募だけで選定や提携が決まることはありません。",
+		"maker.application.success.title":
+			"作品をご紹介いただきありがとうございます。",
+		"maker.application.success.body":
+			"応募内容をPonyoチームが確認します。応募だけで選定や提携が決まることはありません。",
 		"maker.application.form.eyebrow": "最初のご挨拶",
 		"maker.application.form.title": "つくっているものを教えてください",
-		"maker.application.form.intro": "実際の商品情報と写真をお寄せください。必須項目には印が付いています。",
-		"maker.application.error.unconfigured": "Ponyoの応募サービスが設定されていないため、応募を保存できません。",
-		"maker.application.error.photo_required": "商品写真を1枚以上追加してください。",
+		"maker.application.form.intro":
+			"実際の商品情報と写真をお寄せください。必須項目には印が付いています。",
+		"maker.application.error.unconfigured":
+			"Ponyoの応募サービスが設定されていないため、応募を保存できません。",
+		"maker.application.error.photo_required":
+			"商品写真を1枚以上追加してください。",
 		"maker.application.error.submit": "メイカー応募を保存できませんでした。",
-		"maker.application.service_unavailable": "現在、応募サービスが設定されていないため送信できません。",
-		"maker.application.photos.skipped": "{{count}}枚の写真を追加できませんでした。5MB以下の画像を最大3枚選んでください。",
-		"maker.application.photos.help": "画像を1〜3枚アップロードしてください。JPEG、PNG、WebP形式、各5MBまで。画像は最適化して応募内容とともに保存します。",
+		"maker.application.service_unavailable":
+			"現在、応募サービスが設定されていないため送信できません。",
+		"maker.application.photos.skipped":
+			"{{count}}枚の写真を追加できませんでした。5MB以下の画像を最大3枚選んでください。",
+		"maker.application.photos.help":
+			"画像を1〜3枚アップロードしてください。JPEG、PNG、WebP形式、各5MBまで。画像は最適化して応募内容とともに保存します。",
 		"maker.application.photos.alt": "商品イメージ",
 		"maker.application.photos.remove": "削除",
 		"maker.application.field.maker": "メイカー名またはブランド名",
@@ -878,33 +939,44 @@ export const appTranslations: AppTranslations = {
 		"maker.application.field.exclusivity": "Ponyo限定にできる作品ですか？",
 		"maker.application.field.photos": "商品写真",
 		"maker.application.placeholder.price_range": "通貨と一般的な価格帯を記入",
-		"maker.application.placeholder.product_description": "商品や制作方法、作品の特徴を説明してください。",
-		"maker.application.placeholder.demand": "過去の完売、ウェイトリスト、二次販売の記録などをリンクや説明で共有してください。",
-		"maker.application.placeholder.materials": "確認できる生地、中材、その他の素材を記入してください。",
-		"maker.application.placeholder.exclusivity": "既存の販売先、独占販売の条件、Ponyo向けに提供できる内容を説明してください。",
+		"maker.application.placeholder.product_description":
+			"商品や制作方法、作品の特徴を説明してください。",
+		"maker.application.placeholder.demand":
+			"過去の完売、ウェイトリスト、二次販売の記録などをリンクや説明で共有してください。",
+		"maker.application.placeholder.materials":
+			"確認できる生地、中材、その他の素材を記入してください。",
+		"maker.application.placeholder.exclusivity":
+			"既存の販売先、独占販売の条件、Ponyo向けに提供できる内容を説明してください。",
 		"maker.application.button.sending": "応募を送信中…",
 		"maker.application.button.submit": "メイカー応募を送信",
-		"maker.application.privacy": "連絡先、商品情報、写真は応募審査に使用します。",
+		"maker.application.privacy":
+			"連絡先、商品情報、写真は応募審査に使用します。",
 		"maker.application.privacy_draft": "プライバシーポリシー（草案）",
 		"maker.profile.unavailable.eyebrow": "PONYO MAKERS",
 		"maker.profile.unavailable.title": "メイカープロフィールを表示できません",
-		"maker.profile.unavailable.not_configured": "Ponyoのカタログサービスに接続すると、メイカープロフィールが表示されます。",
-		"maker.profile.unavailable.generic": "メイカープロフィールを読み込めませんでした。",
+		"maker.profile.unavailable.not_configured":
+			"Ponyoのカタログサービスに接続すると、メイカープロフィールが表示されます。",
+		"maker.profile.unavailable.generic":
+			"メイカープロフィールを読み込めませんでした。",
 		"maker.profile.unavailable.cta": "メイカーの方へ",
 		"maker.profile.eyebrow": "PONYOのメイカー",
-		"maker.profile.story_missing": "このメイカーから掲載用のストーリーはまだ届いていません。",
+		"maker.profile.story_missing":
+			"このメイカーから掲載用のストーリーはまだ届いていません。",
 		"maker.profile.collection_cta": "作品一覧を見る",
 		"maker.profile.website_cta": "メイカーのウェブサイト",
 		"maker.profile.seal": "丁寧なものづくり",
 		"maker.profile.philosophy.label": "ものづくりの哲学",
 		"maker.profile.philosophy.title": "作品を支える想い",
-		"maker.profile.philosophy.missing": "メイカーの考え方については、情報が確認でき次第ご紹介します。",
+		"maker.profile.philosophy.missing":
+			"メイカーの考え方については、情報が確認でき次第ご紹介します。",
 		"maker.profile.process.label": "制作工程",
 		"maker.profile.process.title": "アイデアからぬいぐるみへ",
-		"maker.profile.process.missing": "制作工程の詳細は、メイカーに確認後掲載します。",
+		"maker.profile.process.missing":
+			"制作工程の詳細は、メイカーに確認後掲載します。",
 		"maker.profile.materials.label": "素材",
 		"maker.profile.materials.title": "作品に使われている素材",
-		"maker.profile.materials.missing": "商品に使われている素材は、メイカーに確認後掲載します。",
+		"maker.profile.materials.missing":
+			"商品に使われている素材は、メイカーに確認後掲載します。",
 		"maker.profile.specialties.label": "得意な作品",
 		"maker.profile.specialties.title": "つくっているもの",
 		"maker.profile.specialties.missing": "得意な商品分野は、確認後掲載します。",
@@ -912,29 +984,41 @@ export const appTranslations: AppTranslations = {
 		"maker.profile.collection.title": "作品一覧",
 		"maker.profile.collection.piece_one": "点",
 		"maker.profile.collection.piece_other": "点",
-		"maker.profile.collection.empty": "Ponyoのカタログに掲載された商品はまだありません。",
+		"maker.profile.collection.empty":
+			"Ponyoのカタログに掲載された商品はまだありません。",
 		"legal.terms-of-service.title": "利用規約",
-		"legal.terms-of-service.subtitle": "現在のお支払いを伴わない予約モデルに関する草案",
+		"legal.terms-of-service.subtitle":
+			"現在のお支払いを伴わない予約モデルに関する草案",
 		"legal.terms-of-service.section.1.heading": "ウェブサイトの利用",
-		"legal.terms-of-service.section.1.body": "本サイトを適法に利用し、予約またはメイカー応募を送信する際は正確な情報を入力してください。メイカー情報の確認中は、商品情報が不完全な場合があります。",
+		"legal.terms-of-service.section.1.body":
+			"本サイトを適法に利用し、予約またはメイカー応募を送信する際は正確な情報を入力してください。メイカー情報の確認中は、商品情報が不完全な場合があります。",
 		"legal.terms-of-service.section.2.heading": "予約は購入ではありません",
-		"legal.terms-of-service.section.2.body": "予約は商品の購入希望を記録するものです。拘束力はなく、注文の成立や在庫を保証せず、支払いも発生しません。表示される予約数は送信された希望の記録であり、購入の約束や製造の保証ではありません。",
+		"legal.terms-of-service.section.2.body":
+			"予約は商品の購入希望を記録するものです。拘束力はなく、注文の成立や在庫を保証せず、支払いも発生しません。表示される予約数は送信された希望の記録であり、購入の約束や製造の保証ではありません。",
 		"legal.terms-of-service.section.3.heading": "予約のキャンセル",
-		"legal.terms-of-service.section.3.body": "商品名と予約時のメールアドレスを明記し、問い合わせページからPonyoへ連絡することでキャンセルを依頼できます。運用手順と対応可能な連絡先は公開前に確認が必要です。予約に対する支払いや返金はありません。",
+		"legal.terms-of-service.section.3.body":
+			"商品名と予約時のメールアドレスを明記し、問い合わせページからPonyoへ連絡することでキャンセルを依頼できます。運用手順と対応可能な連絡先は公開前に確認が必要です。予約に対する支払いや返金はありません。",
 		"legal.terms-of-service.section.4.heading": "将来の購入について",
-		"legal.terms-of-service.section.4.body": "有料取引、支払い方法、配送条件、法定表示、キャンセル権は現在の予約フローには含まれません。決済を有効にする前に、Ponyoは最終条件を公開する必要があります。",
+		"legal.terms-of-service.section.4.body":
+			"有料取引、支払い方法、配送条件、法定表示、キャンセル権は現在の予約フローには含まれません。決済を有効にする前に、Ponyoは最終条件を公開する必要があります。",
 		"legal.terms-of-service.section.5.heading": "草案について",
-		"legal.terms-of-service.section.5.body": "本書は確定した法的助言ではありません。公開前に、日本および韓国の要件に詳しい法律専門家に確認し、準拠法と消費者向け表示を確定してください。",
+		"legal.terms-of-service.section.5.body":
+			"本書は確定した法的助言ではありません。公開前に、日本および韓国の要件に詳しい法律専門家に確認し、準拠法と消費者向け表示を確定してください。",
 		"legal.returns-policy.title": "返品・返金ポリシー",
-		"legal.returns-policy.subtitle": "草案 — 現在の予約フローでは有料購入はできません",
+		"legal.returns-policy.subtitle":
+			"草案 — 現在の予約フローでは有料購入はできません",
 		"legal.returns-policy.section.1.heading": "現在の予約について",
-		"legal.returns-policy.section.1.body": "予約は関心を記録するもので、購入ではありません。料金は発生せず、予約に対する返金もありません。",
+		"legal.returns-policy.section.1.body":
+			"予約は関心を記録するもので、購入ではありません。料金は発生せず、予約に対する返金もありません。",
 		"legal.returns-policy.section.2.heading": "予約のキャンセル",
-		"legal.returns-policy.section.2.body": "商品名と予約時のメールアドレスを明記し、問い合わせページからPonyoへ連絡することでキャンセルを依頼できます。公開前に、対応可能な連絡先とキャンセル手順を確認してください。",
+		"legal.returns-policy.section.2.body":
+			"商品名と予約時のメールアドレスを明記し、問い合わせページからPonyoへ連絡することでキャンセルを依頼できます。公開前に、対応可能な連絡先とキャンセル手順を確認してください。",
 		"legal.returns-policy.section.3.heading": "将来の有料注文",
-		"legal.returns-policy.section.3.body": "現在のお支払いを伴わない予約フローでは、有料購入の返品・返金条件は適用されません。決済を開始する前に、実際の運用と消費者の権利に沿ったポリシーを公開する必要があります。",
+		"legal.returns-policy.section.3.body":
+			"現在のお支払いを伴わない予約フローでは、有料購入の返品・返金条件は適用されません。決済を開始する前に、実際の運用と消費者の権利に沿ったポリシーを公開する必要があります。",
 		"legal.returns-policy.section.4.heading": "草案について",
-		"legal.returns-policy.section.4.body": "本書は確定した法的助言ではありません。公開前に、日本および韓国の要件に詳しい法律専門家に確認してください。",
+		"legal.returns-policy.section.4.body":
+			"本書は確定した法的助言ではありません。公開前に、日本および韓国の要件に詳しい法律専門家に確認してください。",
 	},
 	ko: {
 		"localization.form_label": "언어 및 통화 설정",
@@ -999,9 +1083,9 @@ export const appTranslations: AppTranslations = {
 		"home.budget.treats": "작은 선물",
 		"home.budget.favorites": "많이 사랑받는 아이템",
 		"home.budget.giant": "대형 인형",
-		"home.budget.under": "¥20,000 미만",
-		"home.budget.middle": "¥20,000–¥30,000",
-		"home.budget.over": "¥60,000 이상",
+		"home.budget.under": "이하",
+		"home.budget.middle": "–",
+		"home.budget.over": "이상",
 		"home.rare.title": "희귀 아이템",
 		"home.rare.body":
 			"단종된 인형, 한정판, 찾기 어려운 인기 아이템을 만나 보세요.",
@@ -1300,16 +1384,24 @@ export const appTranslations: AppTranslations = {
 		"product.reservation.title": "예약 의향 등록",
 		"product.reservation.loading": "현재 예약 의향 수를 불러오는 중…",
 		"product.reservation.people_one": "{{count}}명이 예약 의향을 등록했습니다",
-		"product.reservation.people_other": "{{count}}명이 예약 의향을 등록했습니다",
+		"product.reservation.people_other":
+			"{{count}}명이 예약 의향을 등록했습니다",
 		"product.reservation.progress_label": "예약 목표 달성 현황",
 		"product.reservation.progress": "예약 목표의 {{progress}}% 달성",
 		"product.reservation.status.collecting": "예약 접수 중",
 		"product.reservation.status.target_reached": "예약 목표 달성",
 		"product.reservation.status.target_not_reached": "목표 미달 · 예약 접수 중",
-		"product.reservation.target_not_set": "이 상품의 예약 목표는 아직 설정되지 않았습니다.",
+		"product.reservation.target_not_set":
+			"이 상품의 예약 목표는 아직 설정되지 않았습니다.",
 		"product.proof.eyebrow": "세심하게 살펴보기",
 		"product.proof.title": "인형에 담긴 이야기",
-		"product.proof.intro": "메이커가 제공한 정보가 확인된 경우에만 표시합니다. 확인되지 않은 내용은 추측하지 않습니다.",
+		"product.proof.intro": "인형의 매력을 한눈에 살펴보세요.",
+		"product.proof.brand_spotlight": "브랜드 스포트라이트",
+		"product.proof.brand_spotlight_note":
+			"메이커 프로필에서 만드는 사람과 작품을 만나 보세요.",
+		"product.proof.category": "카테고리",
+		"product.proof.type": "종류",
+		"product.proof.color": "색상",
 		"product.proof.maker": "메이커",
 		"product.proof.story": "메이커 이야기",
 		"product.proof.not_provided": "메이커가 아직 정보를 제공하지 않았습니다.",
@@ -1319,114 +1411,166 @@ export const appTranslations: AppTranslations = {
 		"product.proof.edition": "제작 수량",
 		"product.proof.edition_count": "{{count}}개",
 		"product.proof.delivery": "예상 배송일",
+		"product.proof.only_at_ponyo": "PONYO에서만",
 		"product.proof.exclusive": "Ponyo 한정",
 		"product.proof.exclusive_value": "Ponyo에서만 만날 수 있어요",
-		"product.proof.exclusive_missing": "독점 여부 정보가 제공되지 않았습니다.",
-		"product.proof.sample_note": "카탈로그 예시 화면입니다. 메이커 및 상품 정보는 확인되지 않았습니다.",
+		"product.proof.sample_note":
+			"카탈로그 예시 화면입니다. 메이커 및 상품 정보는 확인되지 않았습니다.",
 		"product.proof.size_guide": "Ponyo 사이즈 가이드 보기",
 		"product.reservation.closed": "아직 이 상품의 예약을 받지 않습니다.",
-		"product.reservation.service_unavailable": "현재 예약 서비스를 이용할 수 없습니다.",
+		"product.reservation.service_unavailable":
+			"현재 예약 서비스를 이용할 수 없습니다.",
 		"product.reservation.email": "이메일 주소",
 		"product.reservation.country": "국가",
 		"product.reservation.select_country": "국가 선택",
-		"product.reservation.success": "관심이 등록되었습니다. 구매가 아니며 결제도 이루어지지 않았습니다.",
+		"product.reservation.success":
+			"관심이 등록되었습니다. 구매가 아니며 결제도 이루어지지 않았습니다.",
 		"product.reservation.error": "예약 의향을 저장하지 못했습니다.",
 		"product.reservation.saving": "등록 중…",
 		"product.reservation.submit": "예약 의향 등록",
-		"product.reservation.disclaimer": "{{product}} 예약은 관심을 기록할 뿐입니다. 구속력이 없으며 주문이나 결제가 발생하지 않습니다.",
+		"product.reservation.disclaimer":
+			"{{product}} 예약은 관심을 기록할 뿐입니다. 구속력이 없으며 주문이나 결제가 발생하지 않습니다.",
 		"legal.draft.eyebrow": "PONYO · 정책 초안",
-		"legal.draft.warning": "게시 전 초안입니다. 사업자 정보를 확인하고 법률 전문가의 검토를 받으세요.",
+		"legal.draft.warning":
+			"게시 전 초안입니다. 사업자 정보를 확인하고 법률 전문가의 검토를 받으세요.",
 		"legal.draft.questions": "문의 사항이 있으신가요?",
 		"legal.draft.contact": "Ponyo에 문의하기",
-		"legal.specified-commercial-transactions-act-disclosure.title": "일본 특정상거래법에 따른 표시",
-		"legal.specified-commercial-transactions-act-disclosure.subtitle": "사업자 정보 및 법률 검토용 초안",
-		"legal.specified-commercial-transactions-act-disclosure.section.1.heading": "사업자",
-		"legal.specified-commercial-transactions-act-disclosure.section.1.body": "[사업자의 법적 명칭 — 게시 전에 확인하세요.] 이 표시는 초안이며 게시 전에 검증된 사업자 정보로 완성해야 합니다.",
-		"legal.specified-commercial-transactions-act-disclosure.section.2.heading": "주소 및 연락처",
-		"legal.specified-commercial-transactions-act-disclosure.section.2.body": "사업장 주소: [게시 전 확인.] 전화번호: [게시 전 확인.] 연락처: [거래를 받기 전에 실제로 응대 가능한 연락 방법을 게시하세요.]",
-		"legal.specified-commercial-transactions-act-disclosure.section.3.heading": "가격 및 추가 비용",
-		"legal.specified-commercial-transactions-act-disclosure.section.3.body": "현재 상품 예약은 구매를 수반하지 않는 관심 표시입니다. 예약 시 상품 가격, 배송비, 세금 또는 기타 비용을 청구하지 않습니다. 향후 구매를 제공하기 전에 가격과 추가 비용을 안내해야 합니다.",
-		"legal.specified-commercial-transactions-act-disclosure.section.4.heading": "결제 및 배송",
-		"legal.specified-commercial-transactions-act-disclosure.section.4.body": "예약에는 결제 방법이나 배송 일정이 적용되지 않습니다. 향후 판매의 결제 방법, 배송 시기 및 배송비는 아직 확정되지 않았으며 결제를 활성화하기 전에 공개해야 합니다.",
-		"legal.specified-commercial-transactions-act-disclosure.section.5.heading": "취소 및 반품",
-		"legal.specified-commercial-transactions-act-disclosure.section.5.body": "예약은 주문을 생성하지 않으며 결제가 필요하지 않습니다. 예약 취소 방법과 향후 유료 거래의 취소·반품·환불 조건은 결제를 시작하기 전에 확인하고 공개해야 합니다.",
+		"legal.specified-commercial-transactions-act-disclosure.title":
+			"일본 특정상거래법에 따른 표시",
+		"legal.specified-commercial-transactions-act-disclosure.subtitle":
+			"사업자 정보 및 법률 검토용 초안",
+		"legal.specified-commercial-transactions-act-disclosure.section.1.heading":
+			"사업자",
+		"legal.specified-commercial-transactions-act-disclosure.section.1.body":
+			"[사업자의 법적 명칭 — 게시 전에 확인하세요.] 이 표시는 초안이며 게시 전에 검증된 사업자 정보로 완성해야 합니다.",
+		"legal.specified-commercial-transactions-act-disclosure.section.2.heading":
+			"주소 및 연락처",
+		"legal.specified-commercial-transactions-act-disclosure.section.2.body":
+			"사업장 주소: [게시 전 확인.] 전화번호: [게시 전 확인.] 연락처: [거래를 받기 전에 실제로 응대 가능한 연락 방법을 게시하세요.]",
+		"legal.specified-commercial-transactions-act-disclosure.section.3.heading":
+			"가격 및 추가 비용",
+		"legal.specified-commercial-transactions-act-disclosure.section.3.body":
+			"현재 상품 예약은 구매를 수반하지 않는 관심 표시입니다. 예약 시 상품 가격, 배송비, 세금 또는 기타 비용을 청구하지 않습니다. 향후 구매를 제공하기 전에 가격과 추가 비용을 안내해야 합니다.",
+		"legal.specified-commercial-transactions-act-disclosure.section.4.heading":
+			"결제 및 배송",
+		"legal.specified-commercial-transactions-act-disclosure.section.4.body":
+			"예약에는 결제 방법이나 배송 일정이 적용되지 않습니다. 향후 판매의 결제 방법, 배송 시기 및 배송비는 아직 확정되지 않았으며 결제를 활성화하기 전에 공개해야 합니다.",
+		"legal.specified-commercial-transactions-act-disclosure.section.5.heading":
+			"취소 및 반품",
+		"legal.specified-commercial-transactions-act-disclosure.section.5.body":
+			"예약은 주문을 생성하지 않으며 결제가 필요하지 않습니다. 예약 취소 방법과 향후 유료 거래의 취소·반품·환불 조건은 결제를 시작하기 전에 확인하고 공개해야 합니다.",
 		"legal.privacy-policy.title": "개인정보 처리방침",
-		"legal.privacy-policy.subtitle": "예약 및 메이커 신청 정보 처리에 관한 초안",
+		"legal.privacy-policy.subtitle":
+			"예약 및 메이커 신청 정보 처리에 관한 초안",
 		"legal.privacy-policy.section.1.heading": "수집하는 정보",
-		"legal.privacy-policy.section.1.body": "예약 시 이메일 주소, 국가, 상품 참조 정보 및 예약 시각을 수집합니다. 메이커 신청 시 메이커와 담당자 이름, 이메일, 국가와 도시, 웹사이트 또는 소셜 링크, 상품 URL과 설명, 수요 증빙, 소재와 가격대, 상품 사진, 독점성 정보 및 신청 상태를 수집합니다.",
+		"legal.privacy-policy.section.1.body":
+			"예약 시 이메일 주소, 국가, 상품 참조 정보 및 예약 시각을 수집합니다. 메이커 신청 시 메이커와 담당자 이름, 이메일, 국가와 도시, 웹사이트 또는 소셜 링크, 상품 URL과 설명, 수요 증빙, 소재와 가격대, 상품 사진, 독점성 정보 및 신청 상태를 수집합니다.",
 		"legal.privacy-policy.section.2.heading": "정보 이용 목적",
-		"legal.privacy-policy.section.2.body": "Ponyo는 관심 표시를 기록하고 집계하며 메이커 신청을 관리하기 위해 정보를 사용합니다. 신청서는 Ponyo 팀이 검토하며, 신청만으로 선정이나 제휴가 보장되지는 않습니다.",
+		"legal.privacy-policy.section.2.body":
+			"Ponyo는 관심 표시를 기록하고 집계하며 메이커 신청을 관리하기 위해 정보를 사용합니다. 신청서는 Ponyo 팀이 검토하며, 신청만으로 선정이나 제휴가 보장되지는 않습니다.",
 		"legal.privacy-policy.section.3.heading": "보관 및 보유 기간",
-		"legal.privacy-policy.section.3.body": "제출된 정보는 Ponyo의 신청 데이터베이스에 저장됩니다. 보유 기간, 호스팅 위치, 백업 방식 및 삭제 일정은 초안을 확정하기 전에 확인하고 공개해야 합니다.",
+		"legal.privacy-policy.section.3.body":
+			"제출된 정보는 Ponyo의 신청 데이터베이스에 저장됩니다. 보유 기간, 호스팅 위치, 백업 방식 및 삭제 일정은 초안을 확정하기 전에 확인하고 공개해야 합니다.",
 		"legal.privacy-policy.section.4.heading": "정보 공유",
-		"legal.privacy-policy.section.4.body": "게시 전에 정보를 처리하는 호스팅, 보안, 이메일 및 기타 서비스 제공자, 처리 목적과 위치, 국외 이전 여부를 확인해야 합니다. 세부 내용이 검증될 때까지 이 초안을 게시하지 마세요.",
+		"legal.privacy-policy.section.4.body":
+			"게시 전에 정보를 처리하는 호스팅, 보안, 이메일 및 기타 서비스 제공자, 처리 목적과 위치, 국외 이전 여부를 확인해야 합니다. 세부 내용이 검증될 때까지 이 초안을 게시하지 마세요.",
 		"legal.privacy-policy.section.5.heading": "열람·정정·삭제 요청",
-		"legal.privacy-policy.section.5.body": "제출한 정보의 열람, 정정, 삭제 또는 문의는 연락처 페이지를 통해 Ponyo에 요청할 수 있습니다. 게시 전에 담당 개인정보 문의처와 요청 처리 절차 및 기간을 확인해야 합니다.",
+		"legal.privacy-policy.section.5.body":
+			"제출한 정보의 열람, 정정, 삭제 또는 문의는 연락처 페이지를 통해 Ponyo에 요청할 수 있습니다. 게시 전에 담당 개인정보 문의처와 요청 처리 절차 및 기간을 확인해야 합니다.",
 		"legal.terms-and-returns.title": "이용약관 및 반품 안내",
 		"legal.terms-and-returns.subtitle": "현재 결제 없는 예약 모델에 관한 초안",
 		"legal.terms-and-returns.section.1.heading": "웹사이트 이용",
-		"legal.terms-and-returns.section.1.body": "사이트를 적법하게 이용하고 예약 또는 메이커 신청 시 정확한 정보를 제공하세요. 메이커 정보를 확인하는 동안 상품 정보가 완전하지 않을 수 있습니다.",
+		"legal.terms-and-returns.section.1.body":
+			"사이트를 적법하게 이용하고 예약 또는 메이커 신청 시 정확한 정보를 제공하세요. 메이커 정보를 확인하는 동안 상품 정보가 완전하지 않을 수 있습니다.",
 		"legal.terms-and-returns.section.2.heading": "예약은 구매가 아닙니다",
-		"legal.terms-and-returns.section.2.body": "예약은 상품에 대한 관심만 기록합니다. 구속력이 없고 주문이나 재고를 보장하지 않으며 결제가 이루어지지 않습니다. 표시되는 예약 수는 접수된 관심의 기록이며 구매 약속이나 생산 보장이 아닙니다.",
+		"legal.terms-and-returns.section.2.body":
+			"예약은 상품에 대한 관심만 기록합니다. 구속력이 없고 주문이나 재고를 보장하지 않으며 결제가 이루어지지 않습니다. 표시되는 예약 수는 접수된 관심의 기록이며 구매 약속이나 생산 보장이 아닙니다.",
 		"legal.terms-and-returns.section.3.heading": "예약 취소",
-		"legal.terms-and-returns.section.3.body": "상품과 예약에 사용한 이메일을 알려 연락처 페이지에서 Ponyo에 취소를 요청할 수 있습니다. 취소 절차와 실제 응대 가능한 연락처는 출시 전에 확인해야 합니다. 예약에 대한 결제나 환불은 없습니다.",
+		"legal.terms-and-returns.section.3.body":
+			"상품과 예약에 사용한 이메일을 알려 연락처 페이지에서 Ponyo에 취소를 요청할 수 있습니다. 취소 절차와 실제 응대 가능한 연락처는 출시 전에 확인해야 합니다. 예약에 대한 결제나 환불은 없습니다.",
 		"legal.terms-and-returns.section.4.heading": "향후 구매·반품·환불",
-		"legal.terms-and-returns.section.4.body": "유료 거래, 결제 방법, 배송 조건, 법정 고지, 취소 권리, 반품 및 환불은 현재 예약 흐름에 포함되지 않습니다. 결제 또는 체크아웃을 활성화하기 전에 Ponyo는 최종 약관을 게시해야 합니다.",
+		"legal.terms-and-returns.section.4.body":
+			"유료 거래, 결제 방법, 배송 조건, 법정 고지, 취소 권리, 반품 및 환불은 현재 예약 흐름에 포함되지 않습니다. 결제 또는 체크아웃을 활성화하기 전에 Ponyo는 최종 약관을 게시해야 합니다.",
 		"legal.terms-and-returns.section.5.heading": "초안 상태",
-		"legal.terms-and-returns.section.5.body": "이 문서는 최종 법률 자문이 아닙니다. 게시 전 일본과 한국의 규정에 정통한 법률 전문가에게 검토받고 적용 법률 및 소비자 고지 사항을 확인하세요.",
+		"legal.terms-and-returns.section.5.body":
+			"이 문서는 최종 법률 자문이 아닙니다. 게시 전 일본과 한국의 규정에 정통한 법률 전문가에게 검토받고 적용 법률 및 소비자 고지 사항을 확인하세요.",
 		"home.footer.commercial": "특정상거래법에 따른 고지",
 		"maker.for_makers.hero.eyebrow": "왜 Ponyo에서 판매해야 할까요?",
 		"maker.for_makers.hero.title_lead": "부드러운 작품을 만드는 손길에",
 		"maker.for_makers.hero.title_accent": "주목합니다.",
-		"maker.for_makers.hero.body": "Ponyo는 특별한 봉제 인형과 캐릭터를 만드는 메이커를 위한 큐레이션 공간입니다. 작품에 담긴 이야기와 정성을 소중히 여기는 사람들에게 소개합니다.",
+		"maker.for_makers.hero.body":
+			"Ponyo는 특별한 봉제 인형과 캐릭터를 만드는 메이커를 위한 큐레이션 공간입니다. 작품에 담긴 이야기와 정성을 소중히 여기는 사람들에게 소개합니다.",
 		"maker.for_makers.hero.cta": "작품 소개하기",
 		"maker.for_makers.how.eyebrow": "PONYO 이용 방법",
 		"maker.for_makers.how.title": "세심하고 명확한 과정.",
-		"maker.for_makers.how.intro": "모든 신청서는 Ponyo 팀이 검토합니다. 아래 과정은 선정 보장이 아니라 심사 절차를 안내합니다.",
+		"maker.for_makers.how.intro":
+			"모든 신청서는 Ponyo 팀이 검토합니다. 아래 과정은 선정 보장이 아니라 심사 절차를 안내합니다.",
 		"maker.for_makers.how.step1.title": "작품 소개하기",
-		"maker.for_makers.how.step1.body": "스튜디오와 제품, 만드는 사람들에 대해 알려주세요.",
+		"maker.for_makers.how.step1.body":
+			"스튜디오와 제품, 만드는 사람들에 대해 알려주세요.",
 		"maker.for_makers.how.step2.title": "품질과 수요 증빙하기",
-		"maker.for_makers.how.step2.body": "확인 가능한 소재, 제품 정보, 고객 관심, 현재 판매처를 공유해주세요.",
+		"maker.for_makers.how.step2.body":
+			"확인 가능한 소재, 제품 정보, 고객 관심, 현재 판매처를 공유해주세요.",
 		"maker.for_makers.how.step3.title": "세심한 검토",
-		"maker.for_makers.how.step3.body": "선정 기준에 따라 신청서를 검토합니다. 향후 파트너십 조건은 별도로 협의합니다.",
+		"maker.for_makers.how.step3.body":
+			"선정 기준에 따라 신청서를 검토합니다. 향후 파트너십 조건은 별도로 협의합니다.",
 		"maker.for_makers.tests.eyebrow": "세 가지 확인 사항",
 		"maker.for_makers.tests.title": "Ponyo의 선정 기준",
-		"maker.for_makers.tests.intro": "지원자나 제품에 대한 사실이 아니라 심사 기준입니다.",
+		"maker.for_makers.tests.intro":
+			"지원자나 제품에 대한 사실이 아니라 심사 기준입니다.",
 		"maker.for_makers.test.quality.title": "보여줄 수 있는 품질",
-		"maker.for_makers.test.quality.description": "누가 어떻게 만드는지 확인할 수 있는 정보를 알려주세요. 구조, 소재, 제품 사진을 통해 품질을 정확하게 소개할 수 있습니다.",
+		"maker.for_makers.test.quality.description":
+			"누가 어떻게 만드는지 확인할 수 있는 정보를 알려주세요. 구조, 소재, 제품 사진을 통해 품질을 정확하게 소개할 수 있습니다.",
 		"maker.for_makers.test.quality.evidence": "메이커 정보 · 소재 · 제작 방식",
 		"maker.for_makers.test.demand.title": "검증된 수요",
-		"maker.for_makers.test.demand.description": "컬렉터가 작품을 찾는다는 증거를 보여주세요. 과거 완판, 대기자 명단, 정가보다 높은 재판매 기록 등이 예시입니다.",
-		"maker.for_makers.test.demand.evidence": "판매 기록 · 수요 신호 · 근거 링크",
+		"maker.for_makers.test.demand.description":
+			"컬렉터가 작품을 찾는다는 증거를 보여주세요. 과거 완판, 대기자 명단, 정가보다 높은 재판매 기록 등이 예시입니다.",
+		"maker.for_makers.test.demand.evidence":
+			"판매 기록 · 수요 신호 · 근거 링크",
 		"maker.for_makers.test.discovery.title": "쉽게 찾을 수 없는 작품",
-		"maker.for_makers.test.discovery.description": "대형 마켓플레이스나 일반적인 구매대행 경로에서 쉽게 찾기 어려운 작품을 찾습니다. 현재 판매처를 알려주세요.",
-		"maker.for_makers.test.discovery.evidence": "현재 판매 채널 · 지역별 구매 가능성",
+		"maker.for_makers.test.discovery.description":
+			"대형 마켓플레이스나 일반적인 구매대행 경로에서 쉽게 찾기 어려운 작품을 찾습니다. 현재 판매처를 알려주세요.",
+		"maker.for_makers.test.discovery.evidence":
+			"현재 판매 채널 · 지역별 구매 가능성",
 		"maker.for_makers.offer.eyebrow": "메이커에게 제공하는 것",
 		"maker.for_makers.offer.title": "작품을 세심하게 소개하는 공간.",
-		"maker.for_makers.offer.intro": "메이커의 창작 방향을 존중하고 제품에 대한 결정권을 유지할 수 있는 관계를 지향합니다.",
+		"maker.for_makers.offer.intro":
+			"메이커의 창작 방향을 존중하고 제품에 대한 결정권을 유지할 수 있는 관계를 지향합니다.",
 		"maker.for_makers.offer.discovery.title": "큐레이션을 통한 발견",
-		"maker.for_makers.offer.discovery.body": "특별한 봉제 인형을 찾는 사람과 뛰어난 작품을 연결하는 마켓플레이스입니다.",
+		"maker.for_makers.offer.discovery.body":
+			"특별한 봉제 인형을 찾는 사람과 뛰어난 작품을 연결하는 마켓플레이스입니다.",
 		"maker.for_makers.offer.context.title": "작품의 맥락까지 소개",
-		"maker.for_makers.offer.context.body": "스튜디오와 제작 과정, 작품의 개성을 알릴 수 있습니다.",
+		"maker.for_makers.offer.context.body":
+			"스튜디오와 제작 과정, 작품의 개성을 알릴 수 있습니다.",
 		"maker.for_makers.offer.fees.title": "초기 등록 비용 없음",
-		"maker.for_makers.offer.fees.body": "심사를 위해 작품을 제출할 때 선결제 비용이 없습니다.",
+		"maker.for_makers.offer.fees.body":
+			"심사를 위해 작품을 제출할 때 선결제 비용이 없습니다.",
 		"maker.for_makers.offer.control.title": "메이커가 유지하는 통제권",
-		"maker.for_makers.offer.control.body": "제품과 가격은 메이커가 관리합니다. 향후 파트너십 조건은 별도로 합의합니다.",
+		"maker.for_makers.offer.control.body":
+			"제품과 가격은 메이커가 관리합니다. 향후 파트너십 조건은 별도로 합의합니다.",
 		"maker.for_makers.application.eyebrow": "작품을 직접 소개해주세요",
 		"maker.for_makers.application.title": "소개부터 시작해요.",
-		"maker.for_makers.application.intro": "신청서는 Ponyo 팀이 검토합니다. 신청만으로 선정이나 파트너십이 보장되지 않습니다.",
+		"maker.for_makers.application.intro":
+			"신청서는 Ponyo 팀이 검토합니다. 신청만으로 선정이나 파트너십이 보장되지 않습니다.",
 		"maker.application.success.eyebrow": "신청이 접수되었습니다",
 		"maker.application.success.title": "작품을 소개해주셔서 감사합니다.",
-		"maker.application.success.body": "Ponyo 팀이 신청서를 검토합니다. 신청만으로 선정이나 파트너십이 보장되지 않습니다.",
+		"maker.application.success.body":
+			"Ponyo 팀이 신청서를 검토합니다. 신청만으로 선정이나 파트너십이 보장되지 않습니다.",
 		"maker.application.form.eyebrow": "첫인사를 나눠요",
 		"maker.application.form.title": "무엇을 만드시는지 알려주세요",
-		"maker.application.form.intro": "실제 제품 정보와 사진을 보내주세요. 필수 항목에는 표시가 있습니다.",
-		"maker.application.error.unconfigured": "Ponyo 신청 서비스가 설정되지 않아 신청서를 저장할 수 없습니다.",
-		"maker.application.error.photo_required": "제품 사진을 한 장 이상 추가해주세요.",
+		"maker.application.form.intro":
+			"실제 제품 정보와 사진을 보내주세요. 필수 항목에는 표시가 있습니다.",
+		"maker.application.error.unconfigured":
+			"Ponyo 신청 서비스가 설정되지 않아 신청서를 저장할 수 없습니다.",
+		"maker.application.error.photo_required":
+			"제품 사진을 한 장 이상 추가해주세요.",
 		"maker.application.error.submit": "메이커 신청서를 저장하지 못했습니다.",
-		"maker.application.service_unavailable": "현재 신청 서비스가 설정되지 않아 제출할 수 없습니다.",
-		"maker.application.photos.skipped": "{{count}}장의 사진을 추가하지 못했습니다. 5MB 이하 이미지 최대 3장을 선택해주세요.",
-		"maker.application.photos.help": "이미지 1~3장을 업로드해주세요. JPEG, PNG, WebP 형식이며 각 파일은 최대 5MB입니다. 사진은 최적화되어 신청서와 함께 저장됩니다.",
+		"maker.application.service_unavailable":
+			"현재 신청 서비스가 설정되지 않아 제출할 수 없습니다.",
+		"maker.application.photos.skipped":
+			"{{count}}장의 사진을 추가하지 못했습니다. 5MB 이하 이미지 최대 3장을 선택해주세요.",
+		"maker.application.photos.help":
+			"이미지 1~3장을 업로드해주세요. JPEG, PNG, WebP 형식이며 각 파일은 최대 5MB입니다. 사진은 최적화되어 신청서와 함께 저장됩니다.",
 		"maker.application.photos.alt": "제품 예시",
 		"maker.application.photos.remove": "삭제",
 		"maker.application.field.maker": "메이커 또는 브랜드명",
@@ -1441,30 +1585,40 @@ export const appTranslations: AppTranslations = {
 		"maker.application.field.product_description": "제품 설명",
 		"maker.application.field.demand": "고객 수요 증빙",
 		"maker.application.field.materials": "소재",
-		"maker.application.field.exclusivity": "이 작품을 Ponyo 전용으로 제공할 수 있나요?",
+		"maker.application.field.exclusivity":
+			"이 작품을 Ponyo 전용으로 제공할 수 있나요?",
 		"maker.application.field.photos": "제품 사진",
-		"maker.application.placeholder.price_range": "통화와 일반적인 가격 범위를 입력하세요",
-		"maker.application.placeholder.product_description": "제품과 제작 방식, 특별한 점을 설명해주세요.",
-		"maker.application.placeholder.demand": "과거 완판, 대기자 명단, 재판매 기록 등을 링크나 설명으로 공유해주세요.",
-		"maker.application.placeholder.materials": "확인 가능한 원단, 충전재 및 기타 소재를 적어주세요.",
-		"maker.application.placeholder.exclusivity": "기존 판매처, 독점 조건 또는 Ponyo에 제공할 수 있는 내용을 설명해주세요.",
+		"maker.application.placeholder.price_range":
+			"통화와 일반적인 가격 범위를 입력하세요",
+		"maker.application.placeholder.product_description":
+			"제품과 제작 방식, 특별한 점을 설명해주세요.",
+		"maker.application.placeholder.demand":
+			"과거 완판, 대기자 명단, 재판매 기록 등을 링크나 설명으로 공유해주세요.",
+		"maker.application.placeholder.materials":
+			"확인 가능한 원단, 충전재 및 기타 소재를 적어주세요.",
+		"maker.application.placeholder.exclusivity":
+			"기존 판매처, 독점 조건 또는 Ponyo에 제공할 수 있는 내용을 설명해주세요.",
 		"maker.application.button.sending": "신청서를 보내는 중…",
 		"maker.application.button.submit": "메이커 신청서 제출",
-		"maker.application.privacy": "연락처, 제품 정보, 사진은 신청 검토에 사용됩니다.",
+		"maker.application.privacy":
+			"연락처, 제품 정보, 사진은 신청 검토에 사용됩니다.",
 		"maker.application.privacy_draft": "개인정보 처리방침 초안",
 		"maker.profile.unavailable.eyebrow": "PONYO 메이커",
 		"maker.profile.unavailable.title": "메이커 프로필을 사용할 수 없습니다",
-		"maker.profile.unavailable.not_configured": "Ponyo 카탈로그 서비스가 연결되면 메이커 프로필이 표시됩니다.",
+		"maker.profile.unavailable.not_configured":
+			"Ponyo 카탈로그 서비스가 연결되면 메이커 프로필이 표시됩니다.",
 		"maker.profile.unavailable.generic": "메이커 프로필을 불러오지 못했습니다.",
 		"maker.profile.unavailable.cta": "메이커 안내",
 		"maker.profile.eyebrow": "PONYO 메이커",
-		"maker.profile.story_missing": "이 메이커가 공개용 이야기를 아직 제공하지 않았습니다.",
+		"maker.profile.story_missing":
+			"이 메이커가 공개용 이야기를 아직 제공하지 않았습니다.",
 		"maker.profile.collection_cta": "작품 둘러보기",
 		"maker.profile.website_cta": "메이커 웹사이트",
 		"maker.profile.seal": "정성을 담아 제작",
 		"maker.profile.philosophy.label": "제작 철학",
 		"maker.profile.philosophy.title": "작업을 이끄는 생각",
-		"maker.profile.philosophy.missing": "메이커의 관점은 확인되는 대로 소개하겠습니다.",
+		"maker.profile.philosophy.missing":
+			"메이커의 관점은 확인되는 대로 소개하겠습니다.",
 		"maker.profile.process.label": "제작 과정",
 		"maker.profile.process.title": "아이디어에서 인형까지",
 		"maker.profile.process.missing": "제작 과정은 메이커 확인 후 추가됩니다.",
@@ -1478,29 +1632,40 @@ export const appTranslations: AppTranslations = {
 		"maker.profile.collection.title": "메이커 컬렉션",
 		"maker.profile.collection.piece_one": "개",
 		"maker.profile.collection.piece_other": "개",
-		"maker.profile.collection.empty": "Ponyo 카탈로그에 공개된 제품이 아직 없습니다.",
+		"maker.profile.collection.empty":
+			"Ponyo 카탈로그에 공개된 제품이 아직 없습니다.",
 		"legal.terms-of-service.title": "이용약관",
 		"legal.terms-of-service.subtitle": "현재 결제 없는 예약 모델에 관한 초안",
 		"legal.terms-of-service.section.1.heading": "웹사이트 이용",
-		"legal.terms-of-service.section.1.body": "사이트를 적법하게 이용하고 예약 또는 메이커 신청 시 정확한 정보를 제공하세요. 메이커 정보를 확인하는 동안 상품 정보가 완전하지 않을 수 있습니다.",
+		"legal.terms-of-service.section.1.body":
+			"사이트를 적법하게 이용하고 예약 또는 메이커 신청 시 정확한 정보를 제공하세요. 메이커 정보를 확인하는 동안 상품 정보가 완전하지 않을 수 있습니다.",
 		"legal.terms-of-service.section.2.heading": "예약은 구매가 아닙니다",
-		"legal.terms-of-service.section.2.body": "예약은 상품에 대한 관심만 기록합니다. 구속력이 없고 주문이나 재고를 보장하지 않으며 결제가 이루어지지 않습니다. 표시되는 예약 수는 접수된 관심의 기록이며 구매 약속이나 생산 보장이 아닙니다.",
+		"legal.terms-of-service.section.2.body":
+			"예약은 상품에 대한 관심만 기록합니다. 구속력이 없고 주문이나 재고를 보장하지 않으며 결제가 이루어지지 않습니다. 표시되는 예약 수는 접수된 관심의 기록이며 구매 약속이나 생산 보장이 아닙니다.",
 		"legal.terms-of-service.section.3.heading": "예약 취소",
-		"legal.terms-of-service.section.3.body": "상품과 예약에 사용한 이메일을 알려 연락처 페이지에서 Ponyo에 취소를 요청할 수 있습니다. 취소 절차와 실제 응대 가능한 연락처는 출시 전에 확인해야 합니다. 예약에 대한 결제나 환불은 없습니다.",
+		"legal.terms-of-service.section.3.body":
+			"상품과 예약에 사용한 이메일을 알려 연락처 페이지에서 Ponyo에 취소를 요청할 수 있습니다. 취소 절차와 실제 응대 가능한 연락처는 출시 전에 확인해야 합니다. 예약에 대한 결제나 환불은 없습니다.",
 		"legal.terms-of-service.section.4.heading": "향후 구매",
-		"legal.terms-of-service.section.4.body": "유료 거래, 결제 방법, 배송 조건, 법정 고지, 취소 권리는 현재 예약 흐름에 포함되지 않습니다. 결제를 활성화하기 전에 Ponyo는 최종 약관을 게시해야 합니다.",
+		"legal.terms-of-service.section.4.body":
+			"유료 거래, 결제 방법, 배송 조건, 법정 고지, 취소 권리는 현재 예약 흐름에 포함되지 않습니다. 결제를 활성화하기 전에 Ponyo는 최종 약관을 게시해야 합니다.",
 		"legal.terms-of-service.section.5.heading": "초안 상태",
-		"legal.terms-of-service.section.5.body": "이 문서는 최종 법률 자문이 아닙니다. 게시 전 일본과 한국의 규정에 정통한 법률 전문가에게 검토받고 적용 법률 및 소비자 고지 사항을 확인하세요.",
+		"legal.terms-of-service.section.5.body":
+			"이 문서는 최종 법률 자문이 아닙니다. 게시 전 일본과 한국의 규정에 정통한 법률 전문가에게 검토받고 적용 법률 및 소비자 고지 사항을 확인하세요.",
 		"legal.returns-policy.title": "반품 및 환불 정책",
-		"legal.returns-policy.subtitle": "초안 — 현재 예약 흐름에서는 유료 구매를 제공하지 않습니다",
+		"legal.returns-policy.subtitle":
+			"초안 — 현재 예약 흐름에서는 유료 구매를 제공하지 않습니다",
 		"legal.returns-policy.section.1.heading": "현재 예약",
-		"legal.returns-policy.section.1.body": "예약은 관심을 기록할 뿐 구매가 아닙니다. 결제가 없으며 예약에 대한 환불도 적용되지 않습니다.",
+		"legal.returns-policy.section.1.body":
+			"예약은 관심을 기록할 뿐 구매가 아닙니다. 결제가 없으며 예약에 대한 환불도 적용되지 않습니다.",
 		"legal.returns-policy.section.2.heading": "예약 취소",
-		"legal.returns-policy.section.2.body": "상품과 예약에 사용한 이메일을 알려 연락처 페이지에서 Ponyo에 취소를 요청할 수 있습니다. 게시 전에 담당 연락처와 취소 절차를 확인해야 합니다.",
+		"legal.returns-policy.section.2.body":
+			"상품과 예약에 사용한 이메일을 알려 연락처 페이지에서 Ponyo에 취소를 요청할 수 있습니다. 게시 전에 담당 연락처와 취소 절차를 확인해야 합니다.",
 		"legal.returns-policy.section.3.heading": "향후 유료 주문",
-		"legal.returns-policy.section.3.body": "현재 결제 없는 예약 흐름에는 유료 구매의 반품 및 환불 조건이 적용되지 않습니다. 결제를 시작하기 전에 실제 운영과 소비자 권리를 반영한 정책을 게시해야 합니다.",
+		"legal.returns-policy.section.3.body":
+			"현재 결제 없는 예약 흐름에는 유료 구매의 반품 및 환불 조건이 적용되지 않습니다. 결제를 시작하기 전에 실제 운영과 소비자 권리를 반영한 정책을 게시해야 합니다.",
 		"legal.returns-policy.section.4.heading": "초안 상태",
-		"legal.returns-policy.section.4.body": "이 문서는 최종 법률 자문이 아닙니다. 게시 전에 일본과 한국의 규정에 정통한 법률 전문가에게 검토받으세요.",
+		"legal.returns-policy.section.4.body":
+			"이 문서는 최종 법률 자문이 아닙니다. 게시 전에 일본과 한국의 규정에 정통한 법률 전문가에게 검토받으세요.",
 	},
 	"zh-CN": {
 		"localization.form_label": "语言和货币偏好",
@@ -1562,9 +1727,9 @@ export const appTranslations: AppTranslations = {
 		"home.budget.treats": "甜蜜小礼物",
 		"home.budget.favorites": "人气之选",
 		"home.budget.giant": "巨型毛绒玩具",
-		"home.budget.under": "低于 ¥20,000",
-		"home.budget.middle": "¥20,000–¥30,000",
-		"home.budget.over": "¥60,000 及以上",
+		"home.budget.under": "及以下",
+		"home.budget.middle": "–",
+		"home.budget.over": "及以上",
 		"home.rare.title": "稀有好物",
 		"home.rare.body": "绝版玩偶、限量款，以及难以寻觅的人气好物。",
 		"home.see_all": "查看全部 →",
@@ -1891,9 +2056,9 @@ export const appTranslations: AppTranslations = {
 		"home.budget.treats": "Pequeños caprichos",
 		"home.budget.favorites": "Los favoritos de todos",
 		"home.budget.giant": "Peluches gigantes",
-		"home.budget.under": "Menos de ¥20.000",
-		"home.budget.middle": "¥20.000–¥30.000",
-		"home.budget.over": "¥60.000 o más",
+		"home.budget.under": "o menos",
+		"home.budget.middle": "–",
+		"home.budget.over": "o más",
 		"home.rare.title": "Hallazgos raros",
 		"home.rare.body":
 			"Peluches descatalogados, ediciones limitadas y favoritos difíciles de encontrar.",
