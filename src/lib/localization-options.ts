@@ -38,12 +38,9 @@ export function currencyName(code: string, language: string, fallback: string) {
 }
 
 export const languages: LanguageOption[] = [
-	{ code: "en", label: "English", country: "United Kingdom", flag: "🇬🇧" },
-	{ code: "es", label: "Español", country: "Spain", flag: "🇪🇸" },
-	{ code: "id", label: "Bahasa Indonesia", country: "Indonesia", flag: "🇮🇩" },
 	{ code: "ja", label: "日本語", country: "Japan", flag: "🇯🇵" },
 	{ code: "ko", label: "한국어", country: "South Korea", flag: "🇰🇷" },
-	{ code: "zh-CN", label: "简体中文", country: "China", flag: "🇨🇳" },
+	{ code: "en", label: "English", country: "United Kingdom", flag: "🇬🇧" },
 ];
 
 export const currencies: CurrencyOption[] = [
@@ -56,51 +53,11 @@ export const currencies: CurrencyOption[] = [
 		digits: 0,
 	},
 	{
-		code: "USD",
-		label: "US Dollar",
-		country: "United States",
-		flag: "🇺🇸",
-		symbol: "$",
-		digits: 2,
-	},
-	{
-		code: "EUR",
-		label: "Euro",
-		country: "Euro area",
-		flag: "🇪🇺",
-		symbol: "€",
-		digits: 2,
-	},
-	{
-		code: "GBP",
-		label: "British Pound",
-		country: "United Kingdom",
-		flag: "🇬🇧",
-		symbol: "£",
-		digits: 2,
-	},
-	{
-		code: "AUD",
-		label: "Australian Dollar",
-		country: "Australia",
-		flag: "🇦🇺",
-		symbol: "A$",
-		digits: 2,
-	},
-	{
-		code: "CAD",
-		label: "Canadian Dollar",
-		country: "Canada",
-		flag: "🇨🇦",
-		symbol: "CA$",
-		digits: 2,
-	},
-	{
-		code: "IDR",
-		label: "Indonesian Rupiah",
-		country: "Indonesia",
-		flag: "🇮🇩",
-		symbol: "Rp",
+		code: "KRW",
+		label: "South Korean Won",
+		country: "South Korea",
+		flag: "🇰🇷",
+		symbol: "₩",
 		digits: 0,
 	},
 ];

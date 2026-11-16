@@ -134,11 +134,11 @@ for (const locale of locales) {
       ["empty_title", "Make room for a little love."],
       ["empty_body", "Found a plush that feels like you? Tap its heart and we’ll keep it here for your next visit."],
       ["empty_cta", "Find your first favorite"], ["empty_note", "A small heart. The start of something lovely."],
-      ["rare", "Explore Rare Finds"], ["tip", "Love it now. Come back for it later."],
+      ["rare", "Explore all plush"], ["tip", "Love it now. Come back for it later."],
     ]) assert.ok(text(tree).includes(localized(locale, key, fallback)), key);
     assert.equal(text(byClass(tree, "wishlist-studio-count")), localized(locale, "count", "{{ count }} saved"));
     assert.equal(text(find(tree, (node) => node.type === "strong")), "00");
-    assert.deepEqual(findAll(tree, (node) => node.type === "a").map((node) => node.props.href), ["/shop", "/shop", "/collections/rare-finds"]);
+    assert.deepEqual(findAll(tree, (node) => node.type === "a").map((node) => node.props.href), ["/shop", "/shop", "/collections/all"]);
     assert.equal(collection(tree).props["aria-busy"], false);
     assert.ok(find(tree, (node) => node.type === "h2" && node.props.id === collection(tree).props["aria-labelledby"]));
     assert.equal(findAll(tree, (node) => node.type === "svg").length, 2);

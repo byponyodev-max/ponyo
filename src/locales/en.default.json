@@ -584,10 +584,6 @@
         "waitlist_email": "Email",
         "waitlist_submit": "Notify me",
         "waitlist_success": "You are on the list. We will email you when it is available.",
-        "price_history_title": "Price history",
-        "price_history_lowest": "Lowest recorded price",
-        "price_history_date": "Date",
-        "price_history_price": "Price",
         "choose_size": "Choose size"
     },
     "mp": {

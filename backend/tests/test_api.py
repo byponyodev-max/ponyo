@@ -96,13 +96,13 @@ def checkout_payload(variant_id, *, email="buyer@example.com"):
     }
 
 
-async def add_product(session_factory, *, slug="test-bunny", price=1500, stock=4, price_history=None):
+async def add_product(session_factory, *, slug="test-bunny", price=1500, stock=4):
     async with session_factory() as db:
         product = Product(
             id=uuid4(), slug=slug, name=slug.title(), description="Soft toy", currency="JPY",
             price_amount=price, availability="available", category_name="Bunnies", supplier_name="Ponyo",
-            image_url="https://example.test/bunny.png", image_alt="Bunny", tags=["bunny"], published=True,
-            price_history=price_history or [],
+            image_url="https://example.test/bunny.png", image_alt="Bunny", tags=["bunny"],
+            reservations_open=False, published=True,
         )
         db.add(product)
         await db.flush()
@@ -259,18 +259,17 @@ async def test_ui_copy_translation_is_cached_and_invalidated_by_source_changes(t
 
 
 @pytest.mark.asyncio
-async def test_product_price_history_is_returned_by_catalog_and_detail(test_client):
+async def test_product_catalog_and_detail_do_not_expose_price_history(test_client):
     client, session_factory = test_client
-    history = [{"date": "2026-11-08", "price": 1800}, {"date": "2026-11-09", "price": 1500}]
-    product_id, _ = await add_product(session_factory, price_history=history)
+    product_id, _ = await add_product(session_factory)
 
     catalog = await client.get("/v1/products")
     detail = await client.get(f"/v1/products/{product_id}")
 
     assert catalog.status_code == 200
-    assert catalog.json()["data"][0]["priceHistory"] == history
+    assert "priceHistory" not in catalog.json()["data"][0]
     assert detail.status_code == 200
-    assert detail.json()["data"]["priceHistory"] == history
+    assert "priceHistory" not in detail.json()["data"]
 
 
 @pytest.mark.asyncio

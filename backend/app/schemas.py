@@ -1,11 +1,11 @@
 import base64
 import binascii
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class VariantOut(BaseModel):
@@ -17,11 +17,6 @@ class VariantOut(BaseModel):
     compareAtAmount: int | None = None
     availability: str
     options: dict[str, str] = Field(default_factory=dict)
-
-
-class PriceHistoryEntry(BaseModel):
-    date: str
-    price: int = Field(ge=0)
 
 
 class ProductOut(BaseModel):
@@ -37,11 +32,22 @@ class ProductOut(BaseModel):
     currency: str
     availability: str
     availabilityStatus: str | None = Field(default=None, validation_alias="availability_status")
-    priceHistory: list[PriceHistoryEntry] = Field(default_factory=list, validation_alias="price_history")
     variantId: str | None = None
     categoryId: str | None = None
     brandId: str | None = None
     brandName: str | None = None
+    makerName: str | None = None
+    makerSlug: str | None = None
+    makerStory: str | None = None
+    makerPhilosophy: str | None = None
+    makerProcess: str | None = None
+    materials: str | None = None
+    weightGrams: int | None = None
+    editionCount: int | None = None
+    estimatedDeliveryDate: date | None = None
+    onlyAtPonyo: bool = False
+    reservationsOpen: bool = False
+    reservationTarget: int | None = None
     images: list[dict[str, str]] = Field(default_factory=list)
     galleryImages: list[dict[str, str]] = Field(default_factory=list)
     categoryName: str = Field(validation_alias="category_name")
@@ -155,6 +161,46 @@ class ProductReviewCreate(BaseModel):
                 raise ValueError("One of the review photos is invalid.") from None
             if len(image_bytes) > 400_000 or not image_bytes.startswith(b"\xff\xd8\xff"):
                 raise ValueError("Review photos must be valid JPEG images under 400 KB each.")
+        return photos
+
+
+class ProductReservationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    email: EmailStr
+    country: str = Field(min_length=2, max_length=100)
+
+
+class MakerApplicationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    makerName: str = Field(min_length=1, max_length=180)
+    contactPerson: str = Field(min_length=1, max_length=160)
+    email: EmailStr
+    country: str = Field(min_length=2, max_length=100)
+    city: str = Field(min_length=1, max_length=120)
+    website: AnyHttpUrl | None = Field(default=None, max_length=500)
+    socialMedia: AnyHttpUrl | None = Field(default=None, max_length=500)
+    productUrl: AnyHttpUrl = Field(max_length=500)
+    productDescription: str = Field(min_length=20, max_length=4000)
+    provenDesireEvidence: str = Field(min_length=10, max_length=2000)
+    materials: str = Field(min_length=2, max_length=2000)
+    priceRange: str = Field(min_length=1, max_length=160)
+    productPhotos: list[str] = Field(min_length=1, max_length=3)
+    ponyoExclusivity: str = Field(min_length=10, max_length=2000)
+
+    @field_validator("productPhotos")
+    @classmethod
+    def validate_product_photos(cls, photos: list[str]) -> list[str]:
+        for photo in photos:
+            if len(photo) > 550_000 or not photo.startswith("data:image/jpeg;base64,"):
+                raise ValueError("Product photos must be optimized JPEG images under 400 KB each.")
+            try:
+                image_bytes = base64.b64decode(photo.partition(",")[2], validate=True)
+            except (binascii.Error, ValueError):
+                raise ValueError("One of the product photos is invalid.") from None
+            if len(image_bytes) > 400_000 or not image_bytes.startswith(b"\xff\xd8\xff"):
+                raise ValueError("Product photos must be valid JPEG images under 400 KB each.")
         return photos
 
 
@@ -366,6 +412,38 @@ class SupplierAccountRequest(BaseModel):
 class AdminProductPublicationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     published: bool
+
+
+class AdminProductReservationSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reservationsOpen: bool
+    reservationTarget: int | None = Field(default=None, gt=0, strict=True)
+
+
+class AdminProductProofRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    materials: str | None = Field(default=None, max_length=3000)
+    weightGrams: int | None = Field(default=None, ge=0, strict=True)
+    editionCount: int | None = Field(default=None, gt=0, strict=True)
+    estimatedDeliveryDate: date | None = None
+    onlyAtPonyo: bool | None = None
+
+
+class AdminBrandProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    profileImageUrl: AnyHttpUrl | None = None
+    makerStory: str | None = Field(default=None, max_length=4000)
+    philosophy: str | None = Field(default=None, max_length=3000)
+    process: str | None = Field(default=None, max_length=3000)
+    location: str | None = Field(default=None, max_length=180)
+    specialties: list[str] | None = Field(default=None, max_length=20)
+    website: AnyHttpUrl | None = None
+    socialMedia: AnyHttpUrl | None = None
+
+
+class AdminMakerApplicationStatusRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["pending", "reviewing", "accepted", "declined"]
 
 
 class AdminSupplierStatusRequest(BaseModel):

@@ -6,7 +6,6 @@ import { getLocalizedProducts } from "@/services/localized-products.server";
 import type { Product } from "@/types/product";
 
 const featuredCollections = [
-	{ title: "RARE Finds", slug: "rare-finds", tag: "rare", eyebrow: "Hard to find", description: "Discontinued favorites and limited-edition plush.", tone: "rare", fallback: "/images/catalog/maker-pink-bunny.jpg" },
 	{ title: "Premium Plushies", slug: "premium", tag: "premium", eyebrow: "A little extra lovely", description: "Distinctive details, soft finishes, lasting favorites.", tone: "premium", fallback: "/images/catalog/ponyo-5.png" },
 	{ title: "XL Goodies", slug: "domina-xl", tag: "domina-xl", eyebrow: "Think bigger", description: "Big-hearted companions, from 70 cm to 120 cm.", tone: "xl", fallback: "/images/catalog/ponyo-3.png" },
 	{ title: "New Arrivals", slug: "new-arrivals", tag: "new-arrival", eyebrow: "Just landed", description: "Meet the newest plush friends to join Ponyo.", tone: "new", fallback: "/images/catalog/ponyo-6.png" },
@@ -40,7 +39,7 @@ export default async function CollectionsPage() {
 					<div className="collections-landing-hero-copy">
 						<p className="eyebrow">THE PONYO COLLECTION</p>
 						<h1>Find your next <em>forever friend.</em></h1>
-						<p>Explore rare discoveries, premium favorites, and plush companions of every size—all thoughtfully gathered in one place.</p>
+						<p>Explore premium favorites and plush companions of every size—all thoughtfully gathered in one place.</p>
 						<div className="collections-landing-actions">
 							<Link className="shop-button shop-button-orange" href="/collections/all">Shop all plush <b>→</b></Link>
 							<a className="collections-size-link" href="#shop-by-size">Explore by size <span aria-hidden="true">↓</span></a>

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ElementType, type HTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { currencies, deliveryCountries, languages, type CurrencyOption } from "@/lib/localization-options";
+import { currencies, deliveryCountries, languages } from "@/lib/localization-options";
 import { ponyoApi, PONYO_API_BASE_URL } from "@/services/ponyo-api.client";
 import { appTranslations } from "@/locales/app-translations";
 import { storefrontTranslations } from "@/locales/storefront-translations";
@@ -137,20 +137,23 @@ export function LocalizationProvider({ children, initialLanguage = "en", initial
   }, [currency, rates]);
 
   const formatPrice = useCallback((amount: number, sourceCurrency = "JPY") => {
-    const selected = currencies.find((item) => item.code === currency) as CurrencyOption;
-    const localizedAmount = convertMajorAmount(amount, sourceCurrency);
+    const source = sourceCurrency.toUpperCase();
+    const hasConversionRate = source === currency || Boolean(rates[source] && rates[currency]);
+    const displayCurrency = hasConversionRate ? currency : source;
+    const selected = currencies.find((item) => item.code === displayCurrency);
+    const localizedAmount = hasConversionRate ? convertMajorAmount(amount, source) : amount;
     const formatterLocale = language === "en" ? "en-US" : language === "es" ? "es-ES" : language === "pt-BR" ? "pt-BR" : language === "pt-PT" ? "pt-PT" : language;
+    const formatOptions: Intl.NumberFormatOptions = {
+      style: "currency",
+      currency: displayCurrency,
+      ...(selected ? { minimumFractionDigits: selected.digits, maximumFractionDigits: selected.digits } : {}),
+    };
     try {
-      return new Intl.NumberFormat(formatterLocale, {
-        style: "currency",
-        currency,
-        minimumFractionDigits: selected.digits,
-        maximumFractionDigits: selected.digits,
-      }).format(localizedAmount);
+      return new Intl.NumberFormat(formatterLocale, formatOptions).format(localizedAmount);
     } catch {
-      return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: selected.digits }).format(localizedAmount);
+      return new Intl.NumberFormat("en-US", formatOptions).format(localizedAmount);
     }
-  }, [convertMajorAmount, currency, language]);
+  }, [convertMajorAmount, currency, language, rates]);
 
   const flushTranslations = useCallback(async () => {
     translationTimer.current = null;

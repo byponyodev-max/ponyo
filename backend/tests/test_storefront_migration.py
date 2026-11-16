@@ -28,13 +28,19 @@ NOW = datetime.now(timezone.utc)
 
 
 def _expected_storefront_metadata() -> sa.MetaData:
-    """Revision 0015 creates inventory before revision 0017's sync timestamp."""
+    """Revision 0015 schema, before later supplier and maker-profile additions."""
     metadata = sa.MetaData()
     for table in Base.metadata.tables.values():
         if table.name not in LATER_SUPPLIER_TABLES:
             table.to_metadata(metadata)
     inventory = metadata.tables["supplier_inventory"]
     inventory._columns.remove(inventory.c.last_synced_at)
+    brands = metadata.tables["brands"]
+    for column in (
+        "profile_image_url", "maker_story", "philosophy", "process",
+        "location", "specialties", "website", "social_media",
+    ):
+        brands._columns.remove(brands.c[column])
     return metadata
 
 

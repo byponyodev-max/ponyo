@@ -19,6 +19,7 @@ import "./footer-experience.css";
 import "./domina-responsive.css";
 import "./supplier-portal.css";
 import "./admin-portal.css";
+import "./maker-reservation.css";
 
 const bodyFont = Nunito_Sans({ subsets: ["latin"], variable: "--font-nunito", display: "swap" });
 const headingFont = Libre_Baskerville({ subsets: ["latin"], weight: ["700"], variable: "--font-libre-baskerville", display: "swap" });

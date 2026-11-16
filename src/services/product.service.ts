@@ -230,7 +230,6 @@ const storefrontPreviewMetadata: Record<
 		| "sizeTier"
 		| "dimensions"
 		| "availabilityStatus"
-		| "priceHistory"
 		| "supplierName"
 		| "image"
 	>
@@ -393,12 +392,9 @@ const storefrontPreviewStatuses: Record<
 	"clement-the-fox-xl": "Coming Soon",
 };
 
-const storefrontPreviewPriceHistory: Product["priceHistory"] = [
-	{ date: "2026-11-09", price: 18800 },
-];
-
 export const storefrontPreviewProducts = sampleProducts.map((product) => ({
 	...product,
+	isExampleData: true,
 	color: storefrontPreviewColors[product.slug],
 	sku: `PNY-${product.slug
 		.toUpperCase()
@@ -406,8 +402,6 @@ export const storefrontPreviewProducts = sampleProducts.map((product) => ({
 		.replace(/^-|-$/g, "")}`,
 	...storefrontPreviewMetadata[product.slug],
 	availabilityStatus: storefrontPreviewStatuses[product.slug],
-	priceHistory:
-		product.slug === "hoshi-cloud-bear" ? storefrontPreviewPriceHistory : [],
 	publishedAt: "2026-11-05T15:00:00+09:00",
 	isNew: true,
 	galleryImages: [

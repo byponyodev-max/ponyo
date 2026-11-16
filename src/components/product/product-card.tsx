@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { saveWishlist, useWishlistHandles } from "@/lib/wishlist";
 import { useLocalization } from "@/components/layout/localization-provider";
+import { storefrontFeatures } from "@/lib/storefront-features";
 import { ProductCardAction } from "@/components/product/product-card-action";
 import type { Product } from "@/types/product";
 
@@ -20,7 +21,9 @@ export function ProductCard({ product, badge, compact = false }: { product: Prod
   const discountPercent = product.compareAtAmount && product.compareAtAmount > product.priceAmount
     ? Math.round((product.compareAtAmount - product.priceAmount) / product.compareAtAmount * 100)
     : 0;
-  const statusLabel = product.availabilityStatus === "Coming Soon"
+  const statusLabel = storefrontFeatures.productReservations
+    ? t("product.status.preorder", "Pre-order")
+    : product.availabilityStatus === "Coming Soon"
     ? t("product.status.coming_soon", "Coming soon")
     : product.availabilityStatus === "Waitlist"
       ? t("product.status.waitlist", "Join waitlist")
@@ -69,7 +72,7 @@ export function ProductCard({ product, badge, compact = false }: { product: Prod
             </strong>
             <span className="product-card-arrow" aria-hidden="true">→</span>
           </div>
-          {product.dispatchTime && <p className="shop-product-dispatch">{product.dispatchTime}</p>}
+          {product.dispatchTime && !storefrontFeatures.productReservations && <p className="shop-product-dispatch">{product.dispatchTime}</p>}
         </div>
       </article>
       <ProductCardAction product={product} productName={productName} />

@@ -1,6 +1,5 @@
 import asyncio
 import re
-from datetime import datetime, timezone
 from uuid import uuid5, NAMESPACE_URL
 
 from sqlalchemy import select
@@ -112,6 +111,7 @@ async def seed_products() -> None:
                     tags=item["tags"],
                     size_tier=item["size"],
                     dimensions=item["dimensions"],
+                    reservations_open=True,
                     dispatch_time="Ships in 1–3 business days",
                     published=True,
                 )
@@ -133,15 +133,9 @@ async def seed_products() -> None:
                 product.tags = item["tags"]
                 product.size_tier = item["size"]
                 product.dimensions = item["dimensions"]
+                product.reservations_open = True
                 product.dispatch_time = "Ships in 1–3 business days"
                 product.published = True
-            history = list(product.price_history or [])
-            today = datetime.now(timezone.utc).date().isoformat()
-            if history and history[-1].get("date") == today:
-                history[-1] = {"date": today, "price": item["price"]}
-            elif not history or history[-1].get("price") != item["price"]:
-                history.append({"date": today, "price": item["price"]})
-            product.price_history = history
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id, ProductVariant.title == "Default"))
             if variant is None:
                 db.add(ProductVariant(

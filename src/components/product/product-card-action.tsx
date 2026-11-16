@@ -2,21 +2,27 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useCustomerSession } from "@/components/layout/customer-session-provider";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { ponyoApi } from "@/services/ponyo-api.client";
 import type { CartItem } from "@/lib/cart";
 import type { Product } from "@/types/product";
+import { storefrontFeatures } from "@/lib/storefront-features";
 
 type ProductCardActionProps = {
   product: Product;
   productName: string;
 };
 
-function ProductActionIcon({ type }: { type: "bag" | "email" }) {
-  return type === "bag"
-    ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h15l1 11h-17l1-11Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M8 9V6.8a4 4 0 0 1 8 0V9" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M9 13h6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-    : <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.4" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="m4.5 7 7.5 5.8L19.5 7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="m17.5 3 .65 1.35L19.5 5l-1.35.65L17.5 7l-.65-1.35L15.5 5l1.35-.65L17.5 3Z" fill="currentColor"/></svg>;
+function ProductActionIcon({ type }: { type: "bag" | "email" | "arrow" }) {
+  if (type === "bag") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9h15l1 11h-17l1-11Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M8 9V6.8a4 4 0 0 1 8 0V9" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M9 13h6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>;
+  }
+  if (type === "arrow") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  }
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.4" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="m4.5 7 7.5 5.8L19.5 7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="m17.5 3 .65 1.35L19.5 5l-1.35.65L17.5 7l-.65-1.35L15.5 5l1.35-.65L17.5 3Z" fill="currentColor"/></svg>;
 }
 
 export function ProductCardAction({ product, productName }: ProductCardActionProps) {
@@ -41,6 +47,19 @@ export function ProductCardAction({ product, productName }: ProductCardActionPro
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [dialogOpen]);
+
+  if (storefrontFeatures.productReservations) {
+    return (
+      <div className="product-card-action-wrap">
+        <Link className="product-card-action is-reservation" href={`/products/${encodeURIComponent(product.id)}#product-reservation`}>
+          <span className="product-card-action-label">{t("product.action.reserve_spot", "Reserve a spot")}</span>
+          <span className="product-card-action-icon"><ProductActionIcon type="arrow" /></span>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!needsNotify && !storefrontFeatures.commerce) return null;
 
   function addToCart() {
     const image = typeof product.image === "string" ? product.image : product.image.src;

@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
-from app.currency import SUPPORTED_CURRENCIES, get_jpy_rates
+from app.currency import SUPPORTED_DISPLAY_CURRENCIES, get_jpy_rates
 from app.db import get_db
 from app.models import AppTranslation
 from app.rate_limit import enforce_rate_limit
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/localization", tags=["localization"])
 async def exchange_rates(symbols: str | None = Query(default=None, max_length=64)):
     requested = {code.strip().upper() for code in (symbols or "").split(",") if code.strip()}
     requested.discard("JPY")
-    if requested - SUPPORTED_CURRENCIES:
+    if requested - SUPPORTED_DISPLAY_CURRENCIES:
         raise HTTPException(status_code=422, detail="One or more currencies are not supported.")
     try:
         rates = await get_jpy_rates()

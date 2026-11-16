@@ -15,7 +15,7 @@ const collections = [
   { title: "Cats", slug: "cats" }, { title: "Cute Characters", slug: "characters" },
   { title: "New Arrivals", slug: "new-arrivals" }, { title: "Pandas", slug: "pandas" },
   { title: "Penguins", slug: "penguins" }, { title: "Premium Plushies", slug: "premium" },
-  { title: "Puppies", slug: "puppies" }, { title: "RARE Finds", slug: "rare-finds" },
+  { title: "Puppies", slug: "puppies" },
   { title: "Trending", slug: "trending" }, { title: "XL Goodies", slug: "domina-xl" },
 ];
 const trendingHandles = new Set(["cherry-blossom-bunny", "mint-dino", "hoshi-cloud-bear", "better-days-panda", "bluebell-penguin", "haneul-bunny", "cloud-cat", "biscuit-bow-pup"]);
@@ -24,7 +24,7 @@ function matchesCategory(tags: string[] = [], type = "", category = "", slug = "
   const key = category.toLowerCase().replaceAll("_", "-");
   if (key === "trending") return trendingHandles.has(slug);
   const aliases: Record<string, string> = {
-    "rare-finds": "rare", rare: "rare", premium: "premium", "domina-xl": "domina-xl", "giant-plush": "domina-xl",
+    premium: "premium", "domina-xl": "domina-xl", "giant-plush": "domina-xl",
     "new-arrival": "new-arrival", "new-arrivals": "new-arrival", bears: "bear", bunnies: "bunny", cats: "cat",
     pandas: "panda", puppies: "puppy", penguins: "penguin", characters: "character", "cute-characters": "character",
     collectibles: "collectible",
@@ -37,7 +37,7 @@ function matchesCategory(tags: string[] = [], type = "", category = "", slug = "
 function headingFor(category: string, search: string) {
   if (search) return `Search results for “${search}”`;
   const names: Record<string, string> = {
-    "": "The Full Collection ✧", all: "The Full Collection ✧", "rare-finds": "RARE Finds", premium: "Premium Plushies",
+    "": "The Full Collection ✧", all: "The Full Collection ✧", premium: "Premium Plushies",
     "domina-xl": "XL Goodies", "giant-plush": "XL Goodies", "new-arrival": "New Arrivals", "new-arrivals": "New Arrivals",
     bears: "Bears", bunnies: "Bunnies", cats: "Cats", characters: "Cute Characters", pandas: "Pandas", penguins: "Penguins",
     puppies: "Puppies", trending: "Trending",
@@ -46,7 +46,6 @@ function headingFor(category: string, search: string) {
 }
 
 function collectionImage(category: string) {
-  if (["rare-finds", "rare"].includes(category)) return "/images/catalog/maker-penguin.jpg";
   if (["domina-xl", "giant-plush"].includes(category)) return "/images/catalog/ponyo-3.png";
   if (["new-arrivals", "new-arrival"].includes(category)) return "/images/catalog/ponyo-6.png";
   if (category === "premium") return "/images/catalog/ponyo-5.png";
@@ -61,7 +60,8 @@ function collectionDescription(category: string) {
 
 export default async function ShopPage({ searchParams }: { searchParams: Promise<Query> }) {
   const query = await searchParams;
-  const category = first(query.category) ?? first(query.collection) ?? "";
+  const requestedCategory = first(query.category) ?? first(query.collection) ?? "";
+  const category = ["rare", "rare-finds"].includes(requestedCategory) ? "" : requestedCategory;
   const search = (first(query.q) ?? "").trim();
   const minimum = Number(first(query.min) ?? first(query["filter.v.price.gte"]) ?? 0);
   const maximum = Number(first(query.max) ?? first(query["filter.v.price.lte"]) ?? Number.POSITIVE_INFINITY);

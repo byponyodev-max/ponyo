@@ -5,7 +5,6 @@ export type SupplierAvailability =
 	| "unavailable"
 	| "needs_confirmation";
 export type ProductImage = string | StaticImageData;
-export type ProductPriceHistoryEntry = { date: string; price: number };
 
 export type ProductVariant = {
 	id: string;
@@ -38,7 +37,6 @@ export type Product = {
 		| "Coming Soon"
 		| "Waitlist"
 		| "Unavailable";
-	priceHistory?: ProductPriceHistoryEntry[];
 	categoryName: string;
 	productType?: string;
 	color?: string;
@@ -57,5 +55,18 @@ export type Product = {
 	size?: string;
 	dimensions?: string;
 	dispatchTime?: string;
+	makerName?: string | null;
+	makerSlug?: string | null;
+	makerStory?: string | null;
+	makerPhilosophy?: string | null;
+	makerProcess?: string | null;
+	materials?: string | null;
+	weightGrams?: number | null;
+	editionCount?: number | null;
+	estimatedDeliveryDate?: string | null;
+	onlyAtPonyo?: boolean;
+	reservationsOpen?: boolean;
+	reservationTarget?: number | null;
+	isExampleData?: boolean;
 	badge?: string;
 };

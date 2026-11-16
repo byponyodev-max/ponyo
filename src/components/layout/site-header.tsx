@@ -11,11 +11,11 @@ import { DeliveryRegionBanner } from "@/components/layout/delivery-region-banner
 import { LocalizationPicker } from "@/components/layout/localization-picker";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { useCustomerSession } from "@/components/layout/customer-session-provider";
+import { storefrontFeatures } from "@/lib/storefront-features";
 
 const mainLinks = [
   { title: "Discover", key: "home.header.discover", href: "/" },
   { title: "Shop All", key: "home.footer.shop_all", href: "/collections/all" },
-  { title: "Rare Finds", key: "home.footer.rare", href: "/collections/rare-finds" },
   { title: "Premium Plushies", key: "home.footer.premium", href: "/collections/premium" },
   { title: "XL Goodies", key: "home.footer.domina", href: "/collections/domina-xl" },
   { title: "New Arrivals", key: "home.footer.new", href: "/collections/new-arrivals" },
@@ -72,7 +72,7 @@ function DesktopCollectiblesMenu() {
 const ticker = [
   { text: "NEW: DOMINA GIANT PLUSH UP TO 120 CM", key: "home.announce_2", href: "/pages/domina-xl" },
   { text: "JOIN RARE DROP ALERTS AND BE FIRST TO KNOW", key: "home.announce_3", href: "/#drops" },
-  { text: "RARE & LIMITED PLUSH, HAND-PICKED FOR YOU", key: "home.announce_4", href: "/collections/rare-finds" },
+  { text: "RARE & LIMITED PLUSH, HAND-PICKED FOR YOU", key: "home.announce_4", href: "/collections/all" },
 ];
 
 function JellyfishMark({ className = "" }: { className?: string }) {
@@ -259,8 +259,8 @@ export function SiteHeader() {
           <div className="store-actions">
             <LocalizationPicker />
             <Link href="/collections/all?view=wishlist" className="store-icon-button" aria-label={t("home.header.wishlist", `My Wishlist${wishlistCount ? `, ${wishlistCount} saved` : ""}`, { count: wishlistCount })}><HeartGlyph />{wishlistCount > 0 && <span className="wishlist-count">{wishlistCount}</span>}</Link>
-            <button type="button" className="store-icon-button account-icon-trigger" aria-label={t("home.header.profile", "My profile")} title={t("home.header.profile", "My profile")} onClick={openAccountDrawer}><PersonGlyph /></button>
-            <button className="store-icon-button bag-button" type="button" aria-label={t("home.header.cart", `Cart (${itemCount} items)`, { count: itemCount })} aria-expanded={bagOpen} onClick={() => setBagOpen(true)}><BagGlyph />{itemCount > 0 && <span className="bag-count">{itemCount}</span>}</button>
+            {storefrontFeatures.customerAccounts && <button type="button" className="store-icon-button account-icon-trigger" aria-label={t("home.header.profile", "My profile")} title={t("home.header.profile", "My profile")} onClick={openAccountDrawer}><PersonGlyph /></button>}
+            {storefrontFeatures.commerce && <button className="store-icon-button bag-button" type="button" aria-label={t("home.header.cart", `Cart (${itemCount} items)`, { count: itemCount })} aria-expanded={bagOpen} onClick={() => setBagOpen(true)}><BagGlyph />{itemCount > 0 && <span className="bag-count">{itemCount}</span>}</button>}
           </div>
         </div>
         <div ref={categorySlotRef} className={`store-category-slot${categoryPinned ? " is-pinned" : ""}`} style={categoryPinned ? { height: categoryHeight } : undefined}>
@@ -285,8 +285,8 @@ export function SiteHeader() {
           <div className="smart-header-actions">
             <LocalizationPicker compact />
             <Link href="/collections/all?view=wishlist" className="smart-icon-trigger" aria-label={t("home.header.wishlist", `My Wishlist${wishlistCount ? `, ${wishlistCount} saved` : ""}`, { count: wishlistCount })}><HeartGlyph />{wishlistCount > 0 && <span>{wishlistCount}</span>}</Link>
-            <button type="button" className="smart-icon-trigger smart-profile-trigger" aria-label={t("home.header.profile", "My profile")} title={t("home.header.profile", "My profile")} onClick={openAccountDrawer}><PersonGlyph /></button>
-            <button type="button" className="smart-icon-trigger smart-cart-trigger" aria-label={t("home.header.cart", `Cart (${itemCount} items)`, { count: itemCount })} onClick={() => setBagOpen(true)}><BagGlyph />{itemCount > 0 && <span>{itemCount}</span>}</button>
+            {storefrontFeatures.customerAccounts && <button type="button" className="smart-icon-trigger smart-profile-trigger" aria-label={t("home.header.profile", "My profile")} title={t("home.header.profile", "My profile")} onClick={openAccountDrawer}><PersonGlyph /></button>}
+            {storefrontFeatures.commerce && <button type="button" className="smart-icon-trigger smart-cart-trigger" aria-label={t("home.header.cart", `Cart (${itemCount} items)`, { count: itemCount })} onClick={() => setBagOpen(true)}><BagGlyph />{itemCount > 0 && <span>{itemCount}</span>}</button>}
           </div>
         </div>
         <div className="smart-header-category">
@@ -307,7 +307,7 @@ export function SiteHeader() {
           </div>
           <div className="mobile-menu-content">
             {activeMenu === "root" ? <>
-              <div className="mobile-account-card"><JellyfishMark /><div><strong>{customer ? t("home.header.welcome_back", `Welcome back, ${customer.firstName || "plush friend"}`, { name: customer.firstName || "" }) : t("home.header.welcome", "Welcome to Ponyo")}</strong><span>{customer?.email ?? t("home.header.find_friend", "Find a new forever plush.")}</span></div><button type="button" onClick={openAccountFromMenu}>{customer ? t("home.header.profile", "My profile") : t("home.header.sign_in", "Sign in")}</button></div>
+              {storefrontFeatures.customerAccounts && <div className="mobile-account-card"><JellyfishMark /><div><strong>{customer ? t("home.header.welcome_back", `Welcome back, ${customer.firstName || "plush friend"}`, { name: customer.firstName || "" }) : t("home.header.welcome", "Welcome to Ponyo")}</strong><span>{customer?.email ?? t("home.header.find_friend", "Find a new forever plush.")}</span></div><button type="button" onClick={openAccountFromMenu}>{customer ? t("home.header.profile", "My profile") : t("home.header.sign_in", "Sign in")}</button></div>}
               <p className="mobile-menu-label">{t("home.footer.shop", "Shop")}</p>
               <nav className="mobile-primary-links" aria-label="Shop menu">
                 {mainLinks.map((item) => <Link key={item.title} href={item.href} onClick={() => setMenuOpen(false)}>{t(item.key, item.title)}<span aria-hidden="true">›</span></Link>)}
@@ -317,27 +317,27 @@ export function SiteHeader() {
               <div className="mobile-category-tiles">{animalCategories.map((item) => <Link href={item.href} key={item.title} onClick={() => setMenuOpen(false)}><Image src={item.image} alt="" width={56} height={56} /><span>{t(`home.categories.${item.title === "Cute Characters" ? "characters" : item.title.toLowerCase()}`, item.title)}</span></Link>)}</div>
               <Link className="mobile-domina-card" href="/pages/domina-xl" onClick={() => setMenuOpen(false)}><Image src="/images/catalog/ponyo-3.png" alt="" width={68} height={68} /><span><b>{t("home.header.domina", "DOMINA by Ponyo")}</b><small>{t("home.header.giant_plush_range", "Giant plush from 70 to 120 cm")}</small></span><i>›</i></Link>
               <p className="mobile-menu-label">{t("home.footer.support", "Help")}</p>
-              <nav className="mobile-help-links"><button type="button" onClick={() => { setMenuOpen(false); setBagOpen(true); }}><span>{t("cart.title", "Your cart")}</span><span className="mobile-help-link-meta">{itemCount > 0 && <b>{itemCount}</b>}<i aria-hidden="true">›</i></span></button><Link href="/collections/all?view=wishlist" onClick={() => setMenuOpen(false)}><span>♡ {t("home.header.wishlist", "My Wishlist")}</span>{wishlistCount > 0 && <b>{wishlistCount}</b>}</Link><Link href="/blogs/news" onClick={() => setMenuOpen(false)}>{t("home.footer.journal", "The Plush Journal")}</Link><Link href="/pages/faq" onClick={() => setMenuOpen(false)}>{t("home.footer.faq", "FAQ & Shipping")}</Link><Link href="/pages/contact" onClick={() => setMenuOpen(false)}>{t("home.footer.contact", "Contact us")}</Link><Link href="/pages/about" onClick={() => setMenuOpen(false)}>{t("home.footer.about_link", "About Ponyo")}</Link></nav>
+              <nav className="mobile-help-links">{storefrontFeatures.commerce && <button type="button" onClick={() => { setMenuOpen(false); setBagOpen(true); }}><span>{t("cart.title", "Your cart")}</span><span className="mobile-help-link-meta">{itemCount > 0 && <b>{itemCount}</b>}<i aria-hidden="true">›</i></span></button>}<Link href="/collections/all?view=wishlist" onClick={() => setMenuOpen(false)}><span>♡ {t("home.header.wishlist", "My Wishlist")}</span>{wishlistCount > 0 && <b>{wishlistCount}</b>}</Link>{storefrontFeatures.plushJournal && <Link href="/blogs/news" onClick={() => setMenuOpen(false)}>{t("home.footer.journal", "The Plush Journal")}</Link>}<Link href="/pages/faq" onClick={() => setMenuOpen(false)}>{t("home.footer.faq", "FAQ & Shipping")}</Link><Link href="/pages/contact" onClick={() => setMenuOpen(false)}>{t("home.footer.contact", "Contact us")}</Link><Link href="/pages/about" onClick={() => setMenuOpen(false)}>{t("home.footer.about_link", "About Ponyo")}</Link></nav>
             </> : <div className="mobile-submenu-grid">{animalCategories.map((item) => <Link href={item.href} key={item.title} onClick={() => setMenuOpen(false)}><Image src={item.image} alt="" width={40} height={40} />{item.title}<span>›</span></Link>)}</div>}
           </div>
         </div>
       </dialog>
 
-      <nav className="mobile-tab-bar" aria-label={t("tabbar.label", "Quick navigation")}>
+      <nav className={`mobile-tab-bar${!storefrontFeatures.commerce && !storefrontFeatures.customerAccounts ? " mobile-tab-bar--p0" : ""}`} aria-label={t("tabbar.label", "Quick navigation")}>
         <Link href="/" aria-current={pathname === "/" ? "page" : undefined}><span className="tab-icon">⌂</span><small>{t("tabbar.home", "Home")}</small></Link>
         <Link href="/collections" className={isCategoryRoute ? "is-current" : ""} aria-current={isCategoryRoute ? "page" : undefined} aria-label={t("tabbar.categories", "Browse categories")}><span className="tab-icon"><CategoryGlyph /></span><small>{t("tabbar.categories", "Categories")}</small></Link>
-        <button type="button" className="mobile-cart-tab" aria-current={pathname === "/cart" || pathname === "/checkout" ? "page" : undefined} aria-label={t("home.header.open_cart", `Open cart, ${itemCount} items`, { count: itemCount })} onClick={() => setBagOpen(true)}><span className="tab-icon"><BagGlyph />{itemCount > 0 && <b className="mobile-cart-tab-count">{itemCount}</b>}</span><small>{t("cart.title", "Cart")}</small></button>
+        {storefrontFeatures.commerce && <button type="button" className="mobile-cart-tab" aria-current={pathname === "/cart" || pathname === "/checkout" ? "page" : undefined} aria-label={t("home.header.open_cart", `Open cart, ${itemCount} items`, { count: itemCount })} onClick={() => setBagOpen(true)}><span className="tab-icon"><BagGlyph />{itemCount > 0 && <b className="mobile-cart-tab-count">{itemCount}</b>}</span><small>{t("cart.title", "Cart")}</small></button>}
         <Link href="/collections/new-arrivals" aria-current={isForYouRoute ? "page" : undefined}><span className="tab-icon"><JellyfishMark className="mobile-tab-jellyfish" /></span><small>{t("tabbar.for_you", "For You")}</small></Link>
-        <button type="button" className="mobile-account-tab" aria-current={pathname.startsWith("/account") || pathname === "/orders" ? "page" : undefined} onClick={openAccountDrawer} aria-label={t("home.header.open_account", "Open my account")}><span className="tab-icon"><PersonGlyph /></span><small>{t("tabbar.me", "Me")}</small></button>
+        {storefrontFeatures.customerAccounts && <button type="button" className="mobile-account-tab" aria-current={pathname.startsWith("/account") || pathname === "/orders" ? "page" : undefined} onClick={openAccountDrawer} aria-label={t("home.header.open_account", "Open my account")}><span className="tab-icon"><PersonGlyph /></span><small>{t("tabbar.me", "Me")}</small></button>}
       </nav>
 
-      <AccountDrawer />
+      {storefrontFeatures.customerAccounts && <AccountDrawer />}
 
-      <dialog ref={cartDialog} className="cart-drawer" aria-label={t("cart.title", "Shopping cart")} onClose={() => setBagOpen(false)} onClick={(event) => { if (event.target === cartDialog.current) setBagOpen(false); }}>
+      {storefrontFeatures.commerce && <dialog ref={cartDialog} className="cart-drawer" aria-label={t("cart.title", "Shopping cart")} onClose={() => setBagOpen(false)} onClick={(event) => { if (event.target === cartDialog.current) setBagOpen(false); }}>
         <div className="cart-drawer-heading"><div><span className="eyebrow">{t("home.cart.kicker", "A little bundle of joy")}</span><h2>{t("cart.title", "Your cart")} <span>({itemCount})</span></h2></div><button type="button" className="store-icon-button" aria-label={t("general.close", "Close cart")} onClick={() => setBagOpen(false)}>×</button></div>
         {cart.length === 0 ? <div className="cart-empty"><span>♡</span><p>{t("cart.empty", "Your cart is empty.")}</p><p>{t("home.cart.empty_body", "Find a rare, premium or giant plush friend to take home.")}</p><Link className="shop-button" href="/shop" onClick={() => setBagOpen(false)}>{t("cart.continue_shopping", "Continue shopping")}</Link><div className="cart-empty-links"><span>{t("home.cart.popular", "Shop by type")}</span><Link href="/shop?category=bears">{t("home.categories.bears", "Bears")}</Link><Link href="/shop?category=bunnies">{t("home.categories.bunnies", "Bunnies")}</Link><Link href="/shop?category=new-arrival">{t("home.carousel.new.title", "New Discoveries")}</Link><Link href="/shop?category=domina-xl">{t("home.footer.domina", "Domina XL")}</Link></div></div> : <div className="cart-drawer-items">{cart.map((item) => {const itemName = t(`product.names.${item.slug}`, item.name); return <div className="cart-drawer-item" key={item.id}>{item.catalogId ? <Link className="cart-drawer-item-image" href={`/products/${item.catalogId}`} onClick={() => setBagOpen(false)}><CartDrawerImage src={item.image} alt={item.imageAlt} /></Link> : <span className="cart-drawer-item-image"><CartDrawerImage src={item.image} alt={item.imageAlt} /></span>}<div className="cart-drawer-item-info"><span>{item.maker}</span>{item.catalogId ? <Link href={`/products/${item.catalogId}`} onClick={() => setBagOpen(false)}>{itemName}</Link> : <span className="cart-drawer-item-title">{itemName}</span>}<strong className="cart-drawer-item-price">{formatPrice(item.price, item.currency)} <small>{t("cart.each", "each")}</small></strong><div className="cart-drawer-item-actions"><div className="cart-line-controls"><button type="button" aria-label={t("cart.decrease_item", `Decrease ${itemName} quantity`, { title: itemName })} disabled={item.qty <= 1} onClick={() => saveQuantity(item.id, item.qty - 1)}>−</button><span>{item.qty}</span><button type="button" aria-label={t("cart.increase_item", `Increase ${itemName} quantity`, { title: itemName })} onClick={() => saveQuantity(item.id, item.qty + 1)}>+</button></div><button type="button" className="cart-remove" onClick={() => removeCartItem(item.id)} aria-label={t("cart.remove", `Remove ${itemName}`, { title: itemName })} title={t("cart.remove_item", "Remove item")}><TrashGlyph /><span>{t("cart.remove_item", "Remove")}</span></button></div></div><b className="cart-drawer-item-total">{formatPrice(item.price * item.qty, item.currency)}</b></div>;})}</div>}
         <div className="cart-drawer-footer"><div><span>{t("cart.subtotal", "Subtotal")}</span><strong>{formatPrice(subtotal, cart[0]?.currency ?? "JPY")}</strong></div><p>{t("cart.taxes_and_shipping_at_checkout", "Shipping and taxes are calculated at checkout.")}</p><Link className="shop-button shop-button-orange" href={cart.length ? "/cart" : "/collections/all"} onClick={() => setBagOpen(false)}>{cart.length ? t("cart.view_cart", "View cart") : t("cart.continue_shopping", "Continue shopping")}<b>→</b></Link></div>
-      </dialog>
+      </dialog>}
     </>
   );
 }

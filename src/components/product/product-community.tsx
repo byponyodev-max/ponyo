@@ -4,7 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useId, useRef } from "react";
 import { useEffect, useState, type FormEvent } from "react";
+import { useLocalization } from "@/components/layout/localization-provider";
+import { regionName } from "@/lib/localization-options";
 import { ponyoApi, PONYO_API_BASE_URL, type CustomerProfile, type ProductReview, type ProductReviewSummary } from "@/services/ponyo-api.client";
+import { optimizeJpegPhoto } from "@/lib/optimize-jpeg-photo";
 
 const emptySummary: ProductReviewSummary = { averageRating: 0, reviewCount: 0, reviews: [] };
 
@@ -95,7 +98,7 @@ export function ProductReviews({ productId }: { productId: string }) {
                 const allowedFiles = files.filter((file) => file.size <= 5 * 1024 * 1024 && ["image/jpeg", "image/png", "image/webp"].includes(file.type)).slice(0, 4);
                 const skippedFiles = files.length - allowedFiles.length;
                 void Promise.allSettled(allowedFiles.map(async (file) => {
-                  const dataUrl = await optimizeReviewPhoto(file);
+                  const dataUrl = await optimizeJpegPhoto(file);
                   return dataUrl.length <= 550_000 ? { name: file.name, dataUrl } : null;
                 })).then((results) => {
                   const prepared = results.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);
@@ -127,25 +130,6 @@ function ReviewCard({ review }: { review: ProductReview }) {
     {review.title && <h3>{review.title}</h3>}{review.body && <p>{review.body}</p>}
     {review.photos?.length > 0 && <div className="product-review-card-photos" aria-label="Customer review photos">{review.photos.map((photo, index) => <Image key={index} src={photo} alt={`Customer photo ${index + 1}`} width={112} height={112} unoptimized />)}</div>}
   </article>;
-}
-
-async function optimizeReviewPhoto(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("This photo could not be prepared.");
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("This photo could not be prepared.")), "image/jpeg", 0.72));
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("This photo could not be prepared."));
-    reader.readAsDataURL(blob);
-  });
 }
 
 export function ProductWaitlistForm({ productId, productName }: { productId: string; productName: string }) {
@@ -226,4 +210,98 @@ export function ProductWaitlistForm({ productId, productName }: { productId: str
     </div>
   </div>
   </div>;
+}
+
+export function ProductReservationPanel({
+  productId,
+  productName,
+  reservationsOpen,
+}: {
+  productId: string;
+  productName: string;
+  reservationsOpen: boolean;
+}) {
+  const { deliveryCountries, language, t } = useLocalization();
+  const [reservationCount, setReservationCount] = useState<number | null>(null);
+  const [target, setTarget] = useState<number | null>(null);
+  const [open, setOpen] = useState(reservationsOpen);
+  const [email, setEmail] = useState("");
+  const [country, setCountry] = useState("");
+  const [loading, setLoading] = useState(Boolean(PONYO_API_BASE_URL));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!PONYO_API_BASE_URL) return;
+    let active = true;
+    void ponyoApi.getProductReservations(productId).then((result) => {
+      if (!active) return;
+      setReservationCount(result.reservationCount);
+      setTarget(result.target);
+      setOpen(result.open);
+    }).catch((loadError) => {
+      if (active) setError(loadError instanceof Error ? loadError.message : "Reservation information is unavailable.");
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [productId]);
+
+  async function reserve(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await ponyoApi.submitProductReservation(productId, {
+        email: email.trim(),
+        country,
+      });
+      setReservationCount(result.reservationCount);
+      setTarget(result.target);
+      setMessage(t("product.reservation.success", "Your interest is reserved. This is not a purchase, and no payment was taken."));
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : t("product.reservation.error", "Your reservation could not be saved."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const progress = target && reservationCount !== null
+    ? Math.min(100, Math.round((reservationCount / target) * 100))
+    : null;
+  const targetReached = target !== null && reservationCount !== null && reservationCount >= target;
+  const stage = targetReached
+    ? t("product.reservation.status.target_reached", "Reservation target reached")
+    : target !== null && reservationCount !== null
+      ? t("product.reservation.status.target_not_reached", "Target not reached · collecting reservations")
+      : t("product.reservation.status.collecting", "Collecting reservations");
+
+  return <section className="product-reservation" id="product-reservation" aria-labelledby="product-reservation-title">
+    <div className="product-reservation-heading">
+      <span className="product-reservation-seal" aria-hidden="true">✦</span>
+      <div><p className="eyebrow">{t("product.reservation.eyebrow", "A NOTE OF INTEREST · NO PAYMENT")}</p><h2 id="product-reservation-title">{t("product.reservation.title", "Reserve your interest")}</h2></div>
+    </div>
+    {loading ? <p className="product-reservation-status">{t("product.reservation.loading", "Loading the live reservation count…")}</p>
+      : reservationCount !== null && <div className="product-reservation-counter" aria-live="polite">
+        <strong>{reservationCount}{target ? <span> / {target}</span> : ""}</strong>
+        <span>{reservationCount === 1
+          ? t("product.reservation.people_one", "{{count}} person has reserved interest", { count: reservationCount })
+          : t("product.reservation.people_other", "{{count}} people have reserved interest", { count: reservationCount })}</span>
+        <span className={`product-reservation-stage${targetReached ? " is-reached" : ""}`}>{stage}</span>
+        {progress !== null && <><div className="product-reservation-progress" role="progressbar" aria-label={t("product.reservation.progress_label", "Reservation target reached")} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div><small>{t("product.reservation.progress", "{{progress}}% of the reservation target reached", { progress })}</small></>}
+        {target === null && <small>{t("product.reservation.target_not_set", "No reservation target has been set for this product yet.")}</small>}
+      </div>}
+    {!open ? <p className="product-reservation-status">{t("product.reservation.closed", "Reservations are not open for this piece yet.")}</p>
+      : !PONYO_API_BASE_URL ? <p className="product-reservation-status" role="status">{t("product.reservation.service_unavailable", "The reservation service is not configured right now.")}</p>
+      : <form onSubmit={reserve}>
+        <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required maxLength={320} /></label>
+        <label>{t("product.reservation.country", "Country")}<select autoComplete="country-name" value={country} onChange={(event) => setCountry(event.target.value)} required><option value="">{t("product.reservation.select_country", "Select your country")}</option>{deliveryCountries.map((item) => <option key={item.code} value={item.code}>{regionName(item.code, language, item.label)}</option>)}</select></label>
+        {error && <p className="api-form-error" role="alert">{error}</p>}
+        {message && <p className="product-form-success" role="status">{message}</p>}
+        <button className="product-review-submit" type="submit" disabled={saving}>{saving ? t("product.reservation.saving", "Saving your interest…") : t("product.reservation.submit", "Reserve my interest")}<span aria-hidden="true">→</span></button>
+      </form>}
+    <p className="product-reservation-disclaimer">{t("product.reservation.disclaimer", "{{product}} reservations only record interest. They are non-binding, do not create an order, and require no payment.", { product: productName })}</p>
+  </section>;
 }

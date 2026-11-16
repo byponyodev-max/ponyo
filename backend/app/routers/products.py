@@ -9,9 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from app.db import get_db
 from app.media import storefront_image_url
-from app.models import Brand, Customer, Order, OrderItem, OutboxEvent, Product, ProductCategory, ProductReview, ProductTranslation, ProductVariant, ProductWaitlistEntry
+from app.models import Brand, Customer, Order, OrderItem, OutboxEvent, Product, ProductCategory, ProductReservation, ProductReview, ProductTranslation, ProductVariant, ProductWaitlistEntry
 from app.catalog_stock import available_quantities, sellable_variant
-from app.schemas import ProductOut, ProductReviewCreate, ProductWaitlistRequest, VariantOut
+from app.schemas import ProductOut, ProductReservationRequest, ProductReviewCreate, ProductWaitlistRequest, VariantOut
 from app.security import get_current_customer, get_optional_customer, require_csrf
 from app.rate_limit import enforce_rate_limit
 from app.translations import AWS_TRANSLATE_CODES, get_product_translation
@@ -57,11 +57,22 @@ def product_response(product: Product, translated_name: str | None = None, trans
         currency=default_variant.currency if default_variant else product.currency,
         availability=availability,
         availabilityStatus=product.availability_status,
-        priceHistory=product.price_history or [],
         categoryName=product.category.name if product.category else product.category_name,
         categoryId=str(product.category_id) if product.category_id else None,
         brandId=str(product.brand_id) if product.brand_id else None,
         brandName=product.brand.name if product.brand else product.supplier_name,
+        makerName=product.brand.name if product.brand and not product.brand.is_demo else None,
+        makerSlug=product.brand.slug if product.brand and not product.brand.is_demo else None,
+        makerStory=product.brand.maker_story if product.brand and not product.brand.is_demo else None,
+        makerPhilosophy=product.brand.philosophy if product.brand and not product.brand.is_demo else None,
+        makerProcess=product.brand.process if product.brand and not product.brand.is_demo else None,
+        materials=product.materials,
+        weightGrams=product.weight_grams,
+        editionCount=product.edition_count,
+        estimatedDeliveryDate=product.estimated_delivery_date,
+        onlyAtPonyo=product.only_at_ponyo,
+        reservationsOpen=product.reservations_open,
+        reservationTarget=product.reservation_target,
         images=[{"url": storefront_image_url(image.url), "alt": image.alt} for image in product.images],
         galleryImages=[{"src": storefront_image_url(image.url), "alt": image.alt} for image in product.images],
         productType=product.product_type,
@@ -320,6 +331,61 @@ async def create_product_review(
         "rating": review.rating, "title": review.title, "body": review.body,
         "photos": review.photos or [],
         "verifiedPurchase": review.verified_purchase, "createdAt": review.created_at.isoformat(),
+    }}
+
+
+@router.get("/{product_id}/reservations", response_model=dict)
+async def get_product_reservations(product_id: UUID, db: AsyncSession = Depends(get_db)):
+    product = await product_by_id(product_id, db)
+    count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+        ProductReservation.product_id == product.id,
+    )) or 0
+    return {"data": {
+        "reservationCount": count,
+        "target": product.reservation_target,
+        "open": product.reservations_open,
+    }}
+
+
+@router.post("/{product_id}/reservations", response_model=dict)
+async def create_product_reservation(
+    product_id: UUID,
+    payload: ProductReservationRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "product-reservation", 10, 3600)
+    product = await product_by_id(product_id, db)
+    if not product.reservations_open:
+        raise HTTPException(status_code=409, detail="Reservations are not open for this product.")
+
+    email = str(payload.email).lower().strip()
+    existing = await db.scalar(select(ProductReservation.id).where(
+        ProductReservation.product_id == product.id,
+        ProductReservation.email == email,
+    ))
+    if existing is None:
+        db.add(ProductReservation(
+            product_id=product.id,
+            email=email,
+            country=payload.country.strip(),
+        ))
+        db.add(OutboxEvent(event_type="product.reservation_created", payload={
+            "productId": str(product.id), "productName": product.name, "email": email,
+        }))
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+
+    count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+        ProductReservation.product_id == product.id,
+    )) or 0
+    return {"data": {
+        "accepted": True,
+        "reservationCount": count,
+        "target": product.reservation_target,
     }}
 
 

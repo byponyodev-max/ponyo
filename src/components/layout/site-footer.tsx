@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
+import { storefrontFeatures } from "@/lib/storefront-features";
 
 const footerGroups = [
   {
@@ -10,7 +11,6 @@ const footerGroups = [
     title: "Shop",
     links: [
       ["home.footer.shop_all", "Shop All", "/collections/all"],
-      ["home.footer.rare", "Rare Finds", "/collections/rare-finds"],
       ["home.footer.premium", "Premium Plushies", "/collections/premium"],
       ["home.footer.domina", "XL Goodies", "/collections/domina-xl"],
       ["home.footer.new", "New Arrivals", "/collections/new-arrivals"],
@@ -24,7 +24,7 @@ const footerGroups = [
       ["home.footer.about_link", "About Ponyo", "/pages/about"],
       ["home.footer.journal", "The Plush Journal", "/blogs/news"],
       ["home.footer.request", "Request a plush", "/pages/contact"],
-      ["home.footer.partners", "Partner with Ponyo", "/pages/partners"],
+      ["home.footer.partners", "For Makers", "/for-makers"],
     ],
   },
   {
@@ -88,7 +88,7 @@ export function SiteFooter() {
           {footerGroups.map((group) => (
             <nav className="footer-column" key={group.title} aria-label={t(group.titleKey, group.title)}>
               <h2>{t(group.titleKey, group.title)}</h2>
-              {group.links.map(([key, fallback, href]) => <Link href={href} key={key}>{t(key, fallback)}</Link>)}
+              {group.links.filter(([key]) => key !== "home.footer.journal" || storefrontFeatures.plushJournal).map(([key, fallback, href]) => <Link href={href} key={key}>{t(key, fallback)}</Link>)}
             </nav>
           ))}
         </div>
@@ -108,9 +108,10 @@ export function SiteFooter() {
         <div className="footer-legal">
           <p>© {year} Ponyo. {t("home.footer.rights", "All rights reserved.")}</p>
           <nav aria-label={t("home.footer.policies", "Policies")}>
-            <Link href="/pages/faq">{t("home.footer.privacy", "Privacy")}</Link>
-            <Link href="/pages/faq">{t("home.footer.terms", "Terms")}</Link>
-            <Link href="/pages/faq">{t("home.footer.shipping", "Shipping")}</Link>
+            <Link href="/pages/privacy-policy">{t("home.footer.privacy", "Privacy Policy")}</Link>
+            <Link href="/pages/terms-of-service">{t("home.footer.terms", "Terms of Service")}</Link>
+            <Link href="/pages/returns-policy">{t("home.footer.returns", "Returns & Refunds")}</Link>
+            <Link href="/pages/specified-commercial-transactions-act-disclosure">{t("home.footer.commercial", "Commercial Transactions")}</Link>
           </nav>
         </div>
       </div>

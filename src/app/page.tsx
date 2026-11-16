@@ -5,14 +5,12 @@ import { HomeCarousel } from "@/components/home/home-carousel";
 import { HomeSparkleRain } from "@/components/home/home-sparkle-rain";
 import { AnimalTabs } from "@/components/home/animal-tabs";
 import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
-import { HomeStatCount } from "@/components/home/home-stat-count";
 import { HomeInterestForms } from "@/components/layout/local-store-forms";
 import { ProductShelf } from "@/components/product/product-shelf";
 import { getLocalizedProducts } from "@/services/localized-products.server";
 import { LocalizedPrice, LocalizedText } from "@/components/layout/localization-provider";
 import type { Product } from "@/types/product";
 import locale from "@/locales/en.default.json";
-import { uniqueProducts } from "@/lib/featured-products";
 
 const images = {
   bunny: "/images/catalog/maker-bunny.jpg",
@@ -70,17 +68,12 @@ function AisleCard({ title, description, titleKey, descriptionKey, href, product
 
 export default async function Home() {
   const products = await getLocalizedProducts();
-  const rare = uniqueProducts(products.filter((product) => product.tags?.includes("rare")));
   const premium = byTag(products, "premium", 12);
   const domina = byTag(products, "domina-xl", 6);
   const arrivals = byTag(products, "new-arrival", 10);
   const comingSoon = products.filter((product) => product.availabilityStatus === "Coming Soon");
-  const rarePreview = rare.slice(0, 3);
-  const rareSpotlight = rarePreview[0];
-  const rareSupporting = rarePreview.slice(1);
   const allTrending = products.filter((product) => !product.tags?.includes("new-arrival")).slice(0, 12);
   const aisles = [
-    { title: "Rare Finds", description: "Hard-to-find and limited-edition plush.", titleKey: "home.aisles.rare_title", descriptionKey: "home.aisles.rare_sub", href: "/collections/rare-finds", products: rarePreview },
     { title: "Premium Plushies", description: "Top-quality plush with extra-soft finishes.", titleKey: "home.aisles.premium_title", descriptionKey: "home.aisles.premium_sub", href: "/collections/premium", products: premium.slice(0, 4) },
     { title: "XL Goodies", description: "Giant plush, big enough to hug back.", titleKey: "home.aisles.xl_title", descriptionKey: "home.aisles.xl_sub", href: "/collections/domina-xl", products: domina },
     { title: "Shop by animal", description: "Bears, bunnies, cats and more.", titleKey: "home.aisles.animal_title", descriptionKey: "home.aisles.animal_sub", href: "/collections", products: ["bears", "bunnies", "cats", "pandas"].map((category) => products.find((product) => product.categoryName.toLocaleLowerCase() === category || product.tags?.some((tag) => tag.toLocaleLowerCase() === category))).filter((product): product is Product => Boolean(product)) },
@@ -103,15 +96,6 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="store-stats-bar" aria-label="Ponyo collection highlights" data-sparkle-end>
-        <div className="store-stats">
-          <Link className="store-stat-all" href="/collections/all"><b>🧸</b><span className="store-stat-copy"><strong><HomeStatCount value={products.length} /></strong><span><LocalizedText translationKey="home.stats.all" fallback={locale.home.stats.all} /></span></span></Link>
-          {rare.length > 0 && <Link className="store-stat-rare" href="/collections/rare-finds"><b>💎</b><span className="store-stat-copy"><strong><HomeStatCount value={rare.length} /></strong><span><LocalizedText translationKey="home.stats.rare" fallback={locale.home.stats.rare} /></span></span></Link>}
-          {premium.length > 0 && <Link className="store-stat-premium" href="/collections/premium"><b>✨</b><span className="store-stat-copy"><strong><HomeStatCount value={premium.length} /></strong><span><LocalizedText translationKey="home.stats.premium" fallback={locale.home.stats.premium} /></span></span></Link>}
-          <Link className="store-stat-xl" href="/pages/domina-xl"><b>📏</b><span className="store-stat-copy"><strong><HomeStatCount value={120} /> <small>cm</small></strong><span><LocalizedText translationKey="home.stats.xl" fallback={locale.home.stats.xl} /></span></span></Link>
-        </div>
-      </section>
-
       <nav className="home-category-rail" aria-label="Shop by type">
         <div className="home-category-rail-card"><strong><LocalizedText translationKey="home.category_rail.title" fallback="Find your kind of plush" /></strong>
           <ul>{categories.map((category) => <li key={category.title}><Link href={category.href}><Image src={category.image} alt="" width={56} height={56} /><span><LocalizedText translationKey={`home.categories.${category.title === "Giant plush" ? "giant" : category.title === "Cute Characters" ? "characters" : category.title === "Premium" ? "premium" : category.title === "More plush" ? "more" : category.title.toLowerCase()}`} fallback={category.title} /></span></Link></li>)}</ul>
@@ -131,14 +115,6 @@ export default async function Home() {
           <Link href="/collections/all?filter.v.price.gte=60000"><span><LocalizedText translationKey="home.budget.giant" fallback="Giant splurge" /></span><strong><LocalizedText translationKey="home.budget.over" fallback="¥60,000+" /></strong><i aria-hidden="true">→</i></Link>
         </div>
       </section>
-
-      {rareSpotlight && <section className="rare-spotlight store-container" id="rare-finds">
-        <header><div><h2><LocalizedText translationKey="home.rare.title" fallback="Rare Finds" /></h2><p><LocalizedText translationKey="home.rare.body" fallback="Retired, discontinued, and limited-edition plush that is hard to find anywhere else." /></p></div><Link href="/collections/rare-finds"><LocalizedText translationKey="home.see_all" fallback="See all →" /></Link><span className="home-campaign-jellyfish home-campaign-jellyfish--silver" aria-hidden="true"><JellyfishArtwork id="rare-jumbo-silver" tone="silver" direction={-1} /></span></header>
-        <div className="rare-spotlight-grid">
-          <Link className="rare-featured-product" href={`/products/${rareSpotlight.id}`}><Image src={rareSpotlight.image} alt={rareSpotlight.imageAlt} fill sizes="(max-width: 1024px) 100vw, 52vw" /><span className="rare-spotlight-shade"/><span className="rare-spotlight-badge">✦ <LocalizedText translationKey="home.rare.spotlight" fallback="Spotlight" /></span><span className="rare-featured-copy"><strong><LocalizedText translationKey={`product.names.${rareSpotlight.slug}`} fallback={rareSpotlight.name} /></strong>{rareSpotlight.size && <small>{rareSpotlight.size}</small>}<b><LocalizedPrice amount={rareSpotlight.priceAmount} sourceCurrency={rareSpotlight.currency} /> <i><LocalizedText translationKey="home.rare.view_plush" fallback="View plush →" /></i></b></span></Link>
-          <div className={`rare-supporting-grid${rareSupporting.length === 1 ? " is-single" : ""}`}>{rareSupporting.map((product) => <Link href={`/products/${product.id}`} key={product.id}><span className="rare-supporting-image"><Image src={product.image} alt={product.imageAlt} fill sizes="(max-width: 700px) 44vw, 24vw"/></span><span className="rare-supporting-badge">{product.tags?.includes("rare") && <LocalizedText translationKey="home.rare.new_badge" fallback="✦ Rare · New" />}</span><strong><LocalizedText translationKey={`product.names.${product.slug}`} fallback={product.name} /></strong><small>{product.size ?? product.sizeTier ?? product.productType ?? product.categoryName}</small><b><LocalizedPrice amount={product.priceAmount} sourceCurrency={product.currency} /></b></Link>)}</div>
-        </div>
-      </section>}
 
       <ProductShelf className="home-live-shelf" id="new-arrivals" eyebrow="Just landed" title="Just landed" description="The newest plush on Ponyo. Swipe to see them all." products={arrivals} href="/collections/new-arrivals" linkLabel="See all →" rail compact />
       {comingSoon.length > 0 && <ProductShelf className="home-live-shelf coming-soon-shelf" id="coming-soon" eyebrow="A little preview" title="Coming soon" description="Meet the next plush friends on their way to Ponyo. Ask us to let you know when they arrive." products={comingSoon} href="/collections/all" linkLabel="Explore all plush →" decoration={<span className="home-campaign-jellyfish home-campaign-jellyfish--gold" aria-hidden="true"><JellyfishArtwork id="coming-soon-gold" tone="gold" direction={-1} /></span>} />}

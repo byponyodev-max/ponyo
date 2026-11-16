@@ -31,6 +31,63 @@ const dominaSortOptions = [
   { value: "created-descending", label: "Date, new to old" },
 ];
 
+const legalDrafts: Record<string, { title: string; subtitle: string; sections: Array<{ heading: string; body: string }> }> = {
+  "specified-commercial-transactions-act-disclosure": {
+    title: "Specified Commercial Transactions Act Disclosure",
+    subtitle: "特定商取引法に基づく表記 · Draft for operational and legal review",
+    sections: [
+      { heading: "Business operator", body: "[Business operator's legal name — confirm before publication.] This disclosure is a draft and must be completed with the operator's verified details." },
+      { heading: "Address and contact", body: "Business address: [Confirm before publication.] Telephone: [Confirm before publication.] Contact: [Publish a monitored contact method before accepting transactions.]" },
+      { heading: "Price and additional charges", body: "Current product reservations are non-binding expressions of interest. No purchase price, shipping fee, tax, or other payment is collected for a reservation. Applicable prices and any additional charges must be stated before a future purchase is offered." },
+      { heading: "Payment and delivery", body: "No payment method or delivery schedule applies to a reservation. Payment methods, delivery timing, and shipping charges for any future sale remain to be confirmed and must be disclosed before checkout is enabled." },
+      { heading: "Cancellation and returns", body: "A reservation does not create an order and does not require payment. Cancellation instructions for reservations and any future cancellation, return, or refund terms must be confirmed and published before launch of a paid transaction." },
+    ],
+  },
+  "privacy-policy": {
+    title: "Privacy Policy",
+    subtitle: "Draft describing reservation and maker-application information",
+    sections: [
+      { heading: "Information collected", body: "A reservation collects an email address, country, product reference, and reservation timestamp. A maker application collects maker and contact names, email, country and city, website or social links, product URL and description, evidence of customer demand, material and price-range details, submitted product photos, exclusivity information, and application status." },
+      { heading: "How information is used", body: "Ponyo uses reservation details to record and count expressions of interest and to manage maker applications. An application is reviewed by the Ponyo team; submitting one does not guarantee selection or a partnership." },
+      { heading: "Storage and retention", body: "Submitted information is stored in Ponyo's application database. Retention periods, hosting locations, backup practices, and deletion schedules must be confirmed and published before this draft is finalized." },
+      { heading: "Sharing", body: "Before publication, Ponyo must identify any hosting, security, email, or other service providers that process this information, their purposes and locations, and any cross-border transfers. Do not publish this draft until those details are verified." },
+      { heading: "Your choices and requests", body: "For access, correction, deletion, or questions about submitted information, contact Ponyo through the contact page. A monitored privacy contact and the process and timing for handling requests must be confirmed before publication." },
+    ],
+  },
+  "terms-and-returns": {
+    title: "Terms and Returns",
+    subtitle: "Draft for the current no-payment reservation model",
+    sections: [
+      { heading: "Using this website", body: "Use the site lawfully and provide accurate information when submitting a reservation or maker application. Product information may be incomplete while maker details are being verified." },
+      { heading: "Reservations are not purchases", body: "A reservation records interest in a product only. It is non-binding, does not create an order or guarantee availability, and does not collect payment. Reservation counts describe recorded submissions and are not a purchase commitment or promise of production." },
+      { heading: "Canceling a reservation", body: "A reservation may be canceled by contacting Ponyo through the contact page and identifying the product and email used. The cancellation workflow and a monitored contact address must be confirmed before launch; no payment is due or refunded for a reservation." },
+      { heading: "Future purchases, returns, and refunds", body: "Paid transactions, payment methods, delivery terms, statutory disclosures, cancellation rights, returns, and refunds are not part of the current reservation flow. Ponyo must publish final terms before enabling checkout or collecting payment." },
+      { heading: "Draft status", body: "This document is not final legal advice. Review it with legal professionals familiar with Japanese and Korean requirements, and confirm the applicable governing law and consumer disclosures before publication." },
+    ],
+  },
+  "terms-of-service": {
+    title: "Terms of Service",
+    subtitle: "Draft for the current no-payment reservation model",
+    sections: [
+      { heading: "Using this website", body: "Use the site lawfully and provide accurate information when submitting a reservation or maker application. Product information may be incomplete while maker details are being verified." },
+      { heading: "Reservations are not purchases", body: "A reservation records interest in a product only. It is non-binding, does not create an order or guarantee availability, and does not collect payment. Reservation counts describe recorded submissions and are not a purchase commitment or promise of production." },
+      { heading: "Canceling a reservation", body: "A reservation may be canceled by contacting Ponyo through the contact page and identifying the product and email used. The cancellation workflow and a monitored contact address must be confirmed before launch; no payment is due or refunded for a reservation." },
+      { heading: "Future purchases", body: "Paid transactions, payment methods, delivery terms, statutory disclosures, and cancellation rights are not part of the current reservation flow. Ponyo must publish final terms before enabling checkout or collecting payment." },
+      { heading: "Draft status", body: "This document is not final legal advice. Review it with legal professionals familiar with Japanese and Korean requirements, and confirm the applicable governing law and consumer disclosures before publication." },
+    ],
+  },
+  "returns-policy": {
+    title: "Returns and Refunds",
+    subtitle: "Draft — paid purchases are not available in the current reservation flow",
+    sections: [
+      { heading: "Current reservations", body: "A reservation records interest only. It is not a purchase, no payment is collected, and no refund applies to a reservation." },
+      { heading: "Canceling a reservation", body: "A reservation may be canceled by contacting Ponyo through the contact page and identifying the product and email used. Confirm a monitored contact method and the cancellation workflow before publication." },
+      { heading: "Future paid orders", body: "No returns or refund terms for paid purchases are active in the current no-payment reservation flow. Before checkout or payment is enabled, Ponyo must publish a complete policy that reflects its actual operations and applicable consumer rights." },
+      { heading: "Draft status", body: "This document is not final legal advice. Review it with legal professionals familiar with Japanese and Korean requirements before publication." },
+    ],
+  },
+};
+
 const faqGroups = [
   { id: "ordering", title: faq.ordering_title, questions: [[faq.ordering_q1, faq.ordering_a1], [faq.ordering_q2, faq.ordering_a2], [faq.ordering_q3, faq.ordering_a3]] },
   { id: "shipping", title: faq.shipping_title, questions: [[faq.shipping_q1, faq.shipping_a1], [faq.shipping_q2, faq.shipping_a2], [faq.shipping_q3, faq.shipping_a3], [faq.shipping_q4, faq.shipping_a4]] },
@@ -46,7 +103,18 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (slug === "domina-xl") return { title: "Domina XL", description: domina.sub };
   if (slug === "contact") return { title: "Contact Ponyo" };
   if (slug === "partners") return { title: "Partner with Ponyo", description: "Share your plush collection with the Ponyo community." };
+  if (legalDrafts[slug]) return { title: `${legalDrafts[slug].title} · Ponyo`, description: legalDrafts[slug].subtitle };
   return { title: "Ponyo" };
+}
+
+function LegalDraftPage({ draft, slug }: { draft: (typeof legalDrafts)[string]; slug: string }) {
+  return <SiteFrame className="store-page legal-draft-page">
+    <article className="legal-draft store-container">
+      <header><p className="eyebrow"><LocalizedText translationKey="legal.draft.eyebrow" fallback="PONYO · POLICY DRAFT" /></p><h1><LocalizedText translationKey={`legal.${slug}.title`} fallback={draft.title} /></h1><p><LocalizedText translationKey={`legal.${slug}.subtitle`} fallback={draft.subtitle} /></p><strong className="legal-draft-warning"><LocalizedText translationKey="legal.draft.warning" fallback="DRAFT — confirm business details and obtain legal review before publication." /></strong></header>
+      <div>{draft.sections.map((section, index) => <section key={section.heading}><h2><LocalizedText translationKey={`legal.${slug}.section.${index + 1}.heading`} fallback={section.heading} /></h2><p><LocalizedText translationKey={`legal.${slug}.section.${index + 1}.body`} fallback={section.body} /></p></section>)}</div>
+      <p className="legal-draft-contact"><LocalizedText translationKey="legal.draft.questions" fallback="Questions?" /> <Link href="/pages/contact"><LocalizedText translationKey="legal.draft.contact" fallback="Contact Ponyo" /></Link>.</p>
+    </article>
+  </SiteFrame>;
 }
 
 function AboutPage() {
@@ -233,5 +301,6 @@ export default async function ContentPage({ params, searchParams }: { params: Pr
   if (slug === "contact") return <SiteFrame className="store-page"><ContactPage/></SiteFrame>;
   if (slug === "partners") return <SiteFrame className="store-page"><PartnerPage /></SiteFrame>;
   if (slug === "domina-xl") return <SiteFrame className="store-page"><DominaPage searchParams={searchParams} /></SiteFrame>;
+  if (legalDrafts[slug]) return <LegalDraftPage draft={legalDrafts[slug]} slug={slug} />;
   notFound();
 }

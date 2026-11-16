@@ -11,10 +11,12 @@ from app.db import get_db
 from app.models import (
     Brand,
     Customer,
+    MakerApplication,
     Order,
     OrderItem,
     Product,
     ProductCategory,
+    ProductReservation,
     ProductVariant,
     Shipment,
     Supplier,
@@ -24,7 +26,14 @@ from app.models import (
     SupplierPurchaseOrderItem,
 )
 from app.rate_limit import enforce_rate_limit
-from app.schemas import AdminProductPublicationRequest, AdminSupplierStatusRequest
+from app.schemas import (
+    AdminBrandProfileRequest,
+    AdminMakerApplicationStatusRequest,
+    AdminProductProofRequest,
+    AdminProductPublicationRequest,
+    AdminProductReservationSettings,
+    AdminSupplierStatusRequest,
+)
 from app.security import require_csrf, require_roles
 
 router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
@@ -66,6 +75,13 @@ def product_summary(product: Product) -> dict:
         "variantCount": len(variants),
         "stockQuantity": sum(max(0, variant.stock_quantity) for variant in variants),
         "availability": "available" if any(variant.stock_quantity > 0 for variant in variants) else "unavailable",
+        "materials": product.materials,
+        "weightGrams": product.weight_grams,
+        "editionCount": product.edition_count,
+        "estimatedDeliveryDate": product.estimated_delivery_date.isoformat() if product.estimated_delivery_date else None,
+        "onlyAtPonyo": product.only_at_ponyo,
+        "reservationsOpen": product.reservations_open,
+        "reservationTarget": product.reservation_target,
     }
 
 
@@ -230,6 +246,85 @@ async def set_product_publication(product_id: UUID, payload: AdminProductPublica
     return {"data": product_summary(product)}
 
 
+@router.get("/reservations", response_model=dict)
+async def list_product_reservations(_admin: Customer = Depends(require_roles("admin")), db: AsyncSession = Depends(get_db)):
+    products = (await db.scalars(
+        select(Product).order_by(Product.name, Product.id)
+        .options(selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images))
+    )).all()
+    counts = dict((await db.execute(
+        select(ProductReservation.product_id, func.count(ProductReservation.id))
+        .group_by(ProductReservation.product_id)
+    )).all())
+    country_counts: dict[UUID, list[dict[str, str | int]]] = {}
+    for product_id, country, count in (await db.execute(
+        select(ProductReservation.product_id, ProductReservation.country, func.count(ProductReservation.id))
+        .group_by(ProductReservation.product_id, ProductReservation.country)
+        .order_by(ProductReservation.country)
+    )).all():
+        country_counts.setdefault(product_id, []).append({"country": country, "count": count})
+    return {"data": [
+        {
+            **product_summary(product),
+            "reservationCount": counts.get(product.id, 0),
+            "reservationsByCountry": country_counts.get(product.id, []),
+        }
+        for product in products
+    ]}
+
+
+@router.patch("/products/{product_id}/reservations", response_model=dict)
+async def set_product_reservation_settings(
+    product_id: UUID,
+    payload: AdminProductReservationSettings,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-product-reservations", 30, 60)
+    product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update())
+    if product is None:
+        raise HTTPException(404, "Product not found.")
+    product.reservations_open = payload.reservationsOpen
+    product.reservation_target = payload.reservationTarget
+    await db.commit()
+    return {"data": {
+        "id": str(product.id),
+        "reservationsOpen": product.reservations_open,
+        "reservationTarget": product.reservation_target,
+    }}
+
+
+@router.patch("/products/{product_id}/proof", response_model=dict)
+async def update_product_proof(
+    product_id: UUID,
+    payload: AdminProductProofRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-product-proof", 30, 60)
+    product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update().options(
+        selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images),
+    ))
+    if product is None:
+        raise HTTPException(404, "Product not found.")
+    changes = payload.model_dump(exclude_unset=True)
+    field_map = {
+        "materials": "materials",
+        "weightGrams": "weight_grams",
+        "editionCount": "edition_count",
+        "estimatedDeliveryDate": "estimated_delivery_date",
+        "onlyAtPonyo": "only_at_ponyo",
+    }
+    for field, value in changes.items():
+        setattr(product, field_map[field], value)
+    await db.commit()
+    return {"data": product_summary(product)}
+
+
 @router.get("/suppliers", response_model=dict)
 async def list_suppliers(_admin: Customer = Depends(require_roles("admin")), db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(
@@ -254,8 +349,90 @@ async def list_brands(_admin: Customer = Depends(require_roles("admin")), db: As
         .order_by(Brand.name)
     )).all()
     return {"data": [{"id": str(brand.id), "slug": brand.slug, "name": brand.name,
-                       "isDemo": brand.is_demo, "productCount": product_count}
+                       "isDemo": brand.is_demo, "productCount": product_count,
+                       "profileImageUrl": brand.profile_image_url, "makerStory": brand.maker_story,
+                       "philosophy": brand.philosophy, "process": brand.process, "location": brand.location,
+                       "specialties": brand.specialties or [], "website": brand.website,
+                       "socialMedia": brand.social_media}
                       for brand, product_count in rows]}
+
+
+@router.patch("/brands/{brand_id}/profile", response_model=dict)
+async def update_brand_profile(
+    brand_id: UUID,
+    payload: AdminBrandProfileRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-brand-profile", 30, 60)
+    brand = await db.scalar(select(Brand).where(Brand.id == brand_id).with_for_update())
+    if brand is None:
+        raise HTTPException(404, "Brand not found.")
+    changes = payload.model_dump(exclude_unset=True)
+    field_map = {
+        "profileImageUrl": "profile_image_url",
+        "makerStory": "maker_story",
+        "philosophy": "philosophy",
+        "process": "process",
+        "location": "location",
+        "specialties": "specialties",
+        "website": "website",
+        "socialMedia": "social_media",
+    }
+    for field, value in changes.items():
+        if field in {"profileImageUrl", "website", "socialMedia"} and value is not None:
+            value = str(value)
+        setattr(brand, field_map[field], value)
+    await db.commit()
+    return {"data": {"id": str(brand.id), "slug": brand.slug, "name": brand.name}}
+
+
+@router.get("/maker-applications", response_model=dict)
+async def list_maker_applications(_admin: Customer = Depends(require_roles("admin")), db: AsyncSession = Depends(get_db)):
+    applications = (await db.scalars(
+        select(MakerApplication).order_by(MakerApplication.created_at.desc(), MakerApplication.id)
+    )).all()
+    return {"data": [{
+        "id": str(application.id),
+        "makerName": application.maker_name,
+        "contactPerson": application.contact_person,
+        "email": application.email,
+        "country": application.country,
+        "city": application.city,
+        "website": application.website or None,
+        "socialMedia": application.social_media or None,
+        "productUrl": application.product_url,
+        "productDescription": application.product_description,
+        "provenDesireEvidence": application.proven_desire_evidence,
+        "materials": application.materials,
+        "priceRange": application.price_range,
+        "productPhotos": application.product_photos,
+        "ponyoExclusivity": application.ponyo_exclusivity,
+        "status": application.status,
+        "createdAt": application.created_at.isoformat(),
+    } for application in applications]}
+
+
+@router.patch("/maker-applications/{application_id}/status", response_model=dict)
+async def set_maker_application_status(
+    application_id: UUID,
+    payload: AdminMakerApplicationStatusRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-maker-application-status", 30, 60)
+    application = await db.scalar(select(MakerApplication).where(
+        MakerApplication.id == application_id,
+    ).with_for_update())
+    if application is None:
+        raise HTTPException(404, "Maker application not found.")
+    application.status = payload.status
+    await db.commit()
+    return {"data": {"id": str(application.id), "status": application.status}}
 
 
 @router.patch("/suppliers/{supplier_id}/status", response_model=dict)

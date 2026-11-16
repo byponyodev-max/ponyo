@@ -111,6 +111,10 @@
     color: #573b31;
 }
 
+.store-main .product-card-item>.product-card-action-wrap .product-card-action.is-reservation {
+    text-decoration: none;
+}
+
 .store-main .product-card-item>.product-card-action-wrap .product-card-action.is-notify::before {
     border-color: rgb(190 151 78 / 38%);
 }

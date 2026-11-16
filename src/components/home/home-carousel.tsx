@@ -6,14 +6,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalization } from "@/components/layout/localization-provider";
 
 const slideCatalog = [
-  { key: "rare", collection: "rare-finds", kicker: "HARD TO FIND", title: "Rare Finds", description: "Retired, discontinued, and limited-edition plush.", action: "Shop Rare Finds", href: "/shop?category=rare-finds", image: "/images/catalog/ponyo-2.png", imageAlt: "A lineup of soft plush toys sitting together" },
   { key: "xl", collection: "domina-xl", kicker: "DOMINA BY PONYO", title: "XL Goodies", description: "Big plush that fills a room, including Domina.", action: "Shop XL Goodies", href: "/shop?category=domina-xl", image: "/images/catalog/ponyo-3.png", imageAlt: "A person holding an oversized cream bunny plush" },
   { key: "premium", collection: "premium", kicker: "MADE TO LAST", title: "Premium Plushies", description: "Soft, well-made plush chosen for materials and craftsmanship.", action: "Shop Premium Plushies", href: "/shop?category=premium", image: "/images/catalog/ponyo-5.png", imageAlt: "A grid of soft premium plush friends" },
   { key: "new", collection: "new-arrival", kicker: "JUST LANDED", title: "New Discoveries", description: "Fresh finds from new brands and makers.", action: "See what is new", href: "/shop?category=new-arrival", image: "/images/catalog/ponyo-6.png", imageAlt: "A pile of new plush friends on a cosy bed" },
 ];
 
 export function HomeCarousel({ hasCollectibles = false }: { hasCollectibles?: boolean }) {
-  const slides = hasCollectibles ? [slideCatalog[0], slideCatalog[1], slideCatalog[2], { key: "collectibles", collection: "collectibles", kicker: "FOR COLLECTORS", title: "Collectibles", description: "Figurines and collectible toys.", action: "Shop Collectibles", href: "/shop?category=collectibles", image: "/images/catalog/ponyo-7.png", imageAlt: "A grid of collectible plush friends" }, slideCatalog[3]] : slideCatalog;
+  const slides = hasCollectibles ? [slideCatalog[0], slideCatalog[1], { key: "collectibles", collection: "collectibles", kicker: "FOR COLLECTORS", title: "Collectibles", description: "Figurines and collectible toys.", action: "Shop Collectibles", href: "/shop?category=collectibles", image: "/images/catalog/ponyo-7.png", imageAlt: "A grid of collectible plush friends" }, slideCatalog[2]] : slideCatalog;
   const trackRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef(0);
   const timerRef = useRef<number | null>(null);
@@ -22,7 +21,6 @@ export function HomeCarousel({ hasCollectibles = false }: { hasCollectibles?: bo
   const { t } = useLocalization();
 
   const copyKeys: Record<string, { kicker: string; title: string; description: string; action: string }> = {
-    rare: { kicker: "home.slides.rare_eyebrow", title: "home.pillars.rare_title", description: "home.pillars.rare_body", action: "home.slides.rare_cta" },
     xl: { kicker: "home.slides.xl_eyebrow", title: "home.pillars.xl_title", description: "home.pillars.xl_body", action: "home.slides.xl_cta" },
     premium: { kicker: "home.slides.premium_eyebrow", title: "home.pillars.premium_title", description: "home.pillars.premium_body", action: "home.slides.premium_cta" },
     new: { kicker: "home.slides.new_eyebrow", title: "home.pillars.new_title", description: "home.pillars.new_body", action: "home.slides.new_cta" },

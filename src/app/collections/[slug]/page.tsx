@@ -10,5 +10,6 @@ export default async function CollectionAliasPage({ params, searchParams }: { pa
     return WishlistPage();
   }
   if (slug === "frontpage" || slug === "collectibles") redirect("/collections");
+  if (slug === "rare-finds") redirect("/collections/all");
   return ShopPage({ searchParams: Promise.resolve({ ...query, category: slug === "all" ? query.category : slug }) });
 }

@@ -39,6 +39,7 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
         await seed.seed_products()
         async with sessions() as db:
             product = await db.scalar(select(Product).where(Product.slug == "mochi-cloud"))
+            assert product.reservations_open is True
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id))
             offer = await db.scalar(select(SupplierOffer).where(SupplierOffer.variant_id == variant.id))
             inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == offer.id))

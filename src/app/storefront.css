@@ -2165,6 +2165,9 @@
         background: #fffdfa;
         box-shadow: 0 -5px 20px #2c1b1512;
     }
+    .mobile-tab-bar.mobile-tab-bar--p0 {
+        grid-template-columns: repeat(3, 1fr);
+    }
     .mobile-tab-bar a {
         min-width: 0;
         display: flex;

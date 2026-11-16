@@ -21,7 +21,6 @@ const collectionPromos = [
   { key: "domina", href: "/pages/domina-xl", titleKey: "fill.domina_title", bodyKey: "fill.domina_body", actionKey: "fill.domina_cta", title: "Think bigger", body: "Giant plush up to 120 cm from Domina XL.", action: "Shop XL Goodies" },
   { key: "all", href: "/collections/all", titleKey: "fill.all_title", bodyKey: "fill.all_body", actionKey: "fill.all_cta", title: "More to discover", body: "Browse every plush in the marketplace.", action: "Shop all plush" },
   { key: "request", href: "/pages/contact", titleKey: "fill.request_title", bodyKey: "fill.request_body", actionKey: "fill.request_cta", title: "Can't find it?", body: "Tell us the plush you're hunting for and we'll look for it.", action: "Request a plush" },
-  { key: "rare", href: "/collections/rare-finds", titleKey: "fill.rare_title", bodyKey: "fill.rare_body", actionKey: "fill.rare_cta", title: "Rare Finds", body: "Hard-to-find and limited-edition plush.", action: "Explore rare" },
 ];
 
 export function ProductGrid({ products, badges, rail = false, compact = false, fillSlots = false, fillColumns = [2, 3, 4, 5], promoOffset = 0, promoCount = collectionPromos.length }: ProductGridProps) {

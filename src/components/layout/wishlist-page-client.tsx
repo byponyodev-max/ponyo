@@ -69,7 +69,7 @@ export function WishlistPageClient({ products }: { products: Product[] }) {
         <h3>{wishlistReady ? t("wishlist.studio.empty_title", "Make room for a little love.") : t("wishlist.studio.checking", "Gathering your favorites…")}</h3>
         <p>{t("wishlist.studio.empty_body", "Found a plush that feels like you? Tap its heart and we’ll keep it here for your next visit.")}</p>
         <Link className="wishlist-studio-primary" href="/shop">{t("wishlist.studio.empty_cta", "Find your first favorite")}<span aria-hidden="true">→</span></Link>
-        <Link className="wishlist-studio-secondary" href="/collections/rare-finds">{t("wishlist.studio.rare", "Explore Rare Finds")} <span aria-hidden="true">↗</span></Link>
+        <Link className="wishlist-studio-secondary" href="/collections/all">{t("wishlist.studio.rare", "Explore all plush")} <span aria-hidden="true">↗</span></Link>
       </div>}
       <p className="wishlist-studio-footer"><span aria-hidden="true">♡</span>{t("wishlist.studio.tip", "Love it now. Come back for it later.")}</p>
     </section>

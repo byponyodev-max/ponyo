@@ -6,7 +6,9 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 SUPPORTED_CURRENCIES = {"JPY", "USD", "EUR", "GBP", "AUD", "CAD", "IDR"}
-CURRENCY_DIGITS = {"JPY": 0, "USD": 2, "EUR": 2, "GBP": 2, "AUD": 2, "CAD": 2, "IDR": 0}
+SUPPORTED_DISPLAY_CURRENCIES = {"JPY", "KRW"}
+_REQUIRED_RATE_CURRENCIES = (SUPPORTED_CURRENCIES | {"KRW"}) - {"JPY"}
+CURRENCY_DIGITS = {"JPY": 0, "KRW": 0, "USD": 2, "EUR": 2, "GBP": 2, "AUD": 2, "CAD": 2, "IDR": 0}
 _RATE_CACHE_SECONDS = 3600
 _cached_rates: dict[str, Any] | None = None
 _cached_at = 0.0
@@ -14,14 +16,14 @@ _cache_lock = asyncio.Lock()
 
 
 def _fetch_jpy_rates() -> dict[str, Any]:
-    url = "https://api.frankfurter.dev/v1/latest?base=JPY&symbols=USD,EUR,GBP,AUD,CAD,IDR"
+    url = "https://api.frankfurter.dev/v1/latest?base=JPY&symbols=USD,EUR,GBP,AUD,CAD,IDR,KRW"
     request = Request(url, headers={"Accept": "application/json", "User-Agent": "Ponyo-Storefront/1.0"})
     with urlopen(request, timeout=5) as response:
         payload = json.loads(response.read())
     rates = payload.get("rates")
     if payload.get("base") != "JPY" or not isinstance(rates, dict):
         raise ValueError("Invalid FX response")
-    if any(code not in rates or not isinstance(rates[code], (int, float)) or rates[code] <= 0 for code in SUPPORTED_CURRENCIES - {"JPY"}):
+    if any(code not in rates or not isinstance(rates[code], (int, float)) or rates[code] <= 0 for code in _REQUIRED_RATE_CURRENCIES):
         raise ValueError("Incomplete FX response")
     return {"base": "JPY", "date": payload.get("date"), "rates": {"JPY": 1, **rates}}
 

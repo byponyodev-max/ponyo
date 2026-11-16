@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, Uuid, false, func, true
@@ -118,8 +118,47 @@ class ProductWaitlistEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class ProductReservation(Base):
+    __tablename__ = "product_reservations"
+    __table_args__ = (UniqueConstraint("product_id", "email", name="uq_product_reservations_product_email"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    country: Mapped[str] = mapped_column(String(100))
+    accepted_disclaimer_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class MakerApplication(Base):
+    __tablename__ = "maker_applications"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    maker_name: Mapped[str] = mapped_column(String(180))
+    contact_person: Mapped[str] = mapped_column(String(160))
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    country: Mapped[str] = mapped_column(String(100))
+    city: Mapped[str] = mapped_column(String(120))
+    website: Mapped[str] = mapped_column(String(500), default="")
+    social_media: Mapped[str] = mapped_column(String(500), default="")
+    product_url: Mapped[str] = mapped_column(String(500))
+    product_description: Mapped[str] = mapped_column(Text)
+    proven_desire_evidence: Mapped[str] = mapped_column(Text)
+    materials: Mapped[str] = mapped_column(Text)
+    price_range: Mapped[str] = mapped_column(String(160))
+    product_photos: Mapped[list[str]] = mapped_column(JSON, default=list)
+    ponyo_exclusivity: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class Product(Base):
     __tablename__ = "products"
+    __table_args__ = (
+        CheckConstraint("weight_grams IS NULL OR weight_grams >= 0", name="ck_products_weight_nonnegative"),
+        CheckConstraint("edition_count IS NULL OR edition_count > 0", name="ck_products_edition_positive"),
+        CheckConstraint("reservation_target IS NULL OR reservation_target > 0", name="ck_products_reservation_target_positive"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     sku: Mapped[str] = mapped_column(String(120), unique=True, default=new_product_sku)
@@ -131,7 +170,6 @@ class Product(Base):
     compare_at_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     availability: Mapped[str] = mapped_column(String(32), default="available")
     availability_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    price_history: Mapped[list[dict]] = mapped_column(JSON, default=list)
     category_id: Mapped[UUID | None] = mapped_column(ForeignKey("product_categories.id", ondelete="SET NULL"), nullable=True, index=True)
     brand_id: Mapped[UUID | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"), nullable=True, index=True)
     category_name: Mapped[str] = mapped_column(String(100), default="Plushie")
@@ -143,6 +181,13 @@ class Product(Base):
     size_tier: Mapped[str | None] = mapped_column(String(40), nullable=True)
     dimensions: Mapped[str | None] = mapped_column(String(80), nullable=True)
     dispatch_time: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    materials: Mapped[str | None] = mapped_column(Text, nullable=True)
+    weight_grams: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    edition_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estimated_delivery_date: Mapped[date | None] = mapped_column(nullable=True)
+    only_at_ponyo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    reservations_open: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    reservation_target: Mapped[int | None] = mapped_column(Integer, nullable=True)
     published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     variants: Mapped[list[ProductVariant]] = relationship(back_populates="product", cascade="all, delete-orphan")
@@ -426,6 +471,14 @@ class Brand(Base):
     slug: Mapped[str] = mapped_column(String(180), unique=True)
     name: Mapped[str] = mapped_column(String(180))
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    profile_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    maker_story: Mapped[str | None] = mapped_column(Text, nullable=True)
+    philosophy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    process: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    specialties: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    website: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    social_media: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class Supplier(Base):

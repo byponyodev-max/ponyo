@@ -60,7 +60,7 @@ export function CartPageClient() {
         <h2>There’s room for something lovely.</h2>
         <p>Discover rare finds, premium favorites, and oversized companions picked with care.</p>
         <Link className="shop-button shop-button-orange" href="/collections/all">Explore the collection <b>→</b></Link>
-        <nav className="cart-empty-links" aria-label="Explore plush categories"><Link href="/collections/rare-finds">Rare finds</Link><Link href="/collections/bears">Bears</Link><Link href="/collections/bunnies">Bunnies</Link><Link href="/collections/domina-xl">Domina XL</Link></nav>
+        <nav className="cart-empty-links" aria-label="Explore plush categories"><Link href="/collections/all">All plush</Link><Link href="/collections/bears">Bears</Link><Link href="/collections/bunnies">Bunnies</Link><Link href="/collections/domina-xl">Domina XL</Link></nav>
       </section> : <div className="cart-page-layout">
         <section className="cart-line-list" aria-label="Items in your cart">
           <div className="cart-items-heading"><span>Plush picked for you</span><span>{quantity} {quantity === 1 ? "item" : "items"}</span></div>

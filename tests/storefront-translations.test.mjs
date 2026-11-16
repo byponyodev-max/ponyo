@@ -100,6 +100,34 @@ test("shared keys fill gaps in both app-owned and reference locale dictionaries"
   }
 });
 
+test("maker storefront and separate legal drafts have Japanese and Korean copy", () => {
+  const makerFiles = [
+    "src/app/for-makers/page.tsx",
+    "src/app/makers/[slug]/page.tsx",
+    "src/components/makers/maker-application-form.tsx",
+  ];
+  const makerKeys = new Set(makerFiles.flatMap((path) =>
+    [...read(path).matchAll(/["'](maker\.[\w.]+)["']/g)].map(([, key]) => key),
+  ));
+  assert.ok(makerKeys.size > 0);
+  for (const locale of ["ja", "ko"]) {
+    for (const key of makerKeys) {
+      assert.equal(typeof appTranslations[locale]?.[key], "string", `${locale}:${key}`);
+    }
+    for (const [slug, sectionCount] of [["terms-of-service", 5], ["returns-policy", 4]]) {
+      for (const key of [`legal.${slug}.title`, `legal.${slug}.subtitle`]) {
+        assert.equal(typeof appTranslations[locale]?.[key], "string", `${locale}:${key}`);
+      }
+      for (let section = 1; section <= sectionCount; section += 1) {
+        for (const part of ["heading", "body"]) {
+          const key = `legal.${slug}.section.${section}.${part}`;
+          assert.equal(typeof appTranslations[locale]?.[key], "string", `${locale}:${key}`);
+        }
+      }
+    }
+  }
+});
+
 test("eight prepared size keys preserve measurements and natural Japanese/Korean labels", () => {
   const suffixes = ["small", "medium", "large", "xl", "under_25", "range_medium", "range_large", "range_xl"];
   assert.deepEqual(sharedKeys.filter((key) => key.startsWith("home.size.")), suffixes.map((key) => `home.size.${key}`).sort());
@@ -224,9 +252,11 @@ const one = (tree, predicate) => {
 };
 const optionCodes = (tree) => elements(tree, (node) => node.props?.role === "option").map((node) => node.key);
 
-for (const locale of ["en", ...locales]) {
+for (const locale of ["ja", "ko", "en"]) {
   test(`${locale}: picker searches displayed countries/currencies and announces localized currency`, async () => {
     const harness = pickerHarness(locale);
+    assert.deepEqual(Array.from(options.languages, (item) => item.code), ["ja", "ko", "en"]);
+    assert.deepEqual(Array.from(options.currencies, (item) => item.code), ["JPY", "KRW"]);
     const trigger = one(harness.render(), (node) => node.props?.["aria-haspopup"] === "dialog");
     assert.equal(trigger.props["aria-label"], `${options.languages.find((item) => item.code === locale).label} / ${options.currencyName("JPY", locale, "Japanese Yen")}`);
     trigger.props.onClick();
@@ -244,12 +274,13 @@ for (const locale of ["en", ...locales]) {
       assert.ok(optionCodes(search(options.currencyName(item.code, locale, item.label))).includes(item.code), item.code);
     }
     assert.ok(optionCodes(search(options.regionName("JP", locale, "Japan"))).includes("JPY"));
-    assert.deepEqual(optionCodes(search("  uSd  ")), ["USD"]);
-    assert.deepEqual(optionCodes(search("US Dollar")), ["USD"]);
+    assert.ok(optionCodes(search(options.regionName("KR", locale, "South Korea"))).includes("KRW"));
+    assert.deepEqual(optionCodes(search("  kRw  ")), ["KRW"]);
+    assert.deepEqual(optionCodes(search("South Korean Won")), ["KRW"]);
     assert.deepEqual(optionCodes(search("no-such-currency")), []);
-    const usd = one(search("USD"), (node) => node.props?.role === "option");
-    await usd.props.onClick();
-    assert.equal(one(harness.render(), (node) => node.props?.["aria-haspopup"] === "dialog").props["aria-label"], `${options.languages.find((item) => item.code === locale).label} / ${options.currencyName("USD", locale, "US Dollar")}`);
+    const krw = one(search("KRW"), (node) => node.props?.role === "option");
+    await krw.props.onClick();
+    assert.equal(one(harness.render(), (node) => node.props?.["aria-haspopup"] === "dialog").props["aria-label"], `${options.languages.find((item) => item.code === locale).label} / ${options.currencyName("KRW", locale, "South Korean Won")}`);
   });
 }
 
@@ -261,8 +292,9 @@ test("picker recomputes localized search results when language changes without q
   harness.setLocale("ja");
   assert.deepEqual(optionCodes(harness.render()), ["en"]);
   elements(harness.render(), (node) => node.props?.role === "tab")[1].props.onClick();
-  one(harness.render(), (node) => node.type === "input").props.onChange({ target: { value: "米ドル" } });
-  assert.deepEqual(optionCodes(harness.render()), ["USD"]);
+  const japaneseWon = options.currencyName("KRW", "ja", "South Korean Won");
+  one(harness.render(), (node) => node.type === "input").props.onChange({ target: { value: japaneseWon } });
+  assert.deepEqual(optionCodes(harness.render()), ["KRW"]);
   harness.setLocale("ko");
   assert.deepEqual(optionCodes(harness.render()), []);
 });

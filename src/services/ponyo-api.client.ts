@@ -191,6 +191,65 @@ export type AdminProduct = {
 	variantCount: number;
 	stockQuantity: number;
 	availability: string;
+	materials: string | null;
+	weightGrams: number | null;
+	editionCount: number | null;
+	estimatedDeliveryDate: string | null;
+	onlyAtPonyo: boolean;
+	reservationsOpen: boolean;
+	reservationTarget: number | null;
+	reservationCount?: number;
+	reservationsByCountry?: Array<{ country: string; count: number }>;
+};
+
+export type MakerProfile = {
+	id: string;
+	slug: string;
+	name: string;
+	profileImageUrl: string | null;
+	story: string | null;
+	philosophy: string | null;
+	process: string | null;
+	location: string | null;
+	specialties: string[];
+	website: string | null;
+	socialMedia: string | null;
+};
+
+export type MakerApplicationInput = {
+	makerName: string;
+	contactPerson: string;
+	email: string;
+	country: string;
+	city: string;
+	website: string | null;
+	socialMedia: string | null;
+	productUrl: string;
+	productDescription: string;
+	provenDesireEvidence: string;
+	materials: string;
+	priceRange: string;
+	productPhotos: string[];
+	ponyoExclusivity: string;
+};
+
+export type MakerApplicationStatus = "pending" | "reviewing" | "accepted" | "declined";
+
+export type AdminMakerApplication = MakerApplicationInput & {
+	id: string;
+	status: MakerApplicationStatus;
+	createdAt: string;
+};
+
+export type AdminBrandProfile = {
+	profileImageUrl: string | null;
+	makerStory: string | null;
+	philosophy: string | null;
+	process: string | null;
+	location: string | null;
+	specialties: string[];
+	website: string | null;
+	socialMedia: string | null;
 };
 
 export type AdminSupplier = {
@@ -210,7 +269,7 @@ export type AdminBrand = {
 	name: string;
 	isDemo: boolean;
 	productCount: number;
-};
+} & AdminBrandProfile;
 
 export type AdminCustomer = {
 	id: string;
@@ -593,6 +652,24 @@ export const ponyoApi = {
 		apiRequest<Product>(
 			`/products/${encodeURIComponent(id)}?locale=${encodeURIComponent(locale)}`,
 		),
+	getMakerProfile: (slug: string) =>
+		apiRequest<{ maker: MakerProfile; products: Product[] }>(
+			`/makers/${encodeURIComponent(slug)}`,
+		),
+	submitMakerApplication: (input: MakerApplicationInput) =>
+		apiRequest<{ id: string; status: MakerApplicationStatus }>(
+			"/makers/applications",
+			{ method: "POST", body: JSON.stringify(input) },
+		),
+	getProductReservations: (productId: string) =>
+		apiRequest<{ reservationCount: number; target: number | null; open: boolean }>(
+			`/products/${encodeURIComponent(productId)}/reservations`,
+		),
+	submitProductReservation: (productId: string, input: { email: string; country: string }) =>
+		apiRequest<{ accepted: boolean; reservationCount: number; target: number | null }>(
+			`/products/${encodeURIComponent(productId)}/reservations`,
+			{ method: "POST", body: JSON.stringify(input) },
+		),
 	getProductReviews: (productId: string) =>
 		apiRequest<ProductReviewSummary>(
 			`/products/${encodeURIComponent(productId)}/reviews`,
@@ -804,6 +881,30 @@ export const ponyoApi = {
 			offset: number;
 		}>(`/admin/products?${params.toString()}`);
 	},
+	listAdminReservations: () =>
+		apiRequest<AdminProduct[]>("/admin/reservations"),
+	setAdminProductReservations: (
+		id: string,
+		input: { reservationsOpen: boolean; reservationTarget: number | null },
+	) =>
+		apiRequest<{ id: string; reservationsOpen: boolean; reservationTarget: number | null }>(
+			`/admin/products/${encodeURIComponent(id)}/reservations`,
+			{ method: "PATCH", body: JSON.stringify(input) },
+		),
+	updateAdminProductProof: (
+		id: string,
+		input: {
+			materials: string | null;
+			weightGrams: number | null;
+			editionCount: number | null;
+			estimatedDeliveryDate: string | null;
+			onlyAtPonyo: boolean;
+		},
+	) =>
+		apiRequest<AdminProduct>(
+			`/admin/products/${encodeURIComponent(id)}/proof`,
+			{ method: "PATCH", body: JSON.stringify(input) },
+		),
 	setAdminProductPublication: (id: string, published: boolean) =>
 		apiRequest<AdminProduct>(
 			`/admin/products/${encodeURIComponent(id)}/publication`,
@@ -814,6 +915,18 @@ export const ponyoApi = {
 		),
 	listAdminSuppliers: () => apiRequest<AdminSupplier[]>("/admin/suppliers"),
 	listAdminBrands: () => apiRequest<AdminBrand[]>("/admin/brands"),
+	updateAdminBrandProfile: (id: string, input: Partial<AdminBrandProfile>) =>
+		apiRequest<{ id: string; slug: string; name: string }>(
+			`/admin/brands/${encodeURIComponent(id)}/profile`,
+			{ method: "PATCH", body: JSON.stringify(input) },
+		),
+	listAdminMakerApplications: () =>
+		apiRequest<AdminMakerApplication[]>("/admin/maker-applications"),
+	setAdminMakerApplicationStatus: (id: string, status: MakerApplicationStatus) =>
+		apiRequest<{ id: string; status: MakerApplicationStatus }>(
+			`/admin/maker-applications/${encodeURIComponent(id)}/status`,
+			{ method: "PATCH", body: JSON.stringify({ status }) },
+		),
 	setAdminSupplierActive: (id: string, active: boolean) =>
 		apiRequest<{
 			id: string;

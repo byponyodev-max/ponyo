@@ -1,6 +1,8 @@
 import pytest
+from fastapi import HTTPException
 
 from app.currency import convert_minor_amount
+from app.routers import localization
 
 
 @pytest.mark.parametrize(
@@ -23,3 +25,23 @@ def test_convert_minor_amount_preserves_amount_when_currency_matches():
 def test_convert_minor_amount_rejects_unsupported_currency():
     with pytest.raises(ValueError, match="Unsupported currency"):
         convert_minor_amount(100, "JPY", "CHF", {"JPY": 1})
+
+
+@pytest.mark.asyncio
+async def test_localization_rates_include_krw(monkeypatch):
+    async def rates():
+        return {"base": "JPY", "date": "2026-11-16", "rates": {"JPY": 1, "KRW": 9.5}}
+
+    monkeypatch.setattr(localization, "get_jpy_rates", rates)
+
+    assert await localization.exchange_rates("KRW") == {
+        "data": {"base": "JPY", "date": "2026-11-16", "rates": {"JPY": 1, "KRW": 9.5}},
+    }
+
+
+@pytest.mark.asyncio
+async def test_localization_rates_reject_currencies_not_offered_by_storefront():
+    with pytest.raises(HTTPException) as exc_info:
+        await localization.exchange_rates("USD")
+
+    assert exc_info.value.status_code == 422
