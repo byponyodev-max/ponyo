@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Libre_Baskerville, Nunito_Sans } from "next/font/google";
 import { CookieConsentBanner } from "@/components/layout/cookie-consent-banner";
 import { LocalizationProvider } from "@/components/layout/localization-provider";
 import { CustomerSessionProvider } from "@/components/layout/customer-session-provider";
-import { languages } from "@/lib/localization-options";
+import { currencies, getDeliveryLocalization, languages, resolveDeliveryCountry } from "@/lib/localization-options";
 import "./globals.css";
 import "./ponyo-foundation.css";
 import "./storefront.css";
@@ -38,11 +38,16 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const cookieStore = await cookies();
+  const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()]);
   const savedLanguage = cookieStore.get("ponyo-language")?.value;
-  const initialLanguage = languages.some((language) => language.code === savedLanguage) ? savedLanguage! : "en";
-  const initialCurrency = cookieStore.get("ponyo-currency")?.value ?? "JPY";
-  const initialCountry = cookieStore.get("ponyo-country")?.value ?? "JP";
+  const initialCountry = resolveDeliveryCountry(cookieStore.get("ponyo-country")?.value, [
+    requestHeaders.get("cf-ipcountry"),
+    requestHeaders.get("x-vercel-ip-country"),
+  ]);
+  const countryLocalization = getDeliveryLocalization(initialCountry);
+  const savedCurrency = cookieStore.get("ponyo-currency")?.value;
+  const initialLanguage = languages.some((language) => language.code === savedLanguage) ? savedLanguage! : countryLocalization.language;
+  const initialCurrency = currencies.some((currency) => currency.code === savedCurrency) ? savedCurrency! : countryLocalization.currency;
   const initialDeliveryNoticeDismissed = cookieStore.get("ponyo-delivery-notice-dismissed")?.value === "1";
   const savedCookieConsent = cookieStore.get("ponyo-cookie-consent")?.value;
   const initialCookieConsent = savedCookieConsent === "all" || savedCookieConsent === "necessary" || savedCookieConsent === "custom" ? savedCookieConsent : null;

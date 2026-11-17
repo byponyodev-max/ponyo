@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ElementType, type HTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { currencies, deliveryCountries, languages } from "@/lib/localization-options";
+import { currencies, deliveryCountries, getDeliveryLocalization, isDeliveryCountryCode, languages } from "@/lib/localization-options";
 import { ponyoApi, PONYO_API_BASE_URL } from "@/services/ponyo-api.client";
 import { appTranslations } from "@/locales/app-translations";
 import { storefrontTranslations } from "@/locales/storefront-translations";
@@ -48,11 +48,11 @@ function substitute(value: string, values?: Record<string, string | number>) {
   return value.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => String(values[key] ?? match));
 }
 
-export function LocalizationProvider({ children, initialLanguage = "en", initialCurrency = "JPY", initialCountry = "JP", initialDeliveryNoticeDismissed = false }: { children: ReactNode; initialLanguage?: string; initialCurrency?: string; initialCountry?: string; initialDeliveryNoticeDismissed?: boolean }) {
+export function LocalizationProvider({ children, initialLanguage = "ja", initialCurrency = "JPY", initialCountry = "JP", initialDeliveryNoticeDismissed = false }: { children: ReactNode; initialLanguage?: string; initialCurrency?: string; initialCountry?: string; initialDeliveryNoticeDismissed?: boolean }) {
   const router = useRouter();
   const [language, setLanguageState] = useState(languages.some((item) => item.code === initialLanguage) ? initialLanguage : "en");
   const [currency, setCurrencyState] = useState(currencies.some((item) => item.code === initialCurrency) ? initialCurrency : "JPY");
-  const [country, setCountryState] = useState(deliveryCountries.some((item) => item.code === initialCountry) ? initialCountry : "JP");
+  const [country, setCountryState] = useState(isDeliveryCountryCode(initialCountry) ? initialCountry : "JP");
   const [deliveryNoticeDismissed, setDeliveryNoticeDismissed] = useState(initialDeliveryNoticeDismissed);
   const [dictionary, setDictionary] = useState<{ language: string; value: Dictionary } | null>(null);
   const [automaticTranslations, setAutomaticTranslations] = useState<Record<string, string>>({});
@@ -117,10 +117,14 @@ export function LocalizationProvider({ children, initialLanguage = "en", initial
   }, [savePreference]);
 
   const setDeliveryCountry = useCallback(async (next: string) => {
-    if (!deliveryCountries.some((item) => item.code === next)) return;
+    if (!isDeliveryCountryCode(next)) return;
+    const defaults = getDeliveryLocalization(next);
     setCountryState(next);
-    await savePreference({ country: next });
-  }, [savePreference]);
+    setLanguageState(defaults.language);
+    setCurrencyState(defaults.currency);
+    await savePreference({ country: next, language: defaults.language, currency: defaults.currency });
+    router.refresh();
+  }, [router, savePreference]);
 
   const dismissDeliveryNotice = useCallback(async () => {
     setDeliveryNoticeDismissed(true);

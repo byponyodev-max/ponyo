@@ -2,7 +2,7 @@ export type LanguageOption = {
 	code: string;
 	label: string;
 	country: string;
-	flag: string;
+	badge: string;
 };
 export type CurrencyOption = {
 	code: string;
@@ -18,14 +18,40 @@ export type DeliveryCountryOption = {
 	flag: string;
 };
 
+export type DeliveryCountryCode = "JP" | "KR";
+
 export const deliveryCountries: DeliveryCountryOption[] = [
 	{ code: "JP", label: "Japan", flag: "🇯🇵" },
 	{ code: "KR", label: "South Korea", flag: "🇰🇷" },
-	{ code: "US", label: "United States", flag: "🇺🇸" },
-	{ code: "GB", label: "United Kingdom", flag: "🇬🇧" },
-	{ code: "AU", label: "Australia", flag: "🇦🇺" },
-	{ code: "CA", label: "Canada", flag: "🇨🇦" },
 ];
+
+const deliveryLocalization: Record<DeliveryCountryCode, { language: string; currency: string }> = {
+	JP: { language: "ja", currency: "JPY" },
+	KR: { language: "ko", currency: "KRW" },
+};
+
+export function isDeliveryCountryCode(country: string | undefined): country is DeliveryCountryCode {
+	return deliveryCountries.some((item) => item.code === country);
+}
+
+export function resolveDeliveryCountry(
+	savedCountry: string | undefined,
+	detectedCountries: readonly (string | null)[],
+): DeliveryCountryCode {
+	const saved = savedCountry?.trim().toUpperCase();
+	if (isDeliveryCountryCode(saved)) return saved;
+
+	for (const detectedCountry of detectedCountries) {
+		const detected = detectedCountry?.trim().toUpperCase();
+		if (isDeliveryCountryCode(detected)) return detected;
+	}
+
+	return "JP";
+}
+
+export function getDeliveryLocalization(country: DeliveryCountryCode) {
+	return deliveryLocalization[country];
+}
 
 export function regionName(code: string, language: string, fallback: string) {
 	try { return new Intl.DisplayNames([language], { type: "region" }).of(code) ?? fallback; }
@@ -38,9 +64,9 @@ export function currencyName(code: string, language: string, fallback: string) {
 }
 
 export const languages: LanguageOption[] = [
-	{ code: "ja", label: "日本語", country: "Japan", flag: "🇯🇵" },
-	{ code: "ko", label: "한국어", country: "South Korea", flag: "🇰🇷" },
-	{ code: "en", label: "English", country: "United Kingdom", flag: "🇬🇧" },
+	{ code: "ja", label: "日本語", country: "Japan", badge: "JP" },
+	{ code: "ko", label: "한국어", country: "South Korea", badge: "KR" },
+	{ code: "en", label: "English", country: "United Kingdom", badge: "EN" },
 ];
 
 export const currencies: CurrencyOption[] = [

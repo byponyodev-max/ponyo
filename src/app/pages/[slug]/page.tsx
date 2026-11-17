@@ -179,18 +179,99 @@ function FaqIcon({ name }: { name: string }) {
 
 function ContactPage() {
   return <div className="store-container contact-page contact-page--studio">
+    <section className="contact-hero" aria-labelledby="contact-title">
+      <Image
+        className="contact-hero-image"
+        src="/images/contact-support-hero.png"
+        alt="Three smiling plush jellyfish wearing customer service headsets at a cozy desk"
+        fill
+        priority
+        sizes="(max-width: 1200px) 100vw, 1200px"
+      />
+      <div className="contact-hero-content">
+        <span className="contact-hero-kicker"><span aria-hidden="true">✦</span> <LocalizedText translationKey="contact.hero_eyebrow" fallback="THE PONYO TEAM, ALWAYS CLOSE BY" /></span>
+        <h1 id="contact-title"><LocalizedText translationKey="contact.hero_title" fallback="Thoughtful help, from our world to yours." /></h1>
+        <p><LocalizedText translationKey="contact.hero_body" fallback="From choosing a new companion to checking on an order or exploring a partnership, we’re here to listen." /></p>
+        <div className="contact-hero-actions">
+          <a className="contact-hero-button contact-hero-button--light" href="#contact-options"><LocalizedText translationKey="contact.hero_options" fallback="Explore contact options" /> <span aria-hidden="true">↓</span></a>
+          <a className="contact-hero-button contact-hero-button--quiet" href="#contact-form"><LocalizedText translationKey="contact.hero_message" fallback="Send us a note" /> <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+      <span className="contact-hero-seal" aria-hidden="true">PONYO <span>♡</span> CARE</span>
+    </section>
+
+    <section className="contact-channel-section" id="contact-options" aria-labelledby="contact-channels-title">
+      <div className="contact-channel-heading">
+        <div>
+          <p className="contact-channel-eyebrow"><LocalizedText translationKey="contact.channels_eyebrow" fallback="HERE WHEN YOU NEED US" /></p>
+          <h2 id="contact-channels-title"><LocalizedText translationKey="contact.channels_title" fallback="A direct line to the right team." /></h2>
+        </div>
+        <p><LocalizedText translationKey="contact.channels_body" fallback="Choose the way that feels right. Every little note helps us make Ponyo feel more personal." /></p>
+      </div>
+      <div className="contact-channel-grid">
+        <a className="contact-channel-card" href="mailto:hello@byponyo.com">
+          <span className="contact-channel-icon" aria-hidden="true">✉</span>
+          <span className="contact-channel-label"><LocalizedText translationKey="contact.email_general_title" fallback="Everyday questions" /></span>
+          <small><LocalizedText translationKey="contact.email_general_body" fallback="Questions, ideas, or simply a hello." /></small>
+          <b>hello@byponyo.com <span aria-hidden="true">↗</span></b>
+        </a>
+        <a className="contact-channel-card" href="mailto:support@byponyo.com">
+          <span className="contact-channel-icon" aria-hidden="true">♡</span>
+          <span className="contact-channel-label"><LocalizedText translationKey="contact.email_support_title" fallback="Orders & customer care" /></span>
+          <small><LocalizedText translationKey="contact.email_support_body" fallback="Order updates, delivery, and product help." /></small>
+          <b>support@byponyo.com <span aria-hidden="true">↗</span></b>
+        </a>
+        <a className="contact-channel-card" href="mailto:partners@byponyo.com">
+          <span className="contact-channel-icon" aria-hidden="true">✧</span>
+          <span className="contact-channel-label"><LocalizedText translationKey="contact.email_partners_title" fallback="Makers & partnerships" /></span>
+          <small><LocalizedText translationKey="contact.email_partners_body" fallback="Maker stories, partnerships, and collaborations." /></small>
+          <b>partners@byponyo.com <span aria-hidden="true">↗</span></b>
+        </a>
+        <a className="contact-channel-card" href="tel:+817091606676">
+          <span className="contact-channel-icon" aria-hidden="true">☎</span>
+          <span className="contact-channel-label"><LocalizedText translationKey="contact.phone_title" fallback="Call the Ponyo team" /></span>
+          <small><LocalizedText translationKey="contact.phone_body" fallback="Prefer a conversation? Give us a call." /></small>
+          <b>+81 70 9160 6676 <span aria-hidden="true">↗</span></b>
+        </a>
+      </div>
+    </section>
+
     <div className="contact-studio-layout">
-      <section className="contact-studio-intro" aria-labelledby="contact-title">
+      <section className="contact-studio-intro" aria-labelledby="contact-intro-title">
         <span className="contact-studio-eyebrow"><span aria-hidden="true">✦</span> <LocalizedText translationKey="contact.eyebrow" fallback="A LITTLE HELP, A LOT OF HEART" /></span>
-        <h1 id="contact-title"><LocalizedText translationKey="contact.title" fallback="How can we help?" /></h1>
+        <h2 id="contact-intro-title"><LocalizedText translationKey="contact.title" fallback="How can we help?" /></h2>
         <p className="contact-studio-lead"><LocalizedText translationKey="contact.intro" fallback="Questions about an order, delivery, or finding a plush? You’re in the right place." /></p>
         <div className="contact-team-note"><span className="contact-mascot" aria-hidden="true"><Image src="/ponyo-jellyfish.svg" alt="" width={64} height={64} /></span><div><h2><LocalizedText translationKey="contact.team" fallback="Real people. Thoughtful help." /></h2><p><LocalizedText translationKey="contact.team_body" fallback="Send the Ponyo team a note. We’ll reply to the email address you share." /></p></div></div>
         <div className="contact-help-links">
           <Link href="/pages/faq"><span className="contact-help-icon" aria-hidden="true">?</span><span><strong><LocalizedText translationKey="contact.faq" fallback="A quick answer might be waiting" /></strong><small><LocalizedText translationKey="contact.faq_body" fallback="Explore delivery, sizing, and care in our FAQs." /></small><b><LocalizedText translationKey="contact.faq_cta" fallback="Explore FAQs" /> <span aria-hidden="true">↗</span></b></span></Link>
         </div>
       </section>
-      <LocalContactForm />
+      <div className="contact-form-anchor" id="contact-form"><LocalContactForm /></div>
     </div>
+
+    <section className="contact-care-scene" aria-labelledby="contact-care-title">
+      <div className="contact-care-inner">
+        <div className="contact-care-copy">
+          <p className="contact-care-eyebrow"><LocalizedText translationKey="contact.care_eyebrow" fallback="A LITTLE PONYO POSTCARD" /></p>
+          <h2 id="contact-care-title"><LocalizedText translationKey="contact.care_title" fallback="A little note is always welcome." /></h2>
+          <p><LocalizedText translationKey="contact.care_body" fallback="Share a question, a story, or a hello. Our little crew is here to make it feel personal." /></p>
+          <div className="contact-care-actions">
+            <a href="mailto:hello@byponyo.com"><LocalizedText translationKey="contact.care_email" fallback="Email Ponyo" /> <span aria-hidden="true">↗</span></a>
+            <a href="tel:+817091606676"><LocalizedText translationKey="contact.care_phone" fallback="Call our team" /> <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+        <div className="contact-care-art" aria-hidden="true">
+          <span className="contact-care-star contact-care-star--one">✦</span>
+          <span className="contact-care-star contact-care-star--two">✧</span>
+          <span className="contact-care-orbit" />
+          <div className="contact-care-jellyfish contact-care-jellyfish--friend"><Image src="/ponyo-jellyfish.svg" alt="" width={126} height={126} /></div>
+          <div className="contact-care-jellyfish contact-care-jellyfish--main"><Image src="/ponyo-jellyfish.svg" alt="" width={214} height={214} /></div>
+          <span className="contact-care-bubble contact-care-bubble--phone">☎</span>
+          <span className="contact-care-bubble contact-care-bubble--email">✉</span>
+          <span className="contact-care-note">always here to listen <span>♡</span></span>
+        </div>
+      </div>
+    </section>
   </div>;
 }
 

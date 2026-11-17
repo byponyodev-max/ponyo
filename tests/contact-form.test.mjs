@@ -798,6 +798,27 @@ test("all five reviewed dictionaries cover every contact form and page key", () 
 			.matchAll(/t\("(contact\.[^"]+)"/g),
 	].map((match) => match[1]);
 	const pageKeys = [
+		"hero_eyebrow",
+		"hero_title",
+		"hero_body",
+		"hero_options",
+		"hero_message",
+		"channels_eyebrow",
+		"channels_title",
+		"channels_body",
+		"email_general_title",
+		"email_general_body",
+		"email_support_title",
+		"email_support_body",
+		"email_partners_title",
+		"email_partners_body",
+		"phone_title",
+		"phone_body",
+		"care_eyebrow",
+		"care_title",
+		"care_body",
+		"care_email",
+		"care_phone",
 		"eyebrow",
 		"title",
 		"intro",
@@ -813,6 +834,13 @@ test("all five reviewed dictionaries cover every contact form and page key", () 
 	)
 		.split("function ContactPage()")[1]
 		.split("function PartnerPage()")[0];
+	assert.match(contactPage, /src="\/images\/contact-support-hero\.png"/);
+	assert.match(contactPage, /href="mailto:hello@byponyo\.com"/);
+	assert.match(contactPage, /href="mailto:support@byponyo\.com"/);
+	assert.match(contactPage, /href="mailto:partners@byponyo\.com"/);
+	assert.match(contactPage, /href="tel:\+817091606676"/);
+	assert.match(contactPage, /\+81 70 9160 6676/);
+	assert.match(contactPage, /className="contact-care-scene"/);
 	assert.match(contactPage, /href="\/pages\/faq"/);
 	assert.doesNotMatch(contactPage, /href="\/orders"|contact\.orders/);
 	assert.deepEqual(Object.keys(translations), [
