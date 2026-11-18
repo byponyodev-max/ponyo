@@ -15,6 +15,7 @@ from app.schemas import ProductOut, ProductReservationRequest, ProductReviewCrea
 from app.security import get_current_customer, get_optional_customer, require_csrf
 from app.rate_limit import enforce_rate_limit
 from app.translations import AWS_TRANSLATE_CODES, get_product_translation
+from app.translations import _get_nested
 
 router = APIRouter(prefix="/products", tags=["catalog"])
 
@@ -29,17 +30,27 @@ async def product_by_id(product_id: UUID, db: AsyncSession) -> Product:
     return product
 
 
-def product_response(product: Product, translated_name: str | None = None, translated_description: str | None = None, quantities: dict | None = None) -> ProductOut:
+def product_response(product: Product, translation: ProductTranslation | None = None, quantities: dict | None = None) -> ProductOut:
+    translated_fields = translation.fields if translation and translation.fields else {}
+
+    def localized(path: tuple[str, ...], fallback):
+        value = _get_nested(translated_fields, path)
+        return value if isinstance(value, str) and value else fallback
+
     variants = [
         VariantOut(
             id=str(variant.id),
             sku=variant.sku,
-            title=variant.title,
+            title=localized(("variants", str(variant.id), "title"), variant.title),
             priceAmount=variant.price_amount,
             currency=variant.currency,
             compareAtAmount=variant.compare_at_amount,
             availability="available" if (quantities.get(variant.id, 0) if quantities is not None else variant.stock_quantity) > 0 else "unavailable",
-            options=variant.options or {},
+            options={
+                localized(("variants", str(variant.id), "options", str(index), "key"), key):
+                localized(("variants", str(variant.id), "options", str(index), "value"), value)
+                for index, (key, value) in enumerate(sorted((variant.options or {}).items()))
+            },
         )
         for variant in product.variants
         if variant.active
@@ -50,39 +61,39 @@ def product_response(product: Product, translated_name: str | None = None, trans
         id=str(product.id),
         sku=product.sku,
         slug=product.slug,
-        name=translated_name or product.name,
-        description=translated_description if translated_description is not None else product.description,
+        name=translation.name if translation else product.name,
+        description=translation.description if translation else product.description,
         priceAmount=default_variant.priceAmount if default_variant else product.price_amount,
         compareAtAmount=default_variant.compareAtAmount if default_variant else product.compare_at_amount,
         currency=default_variant.currency if default_variant else product.currency,
         availability=availability,
         availabilityStatus=product.availability_status,
-        categoryName=product.category.name if product.category else product.category_name,
+        categoryName=localized(("categoryName",), product.category.name if product.category else product.category_name),
         categoryId=str(product.category_id) if product.category_id else None,
         brandId=str(product.brand_id) if product.brand_id else None,
         brandName=product.brand.name if product.brand else product.supplier_name,
         makerName=product.brand.name if product.brand and not product.brand.is_demo else None,
         makerSlug=product.brand.slug if product.brand and not product.brand.is_demo else None,
-        makerStory=product.brand.maker_story if product.brand and not product.brand.is_demo else None,
-        makerPhilosophy=product.brand.philosophy if product.brand and not product.brand.is_demo else None,
-        makerProcess=product.brand.process if product.brand and not product.brand.is_demo else None,
-        materials=product.materials,
+        makerStory=localized(("makerStory",), product.brand.maker_story) if product.brand and not product.brand.is_demo else None,
+        makerPhilosophy=localized(("makerPhilosophy",), product.brand.philosophy) if product.brand and not product.brand.is_demo else None,
+        makerProcess=localized(("makerProcess",), product.brand.process) if product.brand and not product.brand.is_demo else None,
+        materials=localized(("materials",), product.materials),
         weightGrams=product.weight_grams,
         editionCount=product.edition_count,
         estimatedDeliveryDate=product.estimated_delivery_date,
         onlyAtPonyo=product.only_at_ponyo,
         reservationsOpen=product.reservations_open,
         reservationTarget=product.reservation_target,
-        images=[{"url": storefront_image_url(image.url), "alt": image.alt} for image in product.images],
-        galleryImages=[{"src": storefront_image_url(image.url), "alt": image.alt} for image in product.images],
-        productType=product.product_type,
+        images=[{"url": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],
+        galleryImages=[{"src": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],
+        productType=localized(("productType",), product.product_type),
         supplierName=product.brand.name if product.brand else product.supplier_name,
         image=storefront_image_url(product.images[0].url if product.images else product.image_url),
-        imageAlt=product.images[0].alt if product.images else product.image_alt,
+        imageAlt=localized(("imageAlts", str(product.images[0].id)), product.images[0].alt) if product.images else localized(("imageAlt",), product.image_alt),
         tags=product.tags or [],
-        sizeTier=product.size_tier,
-        dimensions=product.dimensions,
-        dispatchTime=product.dispatch_time,
+        sizeTier=localized(("sizeTier",), product.size_tier),
+        dimensions=localized(("dimensions",), product.dimensions),
+        dispatchTime=localized(("dispatchTime",), product.dispatch_time),
         variantId=str(default_variant.id) if default_variant else None,
         variants=variants,
     )
@@ -165,12 +176,7 @@ async def list_products(
     quantities = await available_quantities(db, [variant for product in rows for variant in product.variants])
     for product in rows:
         translation = await get_product_translation(product, locale, db) if locale != "en" else None
-        data.append(product_response(
-            product,
-            translation.name if translation else None,
-            translation.description if translation else None,
-            quantities,
-        ).model_dump(mode="json"))
+        data.append(product_response(product, translation, quantities).model_dump(mode="json"))
     if locale != "en":
         await db.commit()
     return {"data": data, "page": page, "limit": limit, "total": total}
@@ -199,8 +205,7 @@ async def get_product(
         await db.commit()
     return {"data": product_response(
         product,
-        translation.name if translation else None,
-        translation.description if translation else None,
+        translation,
         await available_quantities(db, product.variants),
     ).model_dump(mode="json")}
 

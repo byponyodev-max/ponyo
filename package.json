@@ -6,14 +6,15 @@
         "node": ">=22.13.0"
     },
     "scripts": {
-        "dev": "next dev --webpack",
+        "dev": "node scripts/run-next.mjs dev --webpack",
         "build": "next build --webpack",
-        "start": "next start",
+        "start": "node scripts/run-next.mjs start",
         "lint": "eslint"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.118.0",
         "next": "16.4.5",
+        "next-intl": "^4.15.1",
         "react": "19.3.0",
         "react-dom": "19.3.0"
     },

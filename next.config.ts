@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 const isDevelopment = process.env.NODE_ENV === "development";
 const useQuickTunnel = isDevelopment && Boolean(process.env.PONYO_DEV_TUNNEL_ORIGIN);
@@ -42,4 +43,6 @@ const nextConfig: NextConfig = {
 	},
 };
 
-export default nextConfig;
+const withNextIntl = createNextIntlPlugin();
+
+export default withNextIntl(nextConfig);

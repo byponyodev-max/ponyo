@@ -206,6 +206,7 @@ class ProductTranslation(Base):
     source_hash: Mapped[str] = mapped_column(String(64))
     name: Mapped[str] = mapped_column(String(240))
     description: Mapped[str] = mapped_column(Text, default="")
+    fields: Mapped[dict] = mapped_column(JSON, default=dict)
     provider: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

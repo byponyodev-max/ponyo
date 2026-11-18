@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.models import (
@@ -325,7 +326,9 @@ async def test_images_without_rows_use_safe_legacy_fallback(test_client):
 async def test_cached_japanese_search_and_disabled_provider_fallback(discovery_catalog):
     client, sessions, product_id, *_ = discovery_catalog
     async with sessions() as db:
-        product = await db.get(Product, product_id)
+        product = await db.scalar(select(Product).where(Product.id == product_id).options(
+            selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images),
+        ))
         db.add(ProductTranslation(
             product_id=product_id, locale="ja", source_hash=source_hash(product),
             name="月のうさぎ", description="ふわふわの月光のおともだち", provider="aws_translate",

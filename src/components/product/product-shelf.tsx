@@ -45,11 +45,11 @@ export function ProductShelf({
       : id === "domina-products"
         ? { title: "home.domina_shelf.title", eyebrow: "home.domina_shelf.eyebrow" }
         : id === "most-loved"
-          ? { title: "home.most_loved.title", description: "home.most_loved.sub" }
+          ? { title: "home.most_loved.title", eyebrow: "home.most_loved.eyebrow", description: "home.most_loved.sub" }
           : null;
   const localizedTitle = localeKeys ? t(localeKeys.title, title) : title;
-  const localizedDescription = description ? t(localeKeys?.description ?? "", description) : description;
-  const localizedEyebrow = eyebrow ? t(localeKeys?.eyebrow ?? "", eyebrow) : eyebrow;
+  const localizedDescription = description && localeKeys?.description ? t(localeKeys.description, description) : description;
+  const localizedEyebrow = eyebrow && localeKeys?.eyebrow ? t(localeKeys.eyebrow, eyebrow) : eyebrow;
   const linkKey = id === "new-arrivals" || id === "more-plush" || id === "domina-products" || id === "most-loved" ? "home.v2.see_all" : id === "coming-soon" ? "home.shelf.coming_soon_link" : "home.see_all";
   const localizedLinkLabel = t(linkKey, linkLabel);
   return (

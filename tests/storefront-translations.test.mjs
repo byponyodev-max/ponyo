@@ -54,7 +54,7 @@ test("all five locales have the same 110 reviewed keys, with only the documented
 test("placeholders retain their exact spelling, spacing and multiplicity in every locale", () => {
     for (const locale of locales) {
         for (const [key, value] of Object.entries(translations[locale])) {
-            assert.deepEqual(placeholders(value), expectedPlaceholders[key] ? ? [], `${locale}:${key}`);
+            assert.deepEqual(placeholders(value), expectedPlaceholders[key] ?? [], `${locale}:${key}`);
             assert.ok(!value.replace(/\{\{\s*\w+\s*\}\}/g, "").match(/[{}]/), `${locale}:${key}`);
             const substituted = value.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name) => ({
                 title: "Ponyo",
@@ -99,8 +99,8 @@ test("shared keys fill gaps in both app-owned and reference locale dictionaries"
     for (const locale of locales) {
         const dictionary = JSON.parse(read(`src/locales/${locale}.json`).replace(/^\/\*[\s\S]*?\*\/\s*/, ""));
         for (const key of sharedKeys) {
-            assert.equal(appTranslations[locale] ? .[key], undefined, `${locale}:${key} already in app dictionary`);
-            const existing = key.split(".").reduce((value, part) => value ? .[part], dictionary);
+            assert.equal(appTranslations[locale]?.[key], undefined, `${locale}:${key} already in app dictionary`);
+            const existing = key.split(".").reduce((value, part) => value?.[part], dictionary);
             assert.notEqual(typeof existing, "string", `${locale}:${key} already in locale JSON`);
         }
     }
@@ -121,7 +121,7 @@ test("eight prepared size keys preserve measurements and natural Japanese/Korean
 test("prepared journal/account keys map to existing English UI rather than invented features", () => {
     const english = JSON.parse(read("src/locales/en.default.json").replace(/^\/\*[\s\S]*?\*\/\s*/, ""));
     for (const key of sharedKeys.filter((key) => key.startsWith("home.pages."))) {
-        assert.equal(typeof key.split(".").reduce((value, part) => value ? .[part], english), "string", key);
+        assert.equal(typeof key.split(".").reduce((value, part) => value?.[part], english), "string", key);
     }
     const auth = read("src/components/account/account-auth-form.tsx");
     for (const phrase of["YOUR PONYO ACCOUNT", "Welcome back", "Create your account", "Reset your password", "Full name", "Email address", "Password", "Show password", "Hide password", "Forgot password?", "Send reset instructions", "Back to sign in"]) {
@@ -162,8 +162,8 @@ test("every supplemental auth key is wired with a nonempty English fallback", ()
             const [key, fallback] = node.arguments;
             wired.add(key.text);
             assert.ok(ts.isStringLiteral(fallback) && fallback.text.trim(), key.text);
-            assert.deepEqual(placeholders(fallback.text), expectedPlaceholders[key.text] ? ? [], key.text);
-            for (const locale of locales) assert.equal(typeof(authTranslations[locale][key.text] ? ? translations[locale][key.text]), "string", `${locale}:${key.text}`);
+            assert.deepEqual(placeholders(fallback.text), expectedPlaceholders[key.text] ?? [], key.text);
+            for (const locale of locales) assert.equal(typeof(authTranslations[locale][key.text] ?? translations[locale][key.text]), "string", `${locale}:${key.text}`);
         }
         ts.forEachChild(node, visit);
     }
@@ -217,7 +217,7 @@ function pickerHarness(initialLocale) {
                     setCurrency: async(value) => { currency = value; },
                     t: (key, fallback, values = {}) => {
                         const template = key === "localization.change_language" ? "{{ language }} / {{ currency }}" : fallback;
-                        return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, name) => values[name] ? ? match);
+                        return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, name) => values[name] ?? match);
                     },
                 })
             };
@@ -234,19 +234,19 @@ function pickerHarness(initialLocale) {
 function elements(node, predicate) {
     if (!node || typeof node !== "object") return [];
     if (Array.isArray(node)) return node.flatMap((child) => elements(child, predicate));
-    return [...(predicate(node) ? [node] : []), ...elements(node.props ? .children, predicate)];
+    return [...(predicate(node) ? [node] : []), ...elements(node.props?.children, predicate)];
 }
 const one = (tree, predicate) => {
     const matches = elements(tree, predicate);
     assert.equal(matches.length, 1);
     return matches[0];
 };
-const optionCodes = (tree) => elements(tree, (node) => node.props ? .role === "option").map((node) => node.key);
+const optionCodes = (tree) => elements(tree, (node) => node.props?.role === "option").map((node) => node.key);
 
 for (const locale of["en", "ja", "ko"]) {
     test(`${locale}: picker searches displayed countries/currencies and announces localized currency`, async() => {
         const harness = pickerHarness(locale);
-        const trigger = one(harness.render(), (node) => node.props ? .["aria-haspopup"] === "dialog");
+        const trigger = one(harness.render(), (node) => node.props?.["aria-haspopup"] === "dialog");
         assert.equal(trigger.props["aria-label"], `${options.languages.find((item) => item.code === locale).label} / ${options.currencyName("JPY", locale, "Japanese Yen")}`);
         trigger.props.onClick();
         const search = (query) => {
@@ -258,7 +258,7 @@ for (const locale of["en", "ja", "ko"]) {
         assert.deepEqual(optionCodes(search("  jA  ")), ["ja"]);
         assert.deepEqual(optionCodes(search("日本語")), ["ja"]);
         assert.deepEqual(optionCodes(search("한국어")), ["ko"]);
-        elements(harness.render(), (node) => node.props ? .role === "tab")[1].props.onClick();
+        elements(harness.render(), (node) => node.props?.role === "tab")[1].props.onClick();
         for (const item of options.currencies) {
             assert.ok(optionCodes(search(options.currencyName(item.code, locale, item.label))).includes(item.code), item.code);
         }
@@ -267,20 +267,20 @@ for (const locale of["en", "ja", "ko"]) {
         const krwName = options.currencyName("KRW", locale, "South Korean Won");
         assert.deepEqual(optionCodes(search(krwName)), ["KRW"]);
         assert.deepEqual(optionCodes(search("no-such-currency")), []);
-        const krw = one(search("KRW"), (node) => node.props ? .role === "option");
+        const krw = one(search("KRW"), (node) => node.props?.role === "option");
         await krw.props.onClick();
-        assert.equal(one(harness.render(), (node) => node.props ? .["aria-haspopup"] === "dialog").props["aria-label"], `${options.languages.find((item) => item.code === locale).label} / ${krwName}`);
+        assert.equal(one(harness.render(), (node) => node.props?.["aria-haspopup"] === "dialog").props["aria-label"], `${options.languages.find((item) => item.code === locale).label} / ${krwName}`);
     });
 }
 
 test("picker recomputes localized search results when language changes without query changes", () => {
     const harness = pickerHarness("en");
-    one(harness.render(), (node) => node.props ? .["aria-haspopup"] === "dialog").props.onClick();
+    one(harness.render(), (node) => node.props?.["aria-haspopup"] === "dialog").props.onClick();
     one(harness.render(), (node) => node.type === "input").props.onChange({ target: { value: "イギリス" } });
     assert.deepEqual(optionCodes(harness.render()), []);
     harness.setLocale("ja");
     assert.deepEqual(optionCodes(harness.render()), ["en"]);
-    elements(harness.render(), (node) => node.props ? .role === "tab")[1].props.onClick();
+    elements(harness.render(), (node) => node.props?.role === "tab")[1].props.onClick();
     const japaneseWonName = options.currencyName("KRW", "ja", "South Korean Won");
     one(harness.render(), (node) => node.type === "input").props.onChange({ target: { value: japaneseWonName } });
     assert.deepEqual(optionCodes(harness.render()), ["KRW"]);

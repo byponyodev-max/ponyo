@@ -9,7 +9,7 @@ const { outputText } = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 });
 
-function client(env, browser = false) {
+function client(env, browser = false, responses = []) {
   const requests = [];
   const context = {
     exports: {},
@@ -19,7 +19,10 @@ function client(env, browser = false) {
     ...(browser ? { window: {}, document: { cookie: "" } } : {}),
     fetch: async (url) => {
       requests.push(url);
-      return { ok: true, json: async () => ({ data: { csrfToken: "test-token" } }) };
+      const payload = responses.length
+        ? responses.shift()
+        : { data: { csrfToken: "test-token" } };
+      return { ok: true, json: async () => payload };
     },
   };
   vm.runInNewContext(outputText, context);
@@ -30,6 +33,53 @@ test("SSR resolves development proxy to absolute backend URL", async () => {
   const { api, requests } = client({ NODE_ENV: "development", NEXT_PUBLIC_PONYO_API_BASE_URL: "/ponyo-api" });
   await api.listProducts("", "ja");
   assert.equal(requests[0], "http://127.0.0.1:8000/v1/products?locale=ja");
+});
+
+test("localized product listing and detail requests carry locale and preserve translated fields", async () => {
+  const product = {
+    id: "product-id",
+    sku: "PNY-UNCHANGED",
+    name: "ふわふわのうさぎ",
+    description: "柔らかい綿のぬいぐるみ",
+    categoryName: "うさぎ",
+    productType: "ぬいぐるみ",
+    materials: "綿とポリエステル",
+    dimensions: "18 cm",
+    dispatchTime: "3日以内に発送",
+    imageAlt: "青いリボンをつけたクリーム色のうさぎ",
+    images: [{ url: "/bunny.png", alt: "青いリボンをつけたクリーム色のうさぎ" }],
+    galleryImages: [{ src: "/bunny.png", alt: "青いリボンをつけたクリーム色のうさぎ" }],
+    makerName: "Mochi & Co.",
+    makerStory: "小さな工房で丁寧に作られています。",
+    variants: [{
+      id: "variant-id",
+      sku: "PNV-UNCHANGED",
+      title: "標準サイズ",
+      options: { "色": "クリーム" },
+      priceAmount: 1800,
+      currency: "JPY",
+      availability: "available",
+    }],
+  };
+  const { api, requests } = client(
+    { NODE_ENV: "development", NEXT_PUBLIC_PONYO_API_BASE_URL: "/ponyo-api" },
+    false,
+    [{ data: [product], page: 1, limit: 24, total: 1 }, { data: product }],
+  );
+
+  const listing = await api.listProducts("", "ja");
+  const detail = await api.getProduct(product.id, "ja");
+
+  assert.deepEqual(requests, [
+    "http://127.0.0.1:8000/v1/products?locale=ja",
+    "http://127.0.0.1:8000/v1/products/product-id?locale=ja",
+  ]);
+  assert.equal(listing[0].materials, product.materials);
+  assert.equal(listing[0].makerStory, product.makerStory);
+  assert.equal(listing[0].variants[0].options["色"], "クリーム");
+  assert.equal(detail.imageAlt, product.imageAlt);
+  assert.equal(detail.sku, product.sku);
+  assert.equal(detail.makerName, "Mochi & Co.");
 });
 
 test("SSR respects a private backend override", async () => {

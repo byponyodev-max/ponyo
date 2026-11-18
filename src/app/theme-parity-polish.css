@@ -8879,7 +8879,7 @@ body {
     background: #f6e9df;
 }
 
-.localization-flag {
+.localization-option-icon {
     width: 27px;
     height: 27px;
     border: 1px solid #eadbd2;
@@ -8888,7 +8888,19 @@ body {
     flex: 0 0 27px;
     place-items: center;
     background: white;
+}
+
+.localization-language-code {
+    color: #705d53;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .04em;
+}
+
+.localization-currency-code {
+    color: #a2502f;
     font-size: 16px;
+    font-weight: 700;
 }
 
 .localization-option-copy {
@@ -8924,6 +8936,18 @@ body {
     margin: 7px 8px;
     color: #826c61;
     font-size: 11px;
+}
+
+.localization-rates-retry {
+    margin-left: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #a2502f;
+    font: inherit;
+    font-weight: 800;
+    text-decoration: underline;
+    cursor: pointer;
     line-height: 1.4;
 }
 
@@ -9253,9 +9277,23 @@ body {
     height: 21px;
 }
 
-.delivery-region-flag {
-    font-size: 16px;
-    line-height: 1;
+.delivery-country-flag {
+    width: 24px;
+    height: 16px;
+    flex: 0 0 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.delivery-country-flag svg {
+    width: 24px;
+    height: 16px;
+    display: block;
+    border: 1px solid #e8d9cf;
+    border-radius: 2px;
+    box-sizing: border-box;
+    box-shadow: 0 1px 2px rgb(46 33 29 / 12%);
 }
 
 .delivery-region-chevron {

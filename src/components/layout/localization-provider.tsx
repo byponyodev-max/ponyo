@@ -2,18 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ElementType, type HTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { currencies, deliveryCountries, getDeliveryLocalization, isDeliveryCountryCode, languages } from "@/lib/localization-options";
 import { ponyoApi, PONYO_API_BASE_URL } from "@/services/ponyo-api.client";
-import { appTranslations } from "@/locales/app-translations";
-import { storefrontTranslations } from "@/locales/storefront-translations";
-import { checkoutTranslations } from "@/locales/checkout-translations";
-import { contactTranslations } from "@/locales/contact-translations";
-import { wishlistTranslations } from "@/locales/wishlist-translations";
-import { authTranslations } from "@/locales/auth-translations";
-import { orderTranslations } from "@/locales/order-translations";
-import { accountTranslations } from "@/locales/account-translations";
 
-type Dictionary = Record<string, unknown>;
 type RatePayload = { base: string; date: string; rates: Record<string, number> };
 type PendingTranslation = { language: string; key: string; text: string };
 type LocalizationContextValue = {
@@ -25,6 +17,8 @@ type LocalizationContextValue = {
   currencies: typeof currencies;
   deliveryCountries: typeof deliveryCountries;
   rates: Record<string, number>;
+  rateStatus: "loading" | "ready" | "error";
+  refreshRates: () => Promise<void>;
   setLanguage: (language: string) => Promise<void>;
   setCurrency: (currency: string) => Promise<void>;
   setDeliveryCountry: (country: string) => Promise<void>;
@@ -36,61 +30,82 @@ type LocalizationContextValue = {
 
 const LocalizationContext = createContext<LocalizationContextValue | null>(null);
 
-function getValue(dictionary: Dictionary | null, key: string): unknown {
-  return key.split(".").reduce<unknown>((value, part) => {
-    if (!value || typeof value !== "object") return undefined;
-    return (value as Record<string, unknown>)[part];
-  }, dictionary);
-}
-
 function substitute(value: string, values?: Record<string, string | number>) {
   if (!values) return value;
   return value.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => String(values[key] ?? match));
 }
 
+function hasRequiredRates(payload: RatePayload | undefined, symbols: string[]): payload is RatePayload {
+  return Boolean(
+    payload?.base === "JPY" &&
+      symbols.every((code) => Number.isFinite(payload.rates?.[code]) && payload.rates[code] > 0),
+  );
+}
+
+async function requestRates(symbols: string[]): Promise<RatePayload> {
+  if (PONYO_API_BASE_URL) {
+    try {
+      const payload = await ponyoApi.getLocalizationRates(symbols.join(","));
+      if (hasRequiredRates(payload, symbols)) return payload;
+    } catch {
+      // Fall back to the same-origin endpoint if the configured API is unavailable.
+    }
+  }
+
+  const response = await fetch(`/api/localization/rates?symbols=${encodeURIComponent(symbols.join(","))}`);
+  if (!response.ok) throw new Error("Unable to load currency exchange rates.");
+  const payload = (await response.json()) as { data?: RatePayload };
+  if (!hasRequiredRates(payload.data, symbols)) throw new Error("Currency exchange rates are incomplete.");
+  return payload.data;
+}
+
 export function LocalizationProvider({ children, initialLanguage = "ja", initialCurrency = "JPY", initialCountry = "JP", initialDeliveryNoticeDismissed = false }: { children: ReactNode; initialLanguage?: string; initialCurrency?: string; initialCountry?: string; initialDeliveryNoticeDismissed?: boolean }) {
   const router = useRouter();
+  const intlTranslate = useTranslations();
   const [language, setLanguageState] = useState(languages.some((item) => item.code === initialLanguage) ? initialLanguage : "en");
   const [currency, setCurrencyState] = useState(currencies.some((item) => item.code === initialCurrency) ? initialCurrency : "JPY");
   const [country, setCountryState] = useState(isDeliveryCountryCode(initialCountry) ? initialCountry : "JP");
   const [deliveryNoticeDismissed, setDeliveryNoticeDismissed] = useState(initialDeliveryNoticeDismissed);
-  const [dictionary, setDictionary] = useState<{ language: string; value: Dictionary } | null>(null);
   const [automaticTranslations, setAutomaticTranslations] = useState<Record<string, string>>({});
   const [rates, setRates] = useState<Record<string, number>>({ JPY: 1 });
+  const [rateStatus, setRateStatus] = useState<"loading" | "ready" | "error">("loading");
+  const rateRequest = useRef<Promise<void> | null>(null);
   const pendingTranslations = useRef<Map<string, PendingTranslation>>(new Map());
   const requestedTranslations = useRef<Set<string>>(new Set());
   const translationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     document.documentElement.lang = language;
-    let alive = true;
-    fetch(`/api/locales/${encodeURIComponent(language)}`, { cache: "no-store" })
-      .then((response) => response.ok ? response.json() as Promise<Dictionary> : null)
-      .then((payload) => { if (alive && payload) setDictionary({ language, value: payload }); })
-      .catch(() => { /* Reviewed app translations remain available offline. */ });
-    return () => { alive = false; };
   }, [language]);
 
-  useEffect(() => {
-    let alive = true;
-    const symbols = currencies.map((item) => item.code).filter((code) => code !== "JPY").join(",");
-    void (async () => {
-      try {
-        const backendRates = PONYO_API_BASE_URL ? await ponyoApi.getLocalizationRates(symbols) : null;
-        const responseRates = backendRates ?? await fetch(`/api/localization/rates?symbols=${encodeURIComponent(symbols)}`).then((response) => response.ok ? response.json().then((payload: { data: RatePayload }) => payload.data) : null);
-        if (alive && responseRates?.rates) setRates({ JPY: 1, ...responseRates.rates });
-      } catch {
-        if (!PONYO_API_BASE_URL) return;
+  const refreshRates = useCallback(() => {
+    if (rateRequest.current) return rateRequest.current;
+    const symbols = currencies.map((item) => item.code).filter((code) => code !== "JPY");
+    const request = (async () => {
+      setRateStatus("loading");
+      for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const response = await fetch(`/api/localization/rates?symbols=${encodeURIComponent(symbols)}`);
-          if (!response.ok) return;
-          const payload = await response.json() as { data: RatePayload };
-          if (alive && payload.data?.rates) setRates({ JPY: 1, ...payload.data.rates });
-        } catch { /* JPY remains available when the FX source is offline. */ }
+          const payload = await requestRates(symbols);
+          setRates({ JPY: 1, ...payload.rates });
+          setRateStatus("ready");
+          return;
+        } catch {
+          if (attempt < 2) {
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 750 * 2 ** attempt));
+          }
+        }
       }
-    })();
-    return () => { alive = false; };
+      setRateStatus("error");
+    })().finally(() => {
+      rateRequest.current = null;
+    });
+    rateRequest.current = request;
+    return request;
   }, []);
+
+  useEffect(() => {
+    void refreshRates();
+  }, [refreshRates]);
 
   const savePreference = useCallback(async (next: { language?: string; currency?: string; country?: string; deliveryNoticeDismissed?: boolean }) => {
     try {
@@ -113,8 +128,9 @@ export function LocalizationProvider({ children, initialLanguage = "ja", initial
   const setCurrency = useCallback(async (next: string) => {
     if (!currencies.some((item) => item.code === next)) return;
     setCurrencyState(next);
+    if (next !== "JPY" && !rates[next] && rateStatus === "error") void refreshRates();
     await savePreference({ currency: next });
-  }, [savePreference]);
+  }, [rateStatus, rates, refreshRates, savePreference]);
 
   const setDeliveryCountry = useCallback(async (next: string) => {
     if (!isDeliveryCountryCode(next)) return;
@@ -210,18 +226,16 @@ export function LocalizationProvider({ children, initialLanguage = "ja", initial
   }, [flushTranslations]);
 
   const t = useCallback((key: string, fallback: string, values?: Record<string, string | number>) => {
-    const activeDictionary = dictionary?.language === language ? dictionary.value : null;
+    const reviewedMessage = intlTranslate.has(key) ? intlTranslate.raw(key) : undefined;
     const automaticValue = automaticTranslations[`${language}:${key}`];
-    const appValue = authTranslations[language]?.[key] ?? accountTranslations[language]?.[key] ?? orderTranslations[language]?.[key] ?? contactTranslations[language]?.[key] ?? wishlistTranslations[language]?.[key] ?? checkoutTranslations[language]?.[key] ?? storefrontTranslations[language]?.[key] ?? appTranslations[language]?.[key];
-    const dictionaryValue = getValue(activeDictionary, key);
-    const reviewedValue = appValue ?? dictionaryValue;
-    if (!reviewedValue && !automaticValue) queueTranslation(language, key, fallback);
-    // Machine translation must never overwrite reviewed, app-owned copy.
-    const value = reviewedValue ?? automaticValue;
-    return substitute(typeof value === "string" && value.trim() ? value : fallback, values);
-  }, [automaticTranslations, dictionary, language, queueTranslation]);
+    if (typeof reviewedMessage === "string" && reviewedMessage.trim()) {
+      return intlTranslate(key, values);
+    }
+    if (!automaticValue) queueTranslation(language, key, fallback);
+    return substitute(automaticValue?.trim() ? automaticValue : fallback, values);
+  }, [automaticTranslations, intlTranslate, language, queueTranslation]);
 
-  const contextValue = useMemo(() => ({ language, currency, country, deliveryNoticeDismissed, languages, currencies, deliveryCountries, rates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount }), [language, currency, country, deliveryNoticeDismissed, rates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount]);
+  const contextValue = useMemo(() => ({ language, currency, country, deliveryNoticeDismissed, languages, currencies, deliveryCountries, rates, rateStatus, refreshRates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount }), [language, currency, country, deliveryNoticeDismissed, rates, rateStatus, refreshRates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount]);
   return <LocalizationContext.Provider value={contextValue}>{children}</LocalizationContext.Provider>;
 }
 

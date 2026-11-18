@@ -114,6 +114,63 @@ test("product cards show the current price without sale-price claims", () => {
 	assert.doesNotMatch(cardSource, /<del>|discountPercent|compareAtAmount/);
 });
 
+test("product shelves keep unmapped copy without queuing an empty translation key", () => {
+	const calls = [];
+	const { ProductShelf } = load("../src/components/product/product-shelf.tsx", {
+		"react/jsx-runtime": {
+			jsx: (type, props) => ({ type, props }),
+			jsxs: (type, props) => ({ type, props }),
+		},
+		"next/link": { default: "a" },
+		"@/components/product/product-grid": { ProductGrid: "ProductGrid" },
+		"@/components/layout/localization-provider": {
+			useLocalization: () => ({
+				t: (key, fallback) => {
+					calls.push({ key, fallback });
+					return fallback;
+				},
+			}),
+		},
+	});
+	const textContent = (node) => {
+		if (typeof node === "string") return node;
+		if (Array.isArray(node)) return node.map(textContent).join("");
+		return node && typeof node === "object"
+			? textContent(node.props?.children)
+			: "";
+	};
+
+	const eyebrow = "An unmapped eyebrow";
+	const description = "An unmapped description";
+	const tree = ProductShelf({
+		id: "unmapped",
+		eyebrow,
+		title: "Unmapped title",
+		description,
+		products: [],
+	});
+
+	assert.deepEqual(calls, [{ key: "home.see_all", fallback: "Shop all →" }]);
+	assert.ok(textContent(tree).includes(eyebrow));
+	assert.ok(textContent(tree).includes(description));
+
+	calls.length = 0;
+	ProductShelf({
+		id: "new-arrivals",
+		eyebrow: "Just landed",
+		title: "Just landed",
+		description: "The newest plush on Ponyo.",
+		products: [],
+		linkLabel: "See all →",
+	});
+	assert.deepEqual(calls.map(({ key }) => key), [
+		"home.v2.new_title",
+		"home.v2.new_sub",
+		"home.shelf.new_eyebrow",
+		"home.v2.see_all",
+	]);
+});
+
 test("product cards are information-only while commerce is paused", () => {
 	const cardSource = read("../src/components/product/product-card.tsx");
 	assert.doesNotMatch(

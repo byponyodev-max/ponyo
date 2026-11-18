@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,8 +24,61 @@ AWS_TRANSLATE_CODES = {
 }
 
 
+def _product_translation_entries(product: Product) -> list[tuple[tuple[str, ...], str]]:
+    entries: list[tuple[tuple[str, ...], str]] = []
+
+    def add(path: tuple[str, ...], value: Any) -> None:
+        if isinstance(value, str) and value:
+            entries.append((path, value))
+
+    add(("categoryName",), product.category.name if product.category else product.category_name)
+    add(("productType",), product.product_type)
+    add(("materials",), product.materials)
+    add(("dimensions",), product.dimensions)
+    add(("dispatchTime",), product.dispatch_time)
+    add(("sizeTier",), product.size_tier)
+    add(("imageAlt",), product.image_alt)
+    for image in sorted(product.images, key=lambda item: (item.sort_order, str(item.id))):
+        add(("imageAlts", str(image.id)), image.alt)
+    for variant in sorted((item for item in product.variants if item.active), key=lambda item: str(item.id)):
+        add(("variants", str(variant.id), "title"), variant.title)
+        for index, (key, value) in enumerate(sorted((variant.options or {}).items())):
+            add(("variants", str(variant.id), "options", str(index), "key"), key)
+            add(("variants", str(variant.id), "options", str(index), "value"), value)
+    if product.brand and not product.brand.is_demo:
+        add(("makerStory",), product.brand.maker_story)
+        add(("makerPhilosophy",), product.brand.philosophy)
+        add(("makerProcess",), product.brand.process)
+    return entries
+
+
+def _set_nested(target: dict[str, Any], path: Iterable[str], value: str) -> None:
+    parts = list(path)
+    current = target
+    for part in parts[:-1]:
+        current = current.setdefault(part, {})
+    current[parts[-1]] = value
+
+
+def _get_nested(source: dict[str, Any], path: Iterable[str], default: Any = None) -> Any:
+    current: Any = source
+    for part in path:
+        if not isinstance(current, dict) or part not in current:
+            return default
+        current = current[part]
+    return current
+
+
 def source_hash(product: Product) -> str:
-    source = json.dumps([product.name, product.description], ensure_ascii=False, separators=(",", ":"))
+    source = json.dumps(
+        {
+            "name": product.name,
+            "description": product.description,
+            "fields": [(list(path), value) for path, value in _product_translation_entries(product)],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
@@ -51,21 +106,36 @@ def _translate_with_aws(text: str, target_language: str) -> str:
     return response["TranslatedText"]
 
 
-async def _translate_product(product: Product, target_language: str) -> tuple[str, str] | None:
+async def _translate_product(
+    product: Product,
+    target_language: str,
+) -> tuple[str, str, dict[str, Any]] | None:
     if settings.translation_provider != "aws_translate" or not _aws_credentials_available():
         return None
     try:
-        name, description = await asyncio.gather(
-            asyncio.wait_for(
-                asyncio.to_thread(_translate_with_aws, product.name, target_language),
-                timeout=settings.translation_timeout_seconds,
-            ),
-            asyncio.wait_for(
-                asyncio.to_thread(_translate_with_aws, product.description, target_language),
-                timeout=settings.translation_timeout_seconds,
-            ) if product.description else asyncio.sleep(0, result=""),
+        entries = _product_translation_entries(product)
+        source_texts = list(dict.fromkeys(
+            text for text in (product.name, product.description, *(value for _, value in entries)) if text
+        ))
+        semaphore = asyncio.Semaphore(6)
+
+        async def translate_one(text: str) -> tuple[str, str]:
+            async with semaphore:
+                translated = await asyncio.wait_for(
+                    asyncio.to_thread(_translate_with_aws, text, target_language),
+                    timeout=settings.translation_timeout_seconds,
+                )
+                return text, translated
+
+        translated_by_source = dict(await asyncio.gather(*(translate_one(text) for text in source_texts)))
+        fields: dict[str, Any] = {}
+        for path, text in entries:
+            _set_nested(fields, path, translated_by_source[text])
+        return (
+            translated_by_source.get(product.name, product.name),
+            translated_by_source.get(product.description, product.description),
+            fields,
         )
-        return name, description
     except Exception:
         # A provider outage should never make the storefront catalog unavailable.
         return None
@@ -95,7 +165,7 @@ async def get_product_translation(
     if cached is None:
         cached = ProductTranslation(product_id=product.id, locale=locale, source_hash=current_hash, provider="aws_translate")
         db.add(cached)
-    cached.name, cached.description = translated
+    cached.name, cached.description, cached.fields = translated
     cached.source_hash = current_hash
     cached.provider = "aws_translate"
     return cached

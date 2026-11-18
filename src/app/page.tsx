@@ -10,6 +10,7 @@ import { ProductShelf } from "@/components/product/product-shelf";
 import { HomeBudgetLinks } from "@/components/home/home-budget-links";
 import { getLocalizedProducts } from "@/services/localized-products.server";
 import { LocalizedPrice, LocalizedText } from "@/components/layout/localization-provider";
+import { getTranslations } from "next-intl/server";
 import type { Product } from "@/types/product";
 import locale from "@/locales/en.default.json";
 
@@ -68,6 +69,7 @@ function AisleCard({ title, description, titleKey, descriptionKey, href, product
 }
 
 export default async function Home() {
+  const t = await getTranslations();
   const products = await getLocalizedProducts();
   const premium = byTag(products, "premium", 12);
   const domina = byTag(products, "domina-xl", 6);
@@ -97,7 +99,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <nav className="home-category-rail" aria-label="Shop by type">
+      <nav className="home-category-rail" aria-label={t("home.category_rail.aria_label")}>
         <div className="home-category-rail-card"><strong><LocalizedText translationKey="home.category_rail.title" fallback="Find your kind of plush" /></strong>
           <ul>{categories.map((category) => <li key={category.title}><Link href={category.href}><Image src={category.image} alt="" width={56} height={56} /><span><LocalizedText translationKey={`home.categories.${category.title === "Giant plush" ? "giant" : category.title === "Cute Characters" ? "characters" : category.title === "Premium" ? "premium" : category.title === "More plush" ? "more" : category.title.toLowerCase()}`} fallback={category.title} /></span></Link></li>)}</ul>
         </div>
@@ -119,16 +121,16 @@ export default async function Home() {
       <AnimalTabs products={products} />
 
       <section className="lifestyle-break">
-        <Image src="/images/catalog/ponyo-6.png" alt="A pile of plush friends on a cosy pastel bed" fill sizes="100vw" />
+        <Image src="/images/catalog/ponyo-6.png" alt={t("home.image_alt.lifestyle")} fill sizes="100vw" />
         <div><span aria-hidden="true">🧸</span><h2><LocalizedText translationKey="home.lifestyle.title" fallback="Every plush has a story. Find yours." /></h2><Link href="/shop"><LocalizedText translationKey="home.lifestyle.cta" fallback="Shop all plush →" /></Link></div>
       </section>
 
       <section className="size-guide store-container" id="sizes">
         <header>
-          <div className="domina-quote-marquee" aria-label="Domina XL: Big hugs, big joy. Plush icons up to 120 centimeters.">
+          <div className="domina-quote-marquee" aria-label={t("home.size.marquee_label")}>
             <div className="domina-quote-track" aria-hidden="true">
-              <span>DOMINA XL <i>✦</i> BIG HUGS, BIG JOY <i>✦</i> UP TO 120 CM <i>✦</i> <LocalizedText translationKey="home.size.domina_quote" fallback="A little more room for wonder" /></span>
-              <span>DOMINA XL <i>✦</i> BIG HUGS, BIG JOY <i>✦</i> UP TO 120 CM <i>✦</i> <LocalizedText translationKey="home.size.domina_quote" fallback="A little more room for wonder" /></span>
+              <span>DOMINA XL <i>✦</i> {t("home.size.marquee_big_hugs")} <i>✦</i> {t("home.size.marquee_up_to")} <i>✦</i> <LocalizedText translationKey="home.size.domina_quote" fallback="A little more room for wonder" /></span>
+              <span>DOMINA XL <i>✦</i> {t("home.size.marquee_big_hugs")} <i>✦</i> {t("home.size.marquee_up_to")} <i>✦</i> <LocalizedText translationKey="home.size.domina_quote" fallback="A little more room for wonder" /></span>
             </div>
           </div>
           <Link className="size-guide-promo" href="/pages/domina-xl">
@@ -151,13 +153,13 @@ export default async function Home() {
             { name: "Medium", range: "25–45 cm", rangeKey: "range_medium", image: images.bear, size: "Medium" },
             { name: "Large", range: "45–70 cm", rangeKey: "range_large", image: images.dog, size: "Large" },
             { name: "XL", range: "70 cm +", rangeKey: "range_xl", image: images.xlCat, size: "XL" },
-          ].map((tile) => <Link className={`size-guide-tile size-guide-tile--${tile.name.toLowerCase()}`} href={`/collections/all?filter.p.m.ponyo.size_tier=${tile.size}`} key={tile.name}><span><Image src={tile.image} alt={`${tile.name} plush size example`} fill sizes="(max-width: 640px) 30vw, 265px" /></span><strong><LocalizedText translationKey={`home.size.${tile.name.toLowerCase()}`} fallback={tile.name} /></strong><small><LocalizedText translationKey={`home.size.${tile.rangeKey}`} fallback={tile.range} /></small></Link>)}
+          ].map((tile) => <Link className={`size-guide-tile size-guide-tile--${tile.name.toLowerCase()}`} href={`/collections/all?filter.p.m.ponyo.size_tier=${tile.size}`} key={tile.name}><span><Image src={tile.image} alt={t("home.size.image_alt", { size: t(`home.size.${tile.name.toLowerCase()}`) })} fill sizes="(max-width: 640px) 30vw, 265px" /></span><strong><LocalizedText translationKey={`home.size.${tile.name.toLowerCase()}`} fallback={tile.name} /></strong><small><LocalizedText translationKey={`home.size.${tile.rangeKey}`} fallback={tile.range} /></small></Link>)}
         </div>
       </section>
 
       <section className="domina-band" id="domina">
         <div className="domina-band-copy"><span className="domina-eyebrow"><LocalizedText translationKey="home.domina.eyebrow" fallback="DOMINA BY PONYO" /></span><h2><LocalizedText translationKey="home.domina.title" fallback="Room for Something Extraordinary." /></h2><p><LocalizedText translationKey="home.domina.body" fallback="Meet Domina XL — oversized plush companions to bring comfort, character, and a little wonder into your space." /></p><Link href="/pages/domina-xl"><LocalizedText translationKey="home.domina.cta" fallback="Shop giant plush →" /></Link></div>
-        <figure><div className="domina-band-image"><Image src="/images/catalog/ponyo-3.png" alt="A person holding an oversized cream bunny plush to show its real-world scale" fill sizes="(max-width: 767px) 90vw, 560px"/></div><figcaption><LocalizedText translationKey="home.domina.caption" fallback="A plush with presence." /></figcaption></figure>
+        <figure><div className="domina-band-image"><Image src="/images/catalog/ponyo-3.png" alt={t("home.image_alt.domina")} fill sizes="(max-width: 767px) 90vw, 560px"/></div><figcaption><LocalizedText translationKey="home.domina.caption" fallback="A plush with presence." /></figcaption></figure>
       </section>
 
       <ProductShelf className="home-live-shelf" id="domina-products" eyebrow="Big plush, memorable presence" title="XL Goodies" products={domina} href="/collections/domina-xl" linkLabel="See all →" />

@@ -8,21 +8,19 @@ export type CurrencyOption = {
 	code: string;
 	label: string;
 	country: string;
-	flag: string;
 	symbol: string;
 	digits: number;
 };
 export type DeliveryCountryOption = {
 	code: string;
 	label: string;
-	flag: string;
 };
 
 export type DeliveryCountryCode = "JP" | "KR";
 
 export const deliveryCountries: DeliveryCountryOption[] = [
-	{ code: "JP", label: "Japan", flag: "🇯🇵" },
-	{ code: "KR", label: "South Korea", flag: "🇰🇷" },
+	{ code: "JP", label: "Japan" },
+	{ code: "KR", label: "South Korea" },
 ];
 
 const deliveryLocalization: Record<DeliveryCountryCode, { language: string; currency: string }> = {
@@ -74,7 +72,6 @@ export const currencies: CurrencyOption[] = [
 		code: "JPY",
 		label: "Japanese Yen",
 		country: "Japan",
-		flag: "🇯🇵",
 		symbol: "¥",
 		digits: 0,
 	},
@@ -82,7 +79,6 @@ export const currencies: CurrencyOption[] = [
 		code: "KRW",
 		label: "South Korean Won",
 		country: "South Korea",
-		flag: "🇰🇷",
 		symbol: "₩",
 		digits: 0,
 	},

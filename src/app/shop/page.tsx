@@ -1,23 +1,37 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { ProductGrid } from "@/components/product/product-grid";
 import { SortSelect } from "@/components/product/sort-select";
 import { CatalogFilterPanel } from "@/components/product/catalog-filter-panel";
 import { getLocalizedProducts } from "@/services/localized-products.server";
 
-export const metadata = { title: "The Full Collection" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations();
+  return {
+    title: t("shop.metadata.title"),
+    description: t("shop.metadata.description"),
+  };
+}
 
 type Query = Record<string, string | string[] | undefined>;
 const first = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
 const collections = [
-  { title: "Bears", slug: "bears" }, { title: "Bunnies", slug: "bunnies" },
-  { title: "Cats", slug: "cats" }, { title: "Cute Characters", slug: "characters" },
-  { title: "New Arrivals", slug: "new-arrivals" }, { title: "Pandas", slug: "pandas" },
-  { title: "Penguins", slug: "penguins" }, { title: "Premium Plushies", slug: "premium" },
-  { title: "Puppies", slug: "puppies" },
-  { title: "Trending", slug: "trending" }, { title: "XL Goodies", slug: "domina-xl" },
+  { title: "Bears", key: "bears", slug: "bears" }, { title: "Bunnies", key: "bunnies", slug: "bunnies" },
+  { title: "Cats", key: "cats", slug: "cats" }, { title: "Cute Characters", key: "characters", slug: "characters" },
+  { title: "New Arrivals", key: "new_arrivals", slug: "new-arrivals" }, { title: "Pandas", key: "pandas", slug: "pandas" },
+  { title: "Penguins", key: "penguins", slug: "penguins" }, { title: "Premium Plushies", key: "premium", slug: "premium" },
+  { title: "Puppies", key: "puppies", slug: "puppies" },
+  { title: "Trending", key: "trending", slug: "trending" }, { title: "XL Goodies", key: "xl", slug: "domina-xl" },
 ];
+const categoryKeys: Record<string, string> = {
+  premium: "premium", "domina-xl": "xl", "giant-plush": "xl",
+  "new-arrival": "new_arrivals", "new-arrivals": "new_arrivals",
+  bears: "bears", bunnies: "bunnies", cats: "cats", characters: "characters",
+  pandas: "pandas", penguins: "penguins", puppies: "puppies", trending: "trending",
+};
 const trendingHandles = new Set(["cherry-blossom-bunny", "mint-dino", "hoshi-cloud-bear", "better-days-panda", "bluebell-penguin", "haneul-bunny", "cloud-cat", "biscuit-bow-pup"]);
 
 function matchesCategory(tags: string[] = [], type = "", category = "", slug = "") {
@@ -34,17 +48,6 @@ function matchesCategory(tags: string[] = [], type = "", category = "", slug = "
   return tags.some((item) => item.toLowerCase() === tag) || type.toLowerCase() === tag;
 }
 
-function headingFor(category: string, search: string) {
-  if (search) return `Search results for “${search}”`;
-  const names: Record<string, string> = {
-    "": "The Full Collection ✧", all: "The Full Collection ✧", premium: "Premium Plushies",
-    "domina-xl": "XL Goodies", "giant-plush": "XL Goodies", "new-arrival": "New Arrivals", "new-arrivals": "New Arrivals",
-    bears: "Bears", bunnies: "Bunnies", cats: "Cats", characters: "Cute Characters", pandas: "Pandas", penguins: "Penguins",
-    puppies: "Puppies", trending: "Trending",
-  };
-  return names[category] ?? category.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 function collectionImage(category: string) {
   if (["domina-xl", "giant-plush"].includes(category)) return "/images/catalog/ponyo-3.png";
   if (["new-arrivals", "new-arrival"].includes(category)) return "/images/catalog/ponyo-6.png";
@@ -53,12 +56,8 @@ function collectionImage(category: string) {
   return "/images/catalog/ponyo-2.png";
 }
 
-function collectionDescription(category: string) {
-  if (category === "premium") return "Premium plush made with the finest materials and stitching.";
-  return "Browse plush by type, size, and price. Product and delivery details are shown on each listing.";
-}
-
 export default async function ShopPage({ searchParams }: { searchParams: Promise<Query> }) {
+  const t = await getTranslations();
   const query = await searchParams;
   const requestedCategory = first(query.category) ?? first(query.collection) ?? "";
   const category = ["rare", "rare-finds"].includes(requestedCategory) ? "" : requestedCategory;
@@ -68,6 +67,10 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   const size = first(query.size) ?? first(query["filter.p.m.ponyo.size_tier"]) ?? "";
   const availability = first(query["filter.v.availability"]) ?? "";
   const sort = first(query.sort_by) ?? "best-selling";
+  const localizedSize = (value: string) => {
+    const key = value.toLowerCase();
+    return ["small", "medium", "large", "xl"].includes(key) ? t(`shop.size.${key}`) : value;
+  };
   const products = await getLocalizedProducts();
   const filtered = products.filter((product) => {
     const haystack = `${product.name} ${product.description} ${product.productType ?? ""} ${(product.tags ?? []).join(" ")}`.toLowerCase();
@@ -94,9 +97,19 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
     if (sort === "created-ascending") return Number((a.tags ?? []).includes("new-arrival")) - Number((b.tags ?? []).includes("new-arrival"));
     return a.name.localeCompare(b.name);
   });
-  const heading = headingFor(category, search);
+  const categoryKey = categoryKeys[category];
+  const heading = search
+    ? t("shop.heading.search", { query: search })
+    : categoryKey
+      ? t(`shop.category.${categoryKey}`)
+      : category
+        ? category.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+        : t("shop.heading.all");
+  const description = category === "premium"
+    ? t("shop.description.premium")
+    : t("shop.description.default");
   const badges = Object.fromEntries(products.map((product) => [product.slug,
-    product.tags?.includes("rare") ? "Rare" : product.tags?.includes("premium") ? "Premium" : product.tags?.includes("new-arrival") ? "New" : "",
+    product.tags?.includes("rare") ? t("shop.badge.rare") : product.tags?.includes("premium") ? t("shop.badge.premium") : product.tags?.includes("new-arrival") ? t("shop.badge.new") : "",
   ]).filter((entry) => entry[1]));
   const filterUrl = (removedKeys: string[] = []) => {
     const params = new URLSearchParams();
@@ -115,44 +128,47 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
     return entry === undefined ? [] : [[key, entry]];
   }));
   const activeFilters = [
-    ...(size ? [{ label: `Size: ${size}`, remove: filterUrl(["size", "filter.p.m.ponyo.size_tier"]) }] : []),
-    ...(availability ? [{ label: "In stock", remove: filterUrl(["filter.v.availability"]) }] : []),
-    ...(minimum ? [{ label: `From ¥${minimum.toLocaleString("en-US")}`, remove: filterUrl(["min", "filter.v.price.gte"]) }] : []),
-    ...(Number.isFinite(maximum) ? [{ label: `Up to ¥${maximum.toLocaleString("en-US")}`, remove: filterUrl(["max", "filter.v.price.lte"]) }] : []),
+    ...(size ? [{ label: t("shop.filter.size_value", { size: localizedSize(size) }), remove: filterUrl(["size", "filter.p.m.ponyo.size_tier"]) }] : []),
+    ...(availability ? [{ label: t("shop.filter.in_stock"), remove: filterUrl(["filter.v.availability"]) }] : []),
+    ...(minimum ? [{ label: t("shop.filter.price_from", { amount: `¥${minimum.toLocaleString("en-US")}` }), remove: filterUrl(["min", "filter.v.price.gte"]) }] : []),
+    ...(Number.isFinite(maximum) ? [{ label: t("shop.filter.price_to", { amount: `¥${maximum.toLocaleString("en-US")}` }), remove: filterUrl(["max", "filter.v.price.lte"]) }] : []),
   ];
 
   return (
     <SiteFrame className="store-page collection-page">
       <header className={`collection-heading collection-tone-${category || "all"}`}>
         <div className="collection-heading-copy"><h1>{heading}</h1>
-          <p>{collectionDescription(category)}</p>
-          <div className="collection-size-chips"><span>{sorted.length} plush</span>{["Small", "Medium", "Large", "XL"].map((tier) => <Link key={tier} href={`/shop?${new URLSearchParams({ ...(category ? { category } : {}), size: tier }).toString()}`} className={size === tier ? "is-selected" : ""}>{tier}</Link>)}</div>
+          <p>{description}</p>
+          <div className="collection-size-chips"><span>{t("shop.count.plush", { count: sorted.length })}</span>{["Small", "Medium", "Large", "XL"].map((tier) => <Link key={tier} href={`/shop?${new URLSearchParams({ ...(category ? { category } : {}), size: tier }).toString()}`} className={size === tier ? "is-selected" : ""}>{localizedSize(tier)}</Link>)}</div>
         </div><div className="collection-heading-image"><Image src={collectionImage(category)} alt="" fill sizes="(max-width: 700px) 100vw, 45vw" priority /></div>
       </header>
-      <nav className="collection-mobile-chips" aria-label="Categories"><Link href="/collections/all" aria-current={!category ? "page" : undefined}>All plush</Link>{collections.map((item) => <Link key={item.slug} href={`/collections/${item.slug}`} aria-current={category === item.slug ? "page" : undefined}>{item.title}<small>{products.filter((product) => matchesCategory(product.tags, product.productType, item.slug, product.slug)).length}</small></Link>)}</nav>
+      <nav className="collection-mobile-chips" aria-label={t("shop.filter.categories_aria")}><Link href="/collections/all" aria-current={!category ? "page" : undefined}>{t("shop.category.all")}<small aria-label={t("shop.count.category", { count: products.length })}>{products.length}</small></Link>{collections.map((item) => {
+        const count = products.filter((product) => matchesCategory(product.tags, product.productType, item.slug, product.slug)).length;
+        return <Link key={item.slug} href={`/collections/${item.slug}`} aria-current={category === item.slug ? "page" : undefined}>{t(`shop.category.${item.key}`)}<small aria-label={t("shop.count.category", { count })}>{count}</small></Link>;
+      })}</nav>
       <div className="collection-layout">
         <aside className="collection-sidebar">
-          <h2>Category</h2>
-          <nav aria-label="Product categories">
-            <Link href="/collections/all" className={!category ? "is-selected" : ""}><span>All plush</span><b>{products.length}</b></Link>
+          <h2>{t("shop.filter.category")}</h2>
+          <nav aria-label={t("shop.filter.product_categories_aria")}>
+            <Link href="/collections/all" className={!category ? "is-selected" : ""}><span>{t("shop.category.all")}</span><b aria-label={t("shop.count.category", { count: products.length })}>{products.length}</b></Link>
             {collections.map((item) => {
               const count = products.filter((product) => matchesCategory(product.tags, product.productType, item.slug, product.slug)).length;
-              return <Link key={item.slug} href={`/collections/${item.slug}`} className={category === item.slug ? "is-selected" : ""}><span>{item.title}</span><b>{count}</b></Link>;
+              return <Link key={item.slug} href={`/collections/${item.slug}`} className={category === item.slug ? "is-selected" : ""}><span>{t(`shop.category.${item.key}`)}</span><b aria-label={t("shop.count.category", { count })}>{count}</b></Link>;
             })}
           </nav>
-          <details className="sidebar-filter" open><summary>Availability</summary><Link href={`/shop?${new URLSearchParams({ ...(category ? { category } : {}), ...(size ? { size } : {}), ...(minimum ? { min: String(minimum) } : {}), ...(Number.isFinite(maximum) ? { max: String(maximum) } : {}), ...(sort !== "best-selling" ? { sort_by: sort } : {}), "filter.v.availability": "1" }).toString()}`} className={availability === "1" ? "is-selected" : ""}>In stock <b>{products.filter((product) => product.availability === "available").length}</b></Link></details>
-          <details className="sidebar-filter" open><summary>Price</summary><form action="/shop" method="get">{category && <input type="hidden" name="category" value={category} />}{search && <input type="hidden" name="q" value={search} />}{size && <input type="hidden" name="size" value={size} />}{availability && <input type="hidden" name="filter.v.availability" value={availability} />}{sort !== "best-selling" && <input type="hidden" name="sort_by" value={sort} />}<label>¥ <input type="number" name="min" min="0" defaultValue={minimum || ""} placeholder="From" /></label><span>to</span><label>¥ <input type="number" name="max" min="0" defaultValue={Number.isFinite(maximum) ? maximum : ""} placeholder="To" /></label><button type="submit" aria-label="Apply price range">›</button></form></details>
+          <details className="sidebar-filter" open><summary>{t("shop.filter.availability")}</summary><Link href={`/shop?${new URLSearchParams({ ...(category ? { category } : {}), ...(size ? { size } : {}), ...(minimum ? { min: String(minimum) } : {}), ...(Number.isFinite(maximum) ? { max: String(maximum) } : {}), ...(sort !== "best-selling" ? { sort_by: sort } : {}), "filter.v.availability": "1" }).toString()}`} className={availability === "1" ? "is-selected" : ""}>{t("shop.filter.in_stock")} <b>{products.filter((product) => product.availability === "available").length}</b></Link></details>
+          <details className="sidebar-filter" open><summary>{t("shop.filter.price")}</summary><form action="/shop" method="get">{category && <input type="hidden" name="category" value={category} />}{search && <input type="hidden" name="q" value={search} />}{size && <input type="hidden" name="size" value={size} />}{availability && <input type="hidden" name="filter.v.availability" value={availability} />}{sort !== "best-selling" && <input type="hidden" name="sort_by" value={sort} />}<label>¥ <input type="number" name="min" min="0" defaultValue={minimum || ""} placeholder={t("shop.filter.from")} /></label><span>{t("shop.filter.to_connector")}</span><label>¥ <input type="number" name="max" min="0" defaultValue={Number.isFinite(maximum) ? maximum : ""} placeholder={t("shop.filter.no_limit")} /></label><button type="submit" aria-label={t("shop.filter.apply_price")}>›</button></form></details>
         </aside>
-        <section className="collection-products" aria-label="Products">
+        <section className="collection-products" aria-label={t("shop.filter.products_aria")}>
           <div className="collection-toolbar">
             <CatalogFilterPanel categories={collections} category={category} size={size} minimum={minimum} maximum={maximum} availability={availability} preservedQuery={preservedQuery} clearHref={clearFiltersUrl} />
-            <span className="collection-count">{sorted.length} products</span>
+            <span className="collection-count">{t("shop.count.products", { count: sorted.length })}</span>
             <SortSelect value={sort} category={category} search={search} preservedFilters={{ ...(minimum ? { min: String(minimum) } : {}), ...(Number.isFinite(maximum) ? { max: String(maximum) } : {}), ...(size ? { size } : {}), ...(availability ? { "filter.v.availability": availability } : {}) }} />
           </div>
-          {activeFilters.length > 0 && <div className="active-filter-chips" aria-label="Active filters">{activeFilters.map((filter) => <Link href={filter.remove} key={filter.label} aria-label={`Remove filter: ${filter.label}`}>{filter.label}<span aria-hidden="true">×</span></Link>)}<Link href={clearFiltersUrl} className="clear-all-filters">Clear all</Link></div>}
-          <p className="mobile-product-count">{sorted.length} products</p>
+          {activeFilters.length > 0 && <div className="active-filter-chips" aria-label={t("shop.filter.active_aria")}>{activeFilters.map((filter) => <Link href={filter.remove} key={filter.label} aria-label={t("shop.filter.remove", { label: filter.label })}>{filter.label}<span aria-hidden="true">×</span></Link>)}<Link href={clearFiltersUrl} className="clear-all-filters">{t("shop.filter.clear_all")}</Link></div>}
+          <p className="mobile-product-count">{t("shop.count.products", { count: sorted.length })}</p>
           <ProductGrid products={sorted} badges={badges} fillSlots />
-          {sorted.length === 0 && <div className="empty-collection"><strong>No plush found just yet.</strong><p>Try a different search or clear your filters.</p><Link className="shop-button shop-button-orange" href="/shop">See all plush</Link></div>}
+          {sorted.length === 0 && <div className="empty-collection"><strong>{t("shop.empty.title")}</strong><p>{t("shop.empty.description")}</p><Link className="shop-button shop-button-orange" href="/shop">{t("shop.empty.cta")}</Link></div>}
         </section>
       </div>
     </SiteFrame>

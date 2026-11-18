@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
+import { translationApiBaseUrl } from "@/services/app-translations.server";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-	const apiBase = (
-		process.env.PONYO_API_BASE_URL ??
-		process.env.NEXT_PUBLIC_PONYO_API_BASE_URL ??
-		(process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "")
-	).replace(/\/$/, "");
+	const apiBase = translationApiBaseUrl();
 	if (!apiBase) {
 		return NextResponse.json(
 			{ error: "Automatic translation service is not configured." },

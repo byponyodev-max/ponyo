@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { Libre_Baskerville, Nunito_Sans } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
 import { CookieConsentBanner } from "@/components/layout/cookie-consent-banner";
 import { LocalizationProvider } from "@/components/layout/localization-provider";
 import { CustomerSessionProvider } from "@/components/layout/customer-session-provider";
@@ -56,12 +57,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang={initialLanguage} className="h-full antialiased">
       <body className={`min-h-full ${bodyFont.variable} ${headingFont.variable}`}>
-        <LocalizationProvider initialLanguage={initialLanguage} initialCurrency={initialCurrency} initialCountry={initialCountry} initialDeliveryNoticeDismissed={initialDeliveryNoticeDismissed}>
-          <CustomerSessionProvider>
-            <CookieConsentBanner initialConsent={initialCookieConsent} initialAnalyticsConsent={initialAnalyticsConsent} initialMarketingConsent={initialMarketingConsent} />
-            {children}
-          </CustomerSessionProvider>
-        </LocalizationProvider>
+        <NextIntlClientProvider>
+          <LocalizationProvider initialLanguage={initialLanguage} initialCurrency={initialCurrency} initialCountry={initialCountry} initialDeliveryNoticeDismissed={initialDeliveryNoticeDismissed}>
+            <CustomerSessionProvider>
+              <CookieConsentBanner initialConsent={initialCookieConsent} initialAnalyticsConsent={initialAnalyticsConsent} initialMarketingConsent={initialMarketingConsent} />
+              {children}
+            </CustomerSessionProvider>
+          </LocalizationProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

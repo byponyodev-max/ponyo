@@ -17,7 +17,7 @@ from sqlalchemy.pool import StaticPool
 from app.db import Base, get_db
 from app.main import app
 from app.models import ContactRequest as ContactRequestModel
-from app.models import Customer, CustomerAddress, EmailVerificationToken, ProductReview, ProductWaitlistEntry, WishlistItem
+from app.models import Brand, Customer, CustomerAddress, EmailVerificationToken, ProductImage, ProductReview, ProductWaitlistEntry, WishlistItem
 from app.models import AppTranslation, Order, OrderItem, OutboxEvent, ProcessedWebhook, Product, ProductTranslation, ProductVariant
 from app.config import Settings, settings
 from app.email_notifications import send_password_reset_email, send_verification_email
@@ -194,6 +194,97 @@ async def test_product_locale_falls_back_to_english_when_translation_is_disabled
 
 
 @pytest.mark.asyncio
+async def test_product_fields_translate_cache_and_keep_english_and_brand_names(test_client, monkeypatch):
+    client, session_factory = test_client
+    product_id, variant_id = await add_product(session_factory)
+    async with session_factory() as db:
+        product = await db.get(Product, product_id)
+        variant = await db.get(ProductVariant, variant_id)
+        brand = Brand(
+            slug="mochi-co",
+            name="Mochi & Co.",
+            maker_story="A small family workshop.",
+            philosophy="Thoughtful toys for everyday comfort.",
+            process="Each plush is stitched by hand.",
+        )
+        db.add(brand)
+        product.brand = brand
+        product.product_type = "Plush"
+        product.materials = "Cotton and polyester"
+        product.dimensions = "18 cm"
+        product.dispatch_time = "Ships in 3 days"
+        product.size_tier = "Small"
+        product.image_alt = "Cream bunny plush"
+        variant.title = "Default size"
+        variant.options = {"Color": "Soft cream", "Size": "18 cm"}
+        db.add(ProductImage(
+            product_id=product_id,
+            url="https://example.test/bunny-detail.png",
+            alt="Cream bunny with a blue bow",
+            sort_order=0,
+        ))
+        await db.commit()
+
+    calls = []
+
+    def fake_translate(text, target_language):
+        calls.append((text, target_language))
+        return f"{target_language}:{text}"
+
+    monkeypatch.setattr(settings, "translation_provider", "aws_translate")
+    monkeypatch.setattr("app.translations._aws_credentials_available", lambda: True)
+    monkeypatch.setattr("app.translations._translate_with_aws", fake_translate)
+
+    english = (await client.get(f"/v1/products/{product_id}?locale=en")).json()["data"]
+    assert english["name"] == "Test-Bunny"
+    assert english["categoryName"] == "Bunnies"
+    assert english["materials"] == "Cotton and polyester"
+    assert english["makerName"] == "Mochi & Co."
+    assert calls == []
+
+    for locale in ("ja", "ko"):
+        listing = (await client.get(f"/v1/products?locale={locale}")).json()["data"][0]
+        detail = (await client.get(f"/v1/products/{product_id}?locale={locale}")).json()["data"]
+        for result in (listing, detail):
+            assert result["categoryName"] == f"{locale}:Bunnies"
+            assert result["productType"] == f"{locale}:Plush"
+            assert result["materials"] == f"{locale}:Cotton and polyester"
+            assert result["dimensions"] == f"{locale}:18 cm"
+            assert result["dispatchTime"] == f"{locale}:Ships in 3 days"
+            assert result["sizeTier"] == f"{locale}:Small"
+            assert result["imageAlt"] == f"{locale}:Cream bunny with a blue bow"
+            assert result["images"][0]["alt"] == f"{locale}:Cream bunny with a blue bow"
+            assert result["galleryImages"][0]["alt"] == f"{locale}:Cream bunny with a blue bow"
+            assert result["makerStory"] == f"{locale}:A small family workshop."
+            assert result["makerPhilosophy"] == f"{locale}:Thoughtful toys for everyday comfort."
+            assert result["makerProcess"] == f"{locale}:Each plush is stitched by hand."
+            assert result["variants"][0]["title"] == f"{locale}:Default size"
+            assert result["variants"][0]["options"] == {
+                f"{locale}:Color": f"{locale}:Soft cream",
+                f"{locale}:Size": f"{locale}:18 cm",
+            }
+            assert result["sku"].startswith("PNY-")
+            assert result["variants"][0]["sku"].startswith("PNV-")
+            assert result["brandName"] == result["makerName"] == "Mochi & Co."
+
+        assert len(calls) > 0
+        calls_after_translation = len(calls)
+        repeated = await client.get(f"/v1/products/{product_id}?locale={locale}")
+        assert repeated.status_code == 200
+        assert len(calls) == calls_after_translation
+
+    async with session_factory() as db:
+        translations = list((await db.scalars(
+            select(ProductTranslation).where(ProductTranslation.product_id == product_id)
+        )).all())
+        assert {translation.locale for translation in translations} == {"ja", "ko"}
+        ja_translation = next(row for row in translations if row.locale == "ja")
+        assert ja_translation.fields["materials"] == "ja:Cotton and polyester"
+        assert ja_translation.fields["variants"][str(variant_id)]["title"] == "ja:Default size"
+        assert ja_translation.fields["imageAlts"]
+
+
+@pytest.mark.asyncio
 async def test_product_translation_is_cached_and_invalidated_by_source_changes(test_client, monkeypatch):
     client, session_factory = test_client
     product_id, _ = await add_product(session_factory)
@@ -211,20 +302,25 @@ async def test_product_translation_is_cached_and_invalidated_by_source_changes(t
     second = await client.get(f"/v1/products/{product_id}?locale=ja")
     assert first.json()["data"][0]["name"] == "ja:Test-Bunny"
     assert second.json()["data"]["name"] == "ja:Test-Bunny"
-    assert len(calls) == 2
+    initial_call_count = len(calls)
+    assert initial_call_count > 2
+    assert initial_call_count == len(set(calls))
 
     async with session_factory() as db:
         product = await db.get(Product, product_id)
         product.name = "Updated Bunny"
+        product.materials = "Cotton plush"
         await db.commit()
 
     updated = await client.get(f"/v1/products/{product_id}?locale=ja")
     assert updated.json()["data"]["name"] == "ja:Updated Bunny"
-    assert len(calls) == 4
+    assert updated.json()["data"]["materials"] == "ja:Cotton plush"
+    assert len(calls) > initial_call_count
     async with session_factory() as db:
         cached = await db.scalar(select(ProductTranslation).where(ProductTranslation.product_id == product_id))
         assert cached is not None
         assert cached.name == "ja:Updated Bunny"
+        assert cached.fields["materials"] == "ja:Cotton plush"
 
 
 @pytest.mark.asyncio
