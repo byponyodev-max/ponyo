@@ -169,7 +169,11 @@ async def test_link_demo_catalog_links_every_product_and_variant_idempotently(te
             category = await db.get(ProductCategory, product.category_id)
             brand = await db.get(Brand, product.brand_id)
             assert category.name == product.category_name
-            assert brand.name == product.supplier_name
+            expected_brand_name = {
+                "Ponyo": "Kumo Stitch Atelier",
+                "Domina": "Domina Plush Studio",
+            }[product.supplier_name]
+            assert brand.name == expected_brand_name
             assert brand.is_demo is True
             images = (await db.scalars(
                 select(ProductImage).where(ProductImage.product_id == product.id)
@@ -265,7 +269,7 @@ async def test_catalog_exposes_links_and_images_but_no_supplier_secrets(supplier
         product = payload["data"][0] if isinstance(payload["data"], list) else payload["data"]
         assert product["categoryId"] == category_id
         assert product["brandId"] == brand_id
-        assert product["brandName"] == "Ponyo"
+        assert product["brandName"] == "Kumo Stitch Atelier"
         assert len(product["images"]) == 1
         assert product["images"][0] == {"url": product["image"], "alt": "Bunny"}
         assert_public(payload)

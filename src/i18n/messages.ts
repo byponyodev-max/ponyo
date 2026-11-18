@@ -2,11 +2,13 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import "server-only";
 import { accountTranslations } from "@/locales/account-translations";
+import { adminUiTranslations } from "@/locales/admin-ui-translations";
 import { appTranslations } from "@/locales/app-translations";
 import { authTranslations } from "@/locales/auth-translations";
 import { checkoutTranslations } from "@/locales/checkout-translations";
 import { contactTranslations } from "@/locales/contact-translations";
 import { orderTranslations } from "@/locales/order-translations";
+import { pagesUiTranslations } from "@/locales/pages-ui-translations";
 import { storefrontTranslations } from "@/locales/storefront-translations";
 import { staticUiTranslations } from "@/locales/static-ui-translations";
 import { wishlistTranslations } from "@/locales/wishlist-translations";
@@ -19,12 +21,14 @@ type LocaleDictionary = Record<string, Record<string, string>>;
 
 const supplementalTranslations: LocaleDictionary[] = [
 	appTranslations,
+	adminUiTranslations,
 	storefrontTranslations,
 	staticUiTranslations,
 	checkoutTranslations,
 	wishlistTranslations,
 	contactTranslations,
 	orderTranslations,
+	pagesUiTranslations,
 	accountTranslations,
 	authTranslations,
 ];

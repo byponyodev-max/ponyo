@@ -103,10 +103,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <span className="product-brand-story-link"><LocalizedText translationKey="product.proof.visit_maker" fallback="Meet the maker" /> <span aria-hidden="true">→</span></span>
           </Link>}
         </div>
-        <div className="product-detail-copy"><ProductPurchasePanel product={displayProduct} />{storefrontFeatures.commerce && <p className="product-payment-caption">Secure checkout powered by Ponyo.</p>}{(storefrontFeatures.productReservations || hasWaitlist || product.reservationsOpen) && <ProductReservationPanel productId={product.id} productName={product.name} reservationsOpen={storefrontFeatures.productReservations || (!isExample && product.reservationsOpen === true)} />}</div>
+        <div className="product-detail-copy"><ProductPurchasePanel product={displayProduct} />{storefrontFeatures.commerce && <p className="product-payment-caption"><LocalizedText as="span" translationKey="pages.product.payment_caption" fallback="Secure checkout powered by Ponyo." /></p>}{(storefrontFeatures.productReservations || hasWaitlist || product.reservationsOpen) && <ProductReservationPanel productId={product.id} productName={product.name} reservationsOpen={storefrontFeatures.productReservations || (!isExample && product.reservationsOpen === true)} />}</div>
       </section>
       {storefrontFeatures.productReviews && <ProductReviews productId={product.id} />}
-      {related.length > 0 && <section className="related-products store-container"><div className="section-head"><div><p className="eyebrow">A FEW MORE TO LOVE</p><h2>You may also like</h2></div><Link className="text-link" href={`/shop?category=${product.categoryName.toLowerCase().replaceAll(" ", "-")}`}>See all →</Link></div><ProductGrid products={related} /></section>}
+      {related.length > 0 && <section className="related-products store-container"><div className="section-head"><div><p className="eyebrow"><LocalizedText as="span" translationKey="pages.product.related_eyebrow" fallback="A FEW MORE TO LOVE" /></p><h2><LocalizedText as="span" translationKey="pages.product.related_title" fallback="You may also like" /></h2></div><Link className="text-link" href={`/shop?category=${product.categoryName.toLowerCase().replaceAll(" ", "-")}`}><LocalizedText as="span" translationKey="pages.product.see_all" fallback="See all →" /></Link></div><ProductGrid products={related} /></section>}
     </SiteFrame>
   );
 }

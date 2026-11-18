@@ -236,7 +236,7 @@ async def test_admin_can_configure_product_proof_and_reservation_counter(test_cl
     assert entries.status_code == 200
     assert entries.json()["data"]["total"] == 1
     assert entries.json()["data"]["items"][0]["email"] == "one@example.com"
-    assert entries.json()["data"]["items"][0]["productName"] == "Admin Proof Plush"
+    assert entries.json()["data"]["items"][0]["productName"] == "Admin-Proof-Plush"
 
     export = await client.get("/v1/admin/reservations/export.csv", params={"productId": str(product_id), "country": "KR"})
     assert export.status_code == 200
