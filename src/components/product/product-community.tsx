@@ -12,6 +12,7 @@ import { optimizeJpegPhoto } from "@/lib/optimize-jpeg-photo";
 const emptySummary: ProductReviewSummary = { averageRating: 0, reviewCount: 0, reviews: [] };
 
 export function ProductReviews({ productId }: { productId: string }) {
+  const { t, language } = useLocalization();
   const reviewFormId = useId();
   const reviewPhotoInputRef = useRef<HTMLInputElement>(null);
   const [summary, setSummary] = useState<ProductReviewSummary>(emptySummary);
@@ -34,7 +35,7 @@ export function ProductReviews({ productId }: { productId: string }) {
       if (!active) return;
       const [reviewsResult, accountResult] = results;
       if (reviewsResult.status === "fulfilled") setSummary(reviewsResult.value);
-      else setError(reviewsResult.reason instanceof Error ? reviewsResult.reason.message : "Reviews are temporarily unavailable.");
+      else setError(reviewsResult.reason instanceof Error ? reviewsResult.reason.message : t("static.product.reviews.unavailable", "Reviews are temporarily unavailable."));
       if (accountResult.status === "fulfilled") setCustomer(accountResult.value);
     }).finally(() => {
       if (active) {
@@ -43,7 +44,7 @@ export function ProductReviews({ productId }: { productId: string }) {
       }
     });
     return () => { active = false; };
-  }, [productId]);
+  }, [productId, t]);
 
   async function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,13 +59,13 @@ export function ProductReviews({ productId }: { productId: string }) {
         const averageRating = reviews.length ? Math.round(reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length * 10) / 10 : 0;
         return { averageRating, reviewCount: reviews.length, reviews };
       });
-      setMessage("Thanks for sharing your Ponyo find!");
+      setMessage(t("static.product.reviews.thanks", "Thanks for sharing your Ponyo find!"));
       setTitle("");
       setBody("");
       setRating(0);
       setReviewPhotos([]);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Your review could not be saved.");
+      setError(submitError instanceof Error ? submitError.message : t("static.product.reviews.save_failed", "Your review could not be saved."));
     } finally {
       setSaving(false);
     }
@@ -72,28 +73,28 @@ export function ProductReviews({ productId }: { productId: string }) {
 
   return <section className="product-reviews" id="product-reviews" aria-labelledby="product-reviews-title">
     <header className="product-reviews-heading">
-      <div><p className="eyebrow">REAL PONYO LOVE</p><h2 id="product-reviews-title">Customer reviews</h2><p>Thoughts from the plush-loving Ponyo community.</p></div>
-      <div className="product-rating-summary" aria-label={`${summary.averageRating} out of 5 stars from ${summary.reviewCount} reviews`}>
+      <div><p className="eyebrow">{t("static.product.reviews.eyebrow", "REAL PONYO LOVE")}</p><h2 id="product-reviews-title">{t("static.product.reviews.title", "Customer reviews")}</h2><p>{t("static.product.reviews.subtitle", "Thoughts from the plush-loving Ponyo community.")}</p></div>
+      <div className="product-rating-summary" aria-label={`${t("static.product.gallery.rating", "{{rating}} out of 5 stars", { rating: summary.averageRating })} ${t("static.product.gallery.reviews", "{{count}} reviews", { count: summary.reviewCount })}`}>
         <strong>{summary.reviewCount ? summary.averageRating.toFixed(1) : "—"}</strong>
         <span className="product-rating-stars" aria-hidden="true">{summary.reviewCount ? "★★★★★" : "☆☆☆☆☆"}</span>
-        <small>{summary.reviewCount} {summary.reviewCount === 1 ? "review" : "reviews"}</small>
+        <small>{summary.reviewCount === 1 ? t("static.product.gallery.one_review", "{{count}} review", { count: summary.reviewCount }) : t("static.product.gallery.reviews", "{{count}} reviews", { count: summary.reviewCount })}</small>
       </div>
     </header>
 
     <div className="product-review-content">
       <div className="product-review-list" aria-live="polite">
-        {loading ? <p className="product-review-empty">Gathering community reviews…</p> : summary.reviews.length ? summary.reviews.map((review) => <ReviewCard key={review.id} review={review} />) : <div className="product-review-empty"><span aria-hidden="true">♡</span><strong>Be the first to review this plush</strong><p>Your note can help another plush find its forever home.</p></div>}
+        {loading ? <p className="product-review-empty">{t("static.product.reviews.loading", "Gathering community reviews…")}</p> : summary.reviews.length ? summary.reviews.map((review) => <ReviewCard key={review.id} review={review} language={language} />) : <div className="product-review-empty"><span aria-hidden="true">♡</span><strong>{t("static.product.reviews.first", "Be the first to review this plush")}</strong><p>{t("static.product.reviews.first_body", "Your note can help another plush find its forever home.")}</p></div>}
       </div>
       <aside className="product-review-form-card">
         <details className="product-review-form-details" id="leave-a-review">
-          <summary><span><span className="eyebrow">HAVE THIS PLUSH?</span><strong>Leave a review</strong><small>Share your experience with the Ponyo community</small></span><span className="product-review-summary-icon" aria-hidden="true">＋</span></summary>
+          <summary><span><span className="eyebrow">{t("static.product.reviews.have", "HAVE THIS PLUSH?")}</span><strong>{t("static.product.reviews.leave", "Leave a review")}</strong><small>{t("static.product.reviews.share_community", "Share your experience with the Ponyo community")}</small></span><span className="product-review-summary-icon" aria-hidden="true">＋</span></summary>
           <div className="product-review-form-body">
-            <p className="product-review-form-copy">Share what you love so other plush friends know what to expect.</p>
-            {checkingAccount ? <p className="product-review-empty">Checking your Ponyo account…</p> : customer ? <form id={reviewFormId} onSubmit={submitReview}>
-              <fieldset className="product-review-rating"><legend>Your rating <span aria-label="required">*</span></legend><div role="group" aria-label="Choose a rating from 1 to 5">{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" className={value <= rating ? "is-selected" : ""} aria-label={`${value} star${value === 1 ? "" : "s"}`} aria-pressed={rating === value} onClick={() => setRating(value)}>★</button>)}</div></fieldset>
-                      <label>Review title <span className="product-review-optional">Optional</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="The little details I love" maxLength={140} /></label>
-              <label>Your review <span className="product-review-optional">Optional</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="How does your new friend feel at home?" maxLength={3000} rows={4} /></label>
-              <div className="product-review-photo-field"><div><strong>Add photos</strong><small>Optional · JPEG, up to 5 MB each · 4 photos maximum</small></div><input ref={reviewPhotoInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Choose review photos (optional)" onChange={(event) => {
+            <p className="product-review-form-copy">{t("static.product.reviews.form_body", "Share what you love so other plush friends know what to expect.")}</p>
+            {checkingAccount ? <p className="product-review-empty">{t("static.product.reviews.checking", "Checking your Ponyo account…")}</p> : customer ? <form id={reviewFormId} onSubmit={submitReview}>
+              <fieldset className="product-review-rating"><legend>{t("static.product.reviews.rating", "Your rating")} <span aria-label={t("static.product.reviews.required", "required")}>*</span></legend><div role="group" aria-label={t("static.product.reviews.choose_rating", "Choose a rating from 1 to 5")}>{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" className={value <= rating ? "is-selected" : ""} aria-label={t("static.product.gallery.stars", "{{count}} star rating", { count: value })} aria-pressed={rating === value} onClick={() => setRating(value)}>★</button>)}</div></fieldset>
+                      <label>{t("static.product.reviews.title_label", "Review title")} <span className="product-review-optional">{t("static.product.reviews.optional", "Optional")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("static.product.reviews.title_placeholder", "The little details I love")} maxLength={140} /></label>
+              <label>{t("static.product.reviews.body_label", "Your review")} <span className="product-review-optional">{t("static.product.reviews.optional", "Optional")}</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder={t("static.product.reviews.body_placeholder", "How does your new friend feel at home?")} maxLength={3000} rows={4} /></label>
+              <div className="product-review-photo-field"><div><strong>{t("static.product.reviews.add_photos", "Add photos")}</strong><small>{t("static.product.reviews.photo_rules", "Optional · JPEG, up to 5 MB each · 4 photos maximum")}</small></div><input ref={reviewPhotoInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label={t("static.product.reviews.choose_photos", "Choose review photos (optional)")} onChange={(event) => {
                 const files = Array.from(event.currentTarget.files ?? []);
                 const allowedFiles = files.filter((file) => file.size <= 5 * 1024 * 1024 && ["image/jpeg", "image/png", "image/webp"].includes(file.type)).slice(0, 4);
                 const skippedFiles = files.length - allowedFiles.length;
@@ -104,17 +105,18 @@ export function ProductReviews({ productId }: { productId: string }) {
                   const prepared = results.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);
                   const failed = results.length - prepared.length;
                   setReviewPhotos(prepared);
-                  setPhotoMessage(skippedFiles || failed ? `${skippedFiles + failed} photo${skippedFiles + failed === 1 ? " was" : "s were"} skipped. Choose image files under 5 MB each.` : "");
+                  const skipped = skippedFiles + failed;
+                  setPhotoMessage(skipped ? t(skipped === 1 ? "static.product.reviews.photos_skipped_one" : "static.product.reviews.photos_skipped_other", skipped === 1 ? "{{count}} photo was skipped. Choose image files under 5 MB each." : "{{count}} photos were skipped. Choose image files under 5 MB each.", { count: skipped }) : "");
                   if (reviewPhotoInputRef.current) reviewPhotoInputRef.current.value = "";
                 });
-              }} />{reviewPhotos.length > 0 && <div className="product-review-photo-list">{reviewPhotos.map((photo, index) => <span key={`${photo.name}-${index}`}><Image src={photo.dataUrl} alt={`Review photo: ${photo.name}`} width={64} height={64} unoptimized /><button type="button" aria-label={`Remove ${photo.name}`} onClick={() => setReviewPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index))}>×</button></span>)}</div>}</div>
+              }} />{reviewPhotos.length > 0 && <div className="product-review-photo-list">{reviewPhotos.map((photo, index) => <span key={`${photo.name}-${index}`}><Image src={photo.dataUrl} alt={t("static.product.review.photo", "Review photo: {{name}}", { name: photo.name })} width={64} height={64} unoptimized /><button type="button" aria-label={t("static.product.reviews.remove_photo", "Remove {{name}}", { name: photo.name })} onClick={() => setReviewPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index))}>×</button></span>)}</div>}</div>
               {photoMessage && <p className="product-review-hint" role="status">{photoMessage}</p>}
-              {rating === 0 && <p className="product-review-hint">Choose a star rating to share your review. Photos are optional.</p>}
+              {rating === 0 && <p className="product-review-hint">{t("static.product.reviews.choose_star", "Choose a star rating to share your review. Photos are optional.")}</p>}
               {error && <p className="api-form-error" role="alert">{error}</p>}
               {message && <p className="product-form-success" role="status">{message}</p>}
-              <button type="submit" className="product-review-submit" disabled={saving || rating === 0}>{saving ? "Saving your review…" : "Share my review"}<span aria-hidden="true">→</span></button>
-              <small>Reviews are linked to your Ponyo account. Purchases are marked when payment is verified.</small>
-            </form> : <div className="product-review-signin"><p>Sign in to share a review with the Ponyo community.</p><Link className="product-review-submit" href={`/account/login?returnTo=${encodeURIComponent(`/products/${productId}#product-reviews`)}`}>Sign in to review <span aria-hidden="true">→</span></Link></div>}
+              <button type="submit" className="product-review-submit" disabled={saving || rating === 0}>{saving ? t("static.product.reviews.saving", "Saving your review…") : t("static.product.reviews.submit", "Share my review")}<span aria-hidden="true">→</span></button>
+              <small>{t("static.product.reviews.verified_note", "Reviews are linked to your Ponyo account. Purchases are marked when payment is verified.")}</small>
+            </form> : <div className="product-review-signin"><p>{t("static.product.reviews.sign_in_body", "Sign in to share a review with the Ponyo community.")}</p><Link className="product-review-submit" href={`/account/login?returnTo=${encodeURIComponent(`/products/${productId}#product-reviews`)}`}>{t("static.product.reviews.sign_in", "Sign in to review")} <span aria-hidden="true">→</span></Link></div>}
           </div>
         </details>
       </aside>
@@ -122,17 +124,19 @@ export function ProductReviews({ productId }: { productId: string }) {
   </section>;
 }
 
-function ReviewCard({ review }: { review: ProductReview }) {
-  const date = new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(review.createdAt));
+function ReviewCard({ review, language }: { review: ProductReview; language: string }) {
+  const { t } = useLocalization();
+  const date = new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(new Date(review.createdAt));
   return <article className="product-review-card">
-    <header><span className="product-review-avatar" aria-hidden="true">{review.reviewerName.slice(0, 1).toUpperCase()}</span><div><strong>{review.reviewerName}</strong><small>{date}</small></div><span className="product-rating-stars" aria-label={`${review.rating} out of 5 stars`}>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span></header>
-    {review.verifiedPurchase && <span className="product-verified-purchase">✓ Verified purchase</span>}
+    <header><span className="product-review-avatar" aria-hidden="true">{review.reviewerName.slice(0, 1).toUpperCase()}</span><div><strong>{review.reviewerName}</strong><small>{date}</small></div><span className="product-rating-stars" aria-label={t("static.product.gallery.rating", "{{rating}} out of 5 stars", { rating: review.rating })}>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span></header>
+    {review.verifiedPurchase && <span className="product-verified-purchase">✓ {t("static.product.reviews.verified", "Verified purchase")}</span>}
     {review.title && <h3>{review.title}</h3>}{review.body && <p>{review.body}</p>}
-    {review.photos?.length > 0 && <div className="product-review-card-photos" aria-label="Customer review photos">{review.photos.map((photo, index) => <Image key={index} src={photo} alt={`Customer photo ${index + 1}`} width={112} height={112} unoptimized />)}</div>}
+    {review.photos?.length > 0 && <div className="product-review-card-photos" aria-label={t("static.product.reviews.photos", "Customer review photos")}>{review.photos.map((photo, index) => <Image key={index} src={photo} alt={t("static.product.reviews.customer_photo", "Customer photo {{number}}", { number: index + 1 })} width={112} height={112} unoptimized />)}</div>}
   </article>;
 }
 
 export function ProductWaitlistForm({ productId, productName }: { productId: string; productName: string }) {
+  const { t } = useLocalization();
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [checkingAccount, setCheckingAccount] = useState(Boolean(PONYO_API_BASE_URL));
@@ -160,9 +164,9 @@ export function ProductWaitlistForm({ productId, productName }: { productId: str
     setMessage("");
     try {
       await ponyoApi.joinProductWaitlist(productId, { email: email.trim(), firstName: firstName.trim() });
-      setMessage(`You’re on the ${productName} waitlist. We’ll email you when it’s available.`);
+      setMessage(t("static.product.waitlist.success", "You’re on the {{product}} waitlist. We’ll email you when it’s available.", { product: productName }));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "We couldn't save your waitlist request.");
+      setError(submitError instanceof Error ? submitError.message : t("product.waitlist.error", "We couldn't save your waitlist request."));
     } finally {
       setSaving(false);
     }
@@ -171,17 +175,17 @@ export function ProductWaitlistForm({ productId, productName }: { productId: str
   return <div className="product-waitlist-layout">
   <section className="product-waitlist" id="product-waitlist" aria-labelledby="product-waitlist-title" tabIndex={-1}>
     <div className="product-waitlist-art" aria-hidden="true"><span>✦</span><span>♡</span></div>
-    <p className="eyebrow">A LITTLE HEADS-UP</p>
-    <h2 id="product-waitlist-title">Join the waitlist</h2>
-    <p>Leave your details and we’ll save your spot for when {productName} is ready.</p>
+    <p className="eyebrow">{t("product.waitlist.eyebrow", "A LITTLE HEADS-UP")}</p>
+    <h2 id="product-waitlist-title">{t("product.waitlist.title", "Join the waitlist")}</h2>
+    <p>{t("product.waitlist.card_body", "Leave your details and we’ll save your spot for when {{product}} is ready.", { product: productName })}</p>
     <form onSubmit={joinWaitlist}>
-      <label>Your name<input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" placeholder="Your name" maxLength={120} disabled={checkingAccount} /></label>
-      <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" required maxLength={320} disabled={checkingAccount} /></label>
+      <label>{t("static.product.waitlist.name", "Your name")}<input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" placeholder={t("static.product.waitlist.name_placeholder", "Your name")} maxLength={120} disabled={checkingAccount} /></label>
+      <label>{t("product.waitlist.email", "Email address")}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} disabled={checkingAccount} /></label>
       {error && <p className="api-form-error" role="alert">{error}</p>}
       {message && <p className="product-form-success" role="status">{message}</p>}
-      <button className="product-review-submit" type="submit" disabled={saving || checkingAccount}>{checkingAccount ? "Checking your account…" : saving ? "Saving your spot…" : "Notify me when it’s here"}<span aria-hidden="true">→</span></button>
+      <button className="product-review-submit" type="submit" disabled={saving || checkingAccount}>{checkingAccount ? t("static.product.waitlist.checking", "Checking your account…") : saving ? t("static.product.waitlist.saving", "Saving your spot…") : t("static.product.waitlist.notify", "Notify me when it’s here")}<span aria-hidden="true">→</span></button>
     </form>
-    {checkingAccount && <small>Your Ponyo details will fill in automatically. You can edit them.</small>}
+    {checkingAccount && <small>{t("static.product.waitlist.autofill", "Your Ponyo details will fill in automatically. You can edit them.")}</small>}
     <div className="product-waitlist-lineup" aria-hidden="true">
       <span className="product-waitlist-lineup-glow" />
       <span className="product-waitlist-lineup-spark product-waitlist-lineup-spark--one">✦</span>
@@ -191,9 +195,9 @@ export function ProductWaitlistForm({ productId, productName }: { productId: str
   </section>
   <div className="product-waitlist-side-art" aria-hidden="true">
     <div className="product-waitlist-side-copy">
-      <span className="product-waitlist-side-kicker"><span aria-hidden="true">✦</span> PONYO WAITLIST LOUNGE <span aria-hidden="true">✦</span></span>
-      <h3>A little magic<br />is on its way</h3>
-      <p>Every good thing is worth waiting for.</p>
+      <span className="product-waitlist-side-kicker"><span aria-hidden="true">✦</span> {t("static.product.waitlist.lounge", "PONYO WAITLIST LOUNGE")} <span aria-hidden="true">✦</span></span>
+      <h3>{t("static.product.waitlist.side_title", "A little magic is on its way")}</h3>
+      <p>{t("static.product.waitlist.side_body", "Every good thing is worth waiting for.")}</p>
     </div>
     <div className="product-waitlist-side-panorama">
       <span className="product-waitlist-lineup-glow" />
@@ -296,7 +300,7 @@ export function ProductReservationPanel({
     {!open ? <p className="product-reservation-status">{t("product.reservation.closed", "Reservations are not open for this piece yet.")}</p>
       : !PONYO_API_BASE_URL ? <p className="product-reservation-status" role="status">{t("product.reservation.service_unavailable", "The reservation service is not configured right now.")}</p>
       : <form onSubmit={reserve}>
-        <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required maxLength={320} /></label>
+        <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} /></label>
         <label>{t("product.reservation.country", "Country")}<select autoComplete="country-name" value={country} onChange={(event) => setCountry(event.target.value)} required><option value="">{t("product.reservation.select_country", "Select your country")}</option>{deliveryCountries.map((item) => <option key={item.code} value={item.code}>{regionName(item.code, language, item.label)}</option>)}</select></label>
         {error && <p className="api-form-error" role="alert">{error}</p>}
         {message && <p className="product-form-success" role="status">{message}</p>}

@@ -202,6 +202,22 @@ export type AdminProduct = {
 	reservationsByCountry?: Array<{ country: string; count: number }>;
 };
 
+export type AdminReservationEntry = {
+	id: string;
+	productId: string;
+	productName: string;
+	email: string;
+	country: string;
+	createdAt: string;
+};
+
+export type AdminReservationPage = {
+	items: AdminReservationEntry[];
+	total: number;
+	limit: number;
+	offset: number;
+};
+
 export type MakerProfile = {
 	id: string;
 	slug: string;
@@ -620,6 +636,30 @@ async function apiRequest<T>(
 	return (payload as ApiEnvelope<T>).data;
 }
 
+async function apiDownload(path: string): Promise<Blob> {
+	if (!PONYO_API_BASE_URL) throw new ApiNotConfiguredError();
+	const response = await fetch(apiUrl(path), {
+		credentials: "include",
+		cache: "no-store",
+		referrerPolicy: "no-referrer",
+		headers: { Accept: "text/csv" },
+	});
+	if (!response.ok) {
+		let message = "The Ponyo service could not complete this request.";
+		try {
+			const payload = (await response.json()) as {
+				detail?: string;
+				error?: { message?: string };
+			};
+			message = payload.error?.message ?? payload.detail ?? message;
+		} catch {
+			message = response.statusText || message;
+		}
+		throw new ApiRequestError(message, response.status);
+	}
+	return response.blob();
+}
+
 export const ponyoApi = {
 	// Public, read-only POST: no authentication or CSRF bootstrap is needed.
 	validateCart: (input: CartValidationInput) =>
@@ -883,6 +923,33 @@ export const ponyoApi = {
 	},
 	listAdminReservations: () =>
 		apiRequest<AdminProduct[]>("/admin/reservations"),
+	listAdminReservationEntries: (filters: {
+		productId?: string;
+		country?: string;
+		q?: string;
+		limit?: number;
+		offset?: number;
+	} = {}) => {
+		const params = new URLSearchParams({
+			limit: String(filters.limit ?? 50),
+			offset: String(filters.offset ?? 0),
+		});
+		if (filters.productId) params.set("productId", filters.productId);
+		if (filters.country) params.set("country", filters.country);
+		if (filters.q) params.set("q", filters.q);
+		return apiRequest<AdminReservationPage>(`/admin/reservations/entries?${params.toString()}`);
+	},
+	downloadAdminReservationCsv: (filters: {
+		productId?: string;
+		country?: string;
+		q?: string;
+	} = {}) => {
+		const params = new URLSearchParams();
+		if (filters.productId) params.set("productId", filters.productId);
+		if (filters.country) params.set("country", filters.country);
+		if (filters.q) params.set("q", filters.q);
+		return apiDownload(`/admin/reservations/export.csv?${params.toString()}`);
+	},
 	setAdminProductReservations: (
 		id: string,
 		input: { reservationsOpen: boolean; reservationTarget: number | null },

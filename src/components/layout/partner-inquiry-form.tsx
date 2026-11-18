@@ -3,10 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { PONYO_API_BASE_URL, ponyoApi } from "@/services/ponyo-api.client";
 import { useCustomerSession } from "@/components/layout/customer-session-provider";
+import { useLocalization } from "@/components/layout/localization-provider";
 
 type InquiryDetails = { company: string; email: string; emailNotificationSent: boolean };
 
 export function PartnerInquiryForm() {
+  const { t } = useLocalization();
   const [submitted, setSubmitted] = useState<InquiryDetails | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,7 +30,7 @@ export function PartnerInquiryForm() {
     setIsSubmitting(true);
     try {
       if (!PONYO_API_BASE_URL) {
-        setErrorMessage("The partnership form needs the local Ponyo API to save submissions.");
+        setErrorMessage(t("static.partner.api_unavailable", "The partnership form needs the local Ponyo API to save submissions."));
         return;
       }
       const result = await ponyoApi.submitContactRequest({
@@ -46,7 +48,7 @@ export function PartnerInquiryForm() {
       setSubmitted({ company, email, emailNotificationSent: result.emailNotificationSent });
       form.reset();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to submit your partnership inquiry.");
+      setErrorMessage(error instanceof Error ? error.message : t("static.partner.submit_failed", "Unable to submit your partnership inquiry."));
     } finally {
       setIsSubmitting(false);
     }
@@ -56,8 +58,8 @@ export function PartnerInquiryForm() {
     return (
       <div className="partner-form-success" role="status">
         <span aria-hidden="true">✿</span>
-        <h2>Thank you, {submitted.company}.</h2>
-        <p>Your partnership inquiry has been saved with contact email <strong>{submitted.email}</strong>. {submitted.emailNotificationSent ? "A notification was emailed to Ponyo." : "Ponyo email notifications are not configured yet."}</p>
+        <h2>{t("static.partner.thanks", "Thank you, {{company}}.", { company: submitted.company })}</h2>
+        <p>{t("static.partner.saved", "Your partnership inquiry has been saved with contact email {{email}}.", { email: submitted.email })} {submitted.emailNotificationSent ? t("static.partner.emailed", "A notification was emailed to Ponyo.") : t("static.partner.email_unavailable", "Ponyo email notifications are not configured yet.")}</p>
       </div>
     );
   }
@@ -65,24 +67,24 @@ export function PartnerInquiryForm() {
   return (
     <form className="partner-inquiry-form" onSubmit={handleSubmit}>
       <div className="partner-form-grid">
-        <label>Company or maker name <span>*</span><input name="company" required maxLength={160} autoComplete="organization" placeholder="Your studio or brand" /></label>
-        <label>Contact name <span>*</span><input name="contactName" required maxLength={160} autoComplete="name" placeholder="Your name" value={contactName ?? [customer?.firstName, customer?.lastName].filter(Boolean).join(" ")} onChange={(event) => setContactName(event.target.value)} /></label>
-        <label>Business email <span>*</span><input name="email" type="email" required maxLength={320} autoComplete="email" placeholder="you@yourstudio.com" value={email ?? customer?.email ?? ""} onChange={(event) => setEmail(event.target.value)} /></label>
-        <label>Website or social link<input name="website" type="url" maxLength={500} placeholder="https://" /></label>
+        <label>{t("static.partner.company", "Company or maker name")} <span>*</span><input name="company" required maxLength={160} autoComplete="organization" placeholder={t("static.partner.company_placeholder", "Your studio or brand")} /></label>
+          <label>{t("static.partner.contact", "Contact name")} <span>*</span><input name="contactName" required maxLength={160} autoComplete="name" placeholder={t("static.partner.contact_placeholder", "Your name")} value={contactName ?? [customer?.firstName, customer?.lastName].filter(Boolean).join(" ")} onChange={(event) => setContactName(event.target.value)} /></label>
+          <label>{t("static.partner.email", "Business email")} <span>*</span><input name="email" type="email" required maxLength={320} autoComplete="email" placeholder={t("static.account.email_placeholder", "you@example.com")} value={email ?? customer?.email ?? ""} onChange={(event) => setEmail(event.target.value)} /></label>
+          <label>{t("static.partner.website", "Website or social link")}<input name="website" type="url" maxLength={500} placeholder="https://" /></label>
       </div>
-      <label>What do you make? <span>*</span>
+        <label>{t("static.partner.product_type", "What do you make?")} <span>*</span>
         <select name="productType" required defaultValue="">
-          <option value="" disabled>Select a product category</option>
-          <option>Plush toys</option>
-          <option>Collectible characters</option>
-          <option>Handmade or limited-edition plush</option>
-          <option>Other</option>
+            <option value="" disabled>{t("static.partner.select_category", "Select a product category")}</option>
+            <option value="Plush toys">{t("static.partner.plush", "Plush toys")}</option>
+            <option value="Collectible characters">{t("static.partner.characters", "Collectible characters")}</option>
+            <option value="Handmade or limited-edition plush">{t("static.partner.handmade", "Handmade or limited-edition plush")}</option>
+            <option value="Other">{t("static.partner.other", "Other")}</option>
         </select>
       </label>
-      <label>Tell us about your products and partnership idea <span>*</span><textarea name="message" required minLength={20} maxLength={4000} rows={6} placeholder="Share your product range, where you make it, and how you would like to work with Ponyo." /></label>
+        <label>{t("static.partner.message", "Tell us about your products and partnership idea")} <span>*</span><textarea name="message" required minLength={20} maxLength={4000} rows={6} placeholder={t("static.partner.message_placeholder", "Share your product range, where you make it, and how you would like to work with Ponyo.")} /></label>
       {errorMessage && <p className="api-form-error" role="alert">{errorMessage}</p>}
-      <button className="shop-button shop-button-orange" type="submit" disabled={isSubmitting}>{isSubmitting ? "Sending inquiry…" : "Send partnership inquiry"}<span aria-hidden="true">→</span></button>
-      <p className="partner-form-privacy">Your details will only be used to review this partnership inquiry.</p>
+        <button className="shop-button shop-button-orange" type="submit" disabled={isSubmitting}>{isSubmitting ? t("static.partner.sending", "Sending inquiry…") : t("static.partner.submit", "Send partnership inquiry")}<span aria-hidden="true">→</span></button>
+        <p className="partner-form-privacy">{t("static.partner.privacy", "Your details will only be used to review this partnership inquiry.")}</p>
     </form>
   );
 }

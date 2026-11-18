@@ -1,8 +1,10 @@
 """Admin-only marketplace operations and read models for the Ponyo dashboard."""
 
+import csv
+from io import StringIO
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -38,6 +40,30 @@ from app.security import require_csrf, require_roles
 from app.translations import TranslationUnavailableError, ensure_product_translations
 
 router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
+
+MAX_RESERVATION_EXPORT_ROWS = 10_000
+
+
+def reservation_filters(product_id: UUID | None, country: str | None, q: str | None):
+    filters = []
+    if product_id is not None:
+        filters.append(ProductReservation.product_id == product_id)
+    if country and country.strip():
+        filters.append(ProductReservation.country.ilike(country.strip()))
+    if q and q.strip():
+        escaped = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        filters.append(or_(
+            ProductReservation.email.ilike(pattern, escape="\\"),
+            Product.name.ilike(pattern, escape="\\"),
+        ))
+    return filters
+
+
+def safe_csv_cell(value: str) -> str:
+    if value.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
+        return f"'{value}"
+    return value
 
 
 def order_summary(order: Order) -> dict:
@@ -277,6 +303,96 @@ async def list_product_reservations(_admin: Customer = Depends(require_roles("ad
         }
         for product in products
     ]}
+
+
+@router.get("/reservations/entries", response_model=dict)
+async def list_reservation_entries(
+    response: Response,
+    product_id: UUID | None = Query(default=None, alias="productId"),
+    country: str | None = Query(default=None, max_length=100),
+    q: str | None = Query(default=None, max_length=180),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    filters = reservation_filters(product_id, country, q)
+    base = select(ProductReservation, Product.name).join(Product, Product.id == ProductReservation.product_id)
+    total = await db.scalar(
+        select(func.count(ProductReservation.id))
+        .join(Product, Product.id == ProductReservation.product_id)
+        .where(*filters)
+    ) or 0
+    rows = (await db.execute(
+        base.where(*filters)
+        .order_by(ProductReservation.created_at.desc(), ProductReservation.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )).all()
+    return {"data": {"items": [
+        {
+            "id": str(reservation.id),
+            "productId": str(reservation.product_id),
+            "productName": product_name,
+            "email": reservation.email,
+            "country": reservation.country,
+            "createdAt": reservation.created_at.isoformat(),
+        }
+        for reservation, product_name in rows
+    ], "total": total, "limit": limit, "offset": offset}}
+
+
+@router.get("/reservations/export.csv")
+async def export_reservation_entries(
+    product_id: UUID | None = Query(default=None, alias="productId"),
+    country: str | None = Query(default=None, max_length=100),
+    q: str | None = Query(default=None, max_length=180),
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    filters = reservation_filters(product_id, country, q)
+    total = await db.scalar(
+        select(func.count(ProductReservation.id))
+        .join(Product, Product.id == ProductReservation.product_id)
+        .where(*filters)
+    ) or 0
+    if total > MAX_RESERVATION_EXPORT_ROWS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Export is limited to {MAX_RESERVATION_EXPORT_ROWS} rows. Narrow the filters and try again.",
+        )
+    rows = (await db.execute(
+        select(
+            ProductReservation.id,
+            Product.name,
+            ProductReservation.email,
+            ProductReservation.country,
+            ProductReservation.created_at,
+        )
+        .join(Product, Product.id == ProductReservation.product_id)
+        .where(*filters)
+        .order_by(ProductReservation.created_at.desc(), ProductReservation.id.desc())
+    )).all()
+    output = StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(["Reservation ID", "Product", "Email", "Country", "Created at"])
+    for reservation_id, product_name, email, country_name, created_at in rows:
+        writer.writerow([
+            safe_csv_cell(str(reservation_id)),
+            safe_csv_cell(product_name),
+            safe_csv_cell(email),
+            safe_csv_cell(country_name),
+            safe_csv_cell(created_at.isoformat()),
+        ])
+    return Response(
+        content=f"\ufeff{output.getvalue()}",
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="ponyo-reservations.csv"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.patch("/products/{product_id}/reservations", response_model=dict)

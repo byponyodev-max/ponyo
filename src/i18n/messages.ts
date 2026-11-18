@@ -8,6 +8,7 @@ import { checkoutTranslations } from "@/locales/checkout-translations";
 import { contactTranslations } from "@/locales/contact-translations";
 import { orderTranslations } from "@/locales/order-translations";
 import { storefrontTranslations } from "@/locales/storefront-translations";
+import { staticUiTranslations } from "@/locales/static-ui-translations";
 import { wishlistTranslations } from "@/locales/wishlist-translations";
 import { localeFilename } from "@/lib/localization-options";
 
@@ -19,6 +20,7 @@ type LocaleDictionary = Record<string, Record<string, string>>;
 const supplementalTranslations: LocaleDictionary[] = [
 	appTranslations,
 	storefrontTranslations,
+	staticUiTranslations,
 	checkoutTranslations,
 	wishlistTranslations,
 	contactTranslations,

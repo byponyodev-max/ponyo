@@ -2,10 +2,16 @@ import pytest
 from sqlalchemy import func, select
 
 from app.models import Brand, Customer, MakerApplication, OutboxEvent, Product, ProductReservation
+from app.routers.admin import safe_csv_cell
 from app.security import hash_password
 from test_api import add_product, csrf_token, seed_customer_session, test_client
 
 pytestmark = pytest.mark.asyncio
+
+
+async def test_reservation_csv_escapes_spreadsheet_formulas():
+    assert safe_csv_cell("=HYPERLINK(\"https://example.com\")") == "'=HYPERLINK(\"https://example.com\")"
+    assert safe_csv_cell("  @SUM(A1:A2)") == "'  @SUM(A1:A2)"
 
 
 async def test_product_reservations_are_idempotent_non_binding_and_counted(test_client):
@@ -139,9 +145,40 @@ async def test_maker_profile_and_product_proof_only_use_published_real_brand_dat
     assert detail.json()["data"]["reservationsOpen"] is False
 
 
+async def test_populated_demo_maker_profiles_are_publicly_linkable(test_client):
+    client, factory = test_client
+    product_id, _ = await add_product(factory, slug="sample-maker-plush")
+    async with factory() as db:
+        product = await db.get(Product, product_id)
+        brand = Brand(
+            slug="sample-maker-studio",
+            name="Sample Maker Studio",
+            is_demo=True,
+            maker_story="A clearly labeled sample maker profile for the demo catalog.",
+            philosophy="Sample philosophy.",
+            process="Sample process.",
+        )
+        db.add(brand)
+        await db.flush()
+        product.brand_id = brand.id
+        product.materials = "Polyester plush"
+        product.only_at_ponyo = True
+        await db.commit()
+
+    profile = await client.get("/v1/makers/sample-maker-studio")
+    detail = await client.get(f"/v1/products/{product_id}")
+    assert profile.status_code == 200
+    assert profile.json()["data"]["maker"]["story"].startswith("A clearly labeled sample")
+    assert detail.json()["data"]["makerSlug"] == "sample-maker-studio"
+    assert detail.json()["data"]["makerName"] == "Sample Maker Studio"
+    assert detail.json()["data"]["materials"] == "Polyester plush"
+    assert detail.json()["data"]["onlyAtPonyo"] is True
+
+
 async def test_admin_can_configure_product_proof_and_reservation_counter(test_client):
     client, factory = test_client
     product_id, _ = await add_product(factory, slug="admin-proof-plush")
+    assert (await client.get("/v1/admin/reservations/entries")).status_code == 401
     admin_id = await seed_customer_session(client, factory, email="proof-admin@example.com")
     async with factory() as db:
         admin = await db.get(Customer, admin_id)
@@ -191,6 +228,22 @@ async def test_admin_can_configure_product_proof_and_reservation_counter(test_cl
         {"country": "JP", "count": 2},
         {"country": "KR", "count": 1},
     ]
+
+    entries = await client.get(
+        "/v1/admin/reservations/entries",
+        params={"productId": str(product_id), "country": "JP", "q": "one@example.com"},
+    )
+    assert entries.status_code == 200
+    assert entries.json()["data"]["total"] == 1
+    assert entries.json()["data"]["items"][0]["email"] == "one@example.com"
+    assert entries.json()["data"]["items"][0]["productName"] == "Admin Proof Plush"
+
+    export = await client.get("/v1/admin/reservations/export.csv", params={"productId": str(product_id), "country": "KR"})
+    assert export.status_code == 200
+    assert export.headers["content-type"].startswith("text/csv")
+    assert "no-store" in export.headers["cache-control"]
+    assert "three@example.com" in export.text
+    assert "one@example.com" not in export.text
 
     public = await client.get(f"/v1/products/{product_id}/reservations")
     assert public.json()["data"] == {"reservationCount": 3, "target": 40, "open": True}

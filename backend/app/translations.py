@@ -42,7 +42,7 @@ def _product_translation_entries(product: Product) -> list[tuple[tuple[str, ...]
         for index, (key, value) in enumerate(sorted((variant.options or {}).items())):
             add(("variants", str(variant.id), "options", str(index), "key"), key)
             add(("variants", str(variant.id), "options", str(index), "value"), value)
-    if product.brand and not product.brand.is_demo:
+    if product.brand and product.brand.maker_story:
         add(("makerStory",), product.brand.maker_story)
         add(("makerPhilosophy",), product.brand.philosophy)
         add(("makerProcess",), product.brand.process)

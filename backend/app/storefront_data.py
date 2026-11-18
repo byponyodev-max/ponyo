@@ -13,6 +13,49 @@ from app.models import (
     Supplier, SupplierInventory, SupplierOffer,
 )
 
+DEMO_MAKER_PROFILES = {
+    "ponyo": {
+        "name": "Kumo Stitch Atelier",
+        "maker_story": "A sample maker profile from Kyoto, creating soft animal characters with rounded silhouettes and careful embroidered details.",
+        "philosophy": "Thoughtful details can make everyday comfort feel special.",
+        "process": "Each sample begins with a hand-drawn shape, then is stitched and checked for softness, seams, and balance.",
+        "location": "Kyoto, Japan",
+        "specialties": ["Soft animal plush", "Embroidered details"],
+    },
+    "studio-haneul-south-korea": {
+        "name": "Studio Haneul",
+        "maker_story": "A sample Seoul studio imagining gentle characters inspired by flowers, clouds, and quiet moments.",
+        "philosophy": "A small, kind detail can brighten an ordinary day.",
+        "process": "Each sample is shaped, sewn, and reviewed for a soft finish and a friendly expression.",
+        "location": "Seoul, South Korea",
+        "specialties": ["Character plush", "Soft accessories"],
+    },
+    "ponyo-selected-maker": {
+        "name": "Mori & Mallow Studio",
+        "maker_story": "A fictional sample studio making cozy companions with expressive faces and comforting textures.",
+        "philosophy": "A plush should feel welcoming from the very first hug.",
+        "process": "The studio tests fabric feel, shape, and stitching on each sample before presenting a design.",
+        "location": "Osaka, Japan",
+        "specialties": ["Cozy companions", "Character design"],
+    },
+    "domina": {
+        "name": "Domina Plush Studio",
+        "maker_story": "A sample studio exploring oversized plush companions designed to bring warmth and character into a room.",
+        "philosophy": "Big comfort can make a space feel a little more personal.",
+        "process": "Each sample is checked for its proportions, seams, and support at a larger scale.",
+        "location": "Tokyo, Japan",
+        "specialties": ["Oversized plush", "Room-scale characters"],
+    },
+    "ponyo-demo-collection": {
+        "name": "Ponyo Sample Studio",
+        "maker_story": "A fictional studio profile created for Ponyo's demo catalog; these maker details are illustrative sample content.",
+        "philosophy": "Playful shapes and gentle colors make a plush feel like a friend.",
+        "process": "These sample designs are reviewed for shape, color, and clear product details.",
+        "location": "Ponyo demo catalog",
+        "specialties": ["Sample characters", "Demo catalog"],
+    },
+}
+
 
 def demo_id(kind: str, key: str):
     return uuid5(NAMESPACE_URL, f"https://ponyo.example/demo/{kind}/{key}")
@@ -37,7 +80,8 @@ async def link_demo_catalog(db: AsyncSession) -> None:
                 db.add(category)
                 await db.flush()
             product.category_id = category.id
-        if product.brand_id is None:
+        brand = await db.get(Brand, product.brand_id) if product.brand_id else None
+        if brand is None:
             slug = catalog_slug(product.supplier_name)
             brand = await db.scalar(select(Brand).where(Brand.slug == slug))
             if brand is None:
@@ -45,6 +89,10 @@ async def link_demo_catalog(db: AsyncSession) -> None:
                 db.add(brand)
                 await db.flush()
             product.brand_id = brand.id
+        profile = DEMO_MAKER_PROFILES.get(brand.slug)
+        if brand.is_demo and profile:
+            for field, value in profile.items():
+                setattr(brand, field, value)
         if not await db.scalar(select(ProductImage.id).where(ProductImage.product_id == product.id)):
             db.add(ProductImage(id=demo_id("image", str(product.id)), product_id=product.id, url=product.image_url, alt=product.image_alt, sort_order=0))
         # A manufacturer/brand is not a supplier business. Use explicitly fictional wholesalers.

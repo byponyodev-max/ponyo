@@ -93,7 +93,7 @@ export function StoreSearch({ compactHeader = false }: { compactHeader?: boolean
 
   return (
     <div ref={rootRef} className={`store-search-root${open ? " is-search-open" : ""}${compactOpen ? " is-compact-search-open" : ""}`}>
-      {compactOpen && <button type="button" className="predictive-search-backdrop" aria-label="Close search" onClick={closeSearch} />}
+      {compactOpen && <button type="button" className="predictive-search-backdrop" aria-label={t("static.search.close", "Close search")} onClick={closeSearch} />}
       <button ref={triggerRef} className="store-search-trigger" type="button" onClick={() => openSearch(compactHeader)} aria-label={t("search.products_heading", "Search products")} aria-expanded={open}>
         <span>{t("home.header.search_placeholder", "Find a plush friend you’ll love…")}</span><span className="store-search-trigger-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="m15.2 15.2 4.8 4.8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg></span>
       </button>

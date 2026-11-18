@@ -32,6 +32,7 @@ async def product_by_id(product_id: UUID, db: AsyncSession) -> Product:
 
 def product_response(product: Product, translation: ProductTranslation | None = None, quantities: dict | None = None) -> ProductOut:
     translated_fields = translation.fields if translation and translation.fields else {}
+    has_maker_profile = bool(product.brand and product.brand.maker_story)
 
     def localized(path: tuple[str, ...], fallback):
         value = _get_nested(translated_fields, path)
@@ -72,16 +73,16 @@ def product_response(product: Product, translation: ProductTranslation | None = 
         categoryId=str(product.category_id) if product.category_id else None,
         brandId=str(product.brand_id) if product.brand_id else None,
         brandName=product.brand.name if product.brand else product.supplier_name,
-        makerName=product.brand.name if product.brand and not product.brand.is_demo else None,
-        makerSlug=product.brand.slug if product.brand and not product.brand.is_demo else None,
-        makerStory=localized(("makerStory",), product.brand.maker_story) if product.brand and not product.brand.is_demo else None,
-        makerPhilosophy=localized(("makerPhilosophy",), product.brand.philosophy) if product.brand and not product.brand.is_demo else None,
-        makerProcess=localized(("makerProcess",), product.brand.process) if product.brand and not product.brand.is_demo else None,
-        makerLocation=localized(("makerLocation",), product.brand.location) if product.brand and not product.brand.is_demo else None,
+        makerName=product.brand.name if has_maker_profile else None,
+        makerSlug=product.brand.slug if has_maker_profile else None,
+        makerStory=localized(("makerStory",), product.brand.maker_story) if has_maker_profile else None,
+        makerPhilosophy=localized(("makerPhilosophy",), product.brand.philosophy) if has_maker_profile else None,
+        makerProcess=localized(("makerProcess",), product.brand.process) if has_maker_profile else None,
+        makerLocation=localized(("makerLocation",), product.brand.location) if has_maker_profile else None,
         makerSpecialties=[
             localized(("makerSpecialties", str(index)), specialty)
             for index, specialty in enumerate(product.brand.specialties or [])
-        ] if product.brand and not product.brand.is_demo else [],
+        ] if has_maker_profile else [],
         materials=localized(("materials",), product.materials),
         weightGrams=product.weight_grams,
         editionCount=product.edition_count,

@@ -890,6 +890,62 @@
     font-size: 10px;
 }
 
+.ad-reservation-entry-filters {
+    align-items: flex-end;
+    flex-wrap: wrap;
+    padding: 12px;
+    border: 1px solid #eee3dc;
+    border-radius: 14px;
+    background: #fcfaf8;
+}
+
+.ad-reservation-entry-filters>label:not(.ad-search) {
+    display: grid;
+    gap: 5px;
+    color: #89766e;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.ad-reservation-entry-filters>label:not(.ad-search) select {
+    min-width: 150px;
+}
+
+.ad-reservation-entry-filters .ad-search {
+    max-width: none;
+}
+
+.ad-reservation-entry-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 4px 2px;
+    color: #89766e;
+    font-size: 11px;
+}
+
+.ad-reservation-entry-pagination>div {
+    display: flex;
+    gap: 8px;
+}
+
+.ad-reservation-entry-pagination button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid #eadfd7;
+    border-radius: 9px;
+    background: #fff;
+    color: #7b6255;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.ad-reservation-entry-pagination button:disabled {
+    cursor: not-allowed;
+    opacity: .48;
+}
+
 .ad-search {
     min-width: 170px;
     max-width: 420px;

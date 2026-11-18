@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocalization } from "@/components/layout/localization-provider";
 
 export type ProductGalleryImage = { src: string; alt: string };
 
 export function ProductGallery({ title, images }: { title: string; images: ProductGalleryImage[] }) {
+  const { t } = useLocalization();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -54,22 +56,22 @@ export function ProductGallery({ title, images }: { title: string; images: Produ
 
   return <>
     <div className="product-gallery">
-      <div ref={trackRef} className="product-gallery-track" role="region" aria-label={`${title} photos`} onScroll={(event) => {
+      <div ref={trackRef} className="product-gallery-track" role="region" aria-label={t("static.product.gallery.photos", "{{title}} photos", { title })} onScroll={(event) => {
         const element = event.currentTarget;
         const index = Math.round(element.scrollLeft / Math.max(1, element.clientWidth));
         setActive(Math.min(index, media.length - 1));
       }}>
-        {media.map((image, index) => <div className="product-gallery-slide" key={`${image.src}-${index}`}><button type="button" className="product-gallery-zoom" aria-label={`View image: ${image.alt || title}`} onClick={() => openAt(index)}><Image src={image.src} alt={image.alt || title} fill priority={index === 0} sizes="(min-width: 1280px) 480px, (min-width: 1024px) 440px, (min-width: 768px) 42vw, calc(100vw - 34px)" /></button></div>)}
+        {media.map((image, index) => <div className="product-gallery-slide" key={`${image.src}-${index}`}><button type="button" className="product-gallery-zoom" aria-label={t("static.product.gallery.show", "Show image {{number}}", { number: index + 1 })} onClick={() => openAt(index)}><Image src={image.src} alt={image.alt || title} fill priority={index === 0} sizes="(min-width: 1280px) 480px, (min-width: 1024px) 440px, (min-width: 768px) 42vw, calc(100vw - 34px)" /></button></div>)}
       </div>
       <span className="product-gallery-count" aria-live="polite">{active + 1} / {media.length}</span>
-      {media.length > 1 && <div className="product-gallery-thumbnails" role="group" aria-label="Choose product image">{media.map((image, index) => <button key={`${image.src}-thumb`} type="button" aria-label={`Show image ${index + 1}`} aria-pressed={active === index} onClick={() => selectImage(index)}><Image src={image.src} alt="" width={64} height={64} /></button>)}</div>}
-      <p className="product-image-caption"><span>♡</span> A new forever friend</p>
+      {media.length > 1 && <div className="product-gallery-thumbnails" role="group" aria-label={t("static.product.gallery.choose", "Choose product image")}>{media.map((image, index) => <button key={`${image.src}-thumb`} type="button" aria-label={t("static.product.gallery.show", "Show image {{number}}", { number: index + 1 })} aria-pressed={active === index} onClick={() => selectImage(index)}><Image src={image.src} alt="" width={64} height={64} /></button>)}</div>}
+      <p className="product-image-caption"><span>♡</span> {t("static.product.gallery.caption", "A new forever friend")}</p>
     </div>
-    <dialog ref={dialogRef} className="product-zoom-dialog" aria-label={`${title} image viewer`} onClose={() => setZoomOpen(false)} onClick={(event) => { if (event.target === dialogRef.current) dialogRef.current?.close(); }}>
+    <dialog ref={dialogRef} className="product-zoom-dialog" aria-label={t("static.product.gallery.viewer", "{{title}} image viewer", { title })} onClose={() => setZoomOpen(false)} onClick={(event) => { if (event.target === dialogRef.current) dialogRef.current?.close(); }}>
       <div className="product-zoom-viewer">
-        <button className="product-zoom-close" type="button" aria-label="Close image" onClick={() => dialogRef.current?.close()}>×</button>
+        <button className="product-zoom-close" type="button" aria-label={t("static.product.gallery.close", "Close image")} onClick={() => dialogRef.current?.close()}>×</button>
         {zoomOpen && current && <Image src={current.src} alt={current.alt || title} fill sizes="100vw" priority />}
-        {media.length > 1 && <><button className="product-zoom-prev" type="button" aria-label="Previous image" onClick={() => move(-1)}>‹</button><button className="product-zoom-next" type="button" aria-label="Next image" onClick={() => move(1)}>›</button><span className="product-zoom-count">{active + 1} / {media.length}</span></>}
+        {media.length > 1 && <><button className="product-zoom-prev" type="button" aria-label={t("static.product.gallery.previous", "Previous image")} onClick={() => move(-1)}>‹</button><button className="product-zoom-next" type="button" aria-label={t("static.product.gallery.next", "Next image")} onClick={() => move(1)}>›</button><span className="product-zoom-count">{active + 1} / {media.length}</span></>}
       </div>
     </dialog>
   </>;

@@ -265,7 +265,7 @@ export function SiteHeader() {
         </div>
         <div ref={categorySlotRef} className={`store-category-slot${categoryPinned ? " is-pinned" : ""}`} style={categoryPinned ? { height: categoryHeight } : undefined}>
         <div className={`store-category-row${categoryPinned ? " is-pinned" : ""}`} style={categoryPinned ? { top: smartHeaderVisible ? 64 : 0 } : undefined}>
-          <nav className="store-navigation" aria-label="Main navigation">
+          <nav className="store-navigation" aria-label={t("static.navigation.main", "Main navigation")}>
             {mainLinks.map((item) => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined}>{t(item.key, item.title)}</Link>)}
             <DesktopCollectiblesMenu />
           </nav>
@@ -290,7 +290,7 @@ export function SiteHeader() {
           </div>
         </div>
         <div className="smart-header-category">
-          <nav aria-label="Sticky main navigation">
+          <nav aria-label={t("static.navigation.sticky", "Sticky main navigation")}>
             {mainLinks.map((item) => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined}>{t(item.key, item.title)}</Link>)}
             <DesktopCollectiblesMenu />
           </nav>
@@ -309,7 +309,7 @@ export function SiteHeader() {
             {activeMenu === "root" ? <>
               {storefrontFeatures.customerAccounts && <div className="mobile-account-card"><JellyfishMark /><div><strong>{customer ? t("home.header.welcome_back", `Welcome back, ${customer.firstName || "plush friend"}`, { name: customer.firstName || "" }) : t("home.header.welcome", "Welcome to Ponyo")}</strong><span>{customer?.email ?? t("home.header.find_friend", "Find a new forever plush.")}</span></div><button type="button" onClick={openAccountFromMenu}>{customer ? t("home.header.profile", "My profile") : t("home.header.sign_in", "Sign in")}</button></div>}
               <p className="mobile-menu-label">{t("home.footer.shop", "Shop")}</p>
-              <nav className="mobile-primary-links" aria-label="Shop menu">
+              <nav className="mobile-primary-links" aria-label={t("static.navigation.shop_menu", "Shop menu")}>
                 {mainLinks.map((item) => <Link key={item.title} href={item.href} onClick={() => setMenuOpen(false)}>{t(item.key, item.title)}<span aria-hidden="true">›</span></Link>)}
                 <button type="button" onClick={() => setActiveMenu("collectibles")}>{t("home.header.collectibles", "Collectibles")}<span aria-hidden="true">›</span></button>
               </nav>
@@ -318,7 +318,7 @@ export function SiteHeader() {
               <Link className="mobile-domina-card" href="/pages/domina-xl" onClick={() => setMenuOpen(false)}><Image src="/images/catalog/ponyo-3.png" alt="" width={68} height={68} /><span><b>{t("home.header.domina", "DOMINA by Ponyo")}</b><small>{t("home.header.giant_plush_range", "Giant plush from 70 to 120 cm")}</small></span><i>›</i></Link>
               <p className="mobile-menu-label">{t("home.footer.support", "Help")}</p>
               <nav className="mobile-help-links">{storefrontFeatures.commerce && <button type="button" onClick={() => { setMenuOpen(false); setBagOpen(true); }}><span>{t("cart.title", "Your cart")}</span><span className="mobile-help-link-meta">{itemCount > 0 && <b>{itemCount}</b>}<i aria-hidden="true">›</i></span></button>}<Link href="/collections/all?view=wishlist" onClick={() => setMenuOpen(false)}><span>♡ {t("home.header.wishlist", "My Wishlist")}</span>{wishlistCount > 0 && <b>{wishlistCount}</b>}</Link>{storefrontFeatures.plushJournal && <Link href="/blogs/news" onClick={() => setMenuOpen(false)}>{t("home.footer.journal", "The Plush Journal")}</Link>}<Link href="/pages/faq" onClick={() => setMenuOpen(false)}>{t("home.footer.faq", "FAQ & Shipping")}</Link><Link href="/pages/contact" onClick={() => setMenuOpen(false)}>{t("home.footer.contact", "Contact us")}</Link><Link href="/pages/about" onClick={() => setMenuOpen(false)}>{t("home.footer.about_link", "About Ponyo")}</Link></nav>
-            </> : <div className="mobile-submenu-grid">{animalCategories.map((item) => <Link href={item.href} key={item.title} onClick={() => setMenuOpen(false)}><Image src={item.image} alt="" width={40} height={40} />{item.title}<span>›</span></Link>)}</div>}
+            </> : <div className="mobile-submenu-grid">{animalCategories.map((item) => <Link href={item.href} key={item.title} onClick={() => setMenuOpen(false)}><Image src={item.image} alt="" width={40} height={40} />{t(`home.categories.${item.title === "Cute Characters" ? "characters" : item.title.toLowerCase()}`, item.title)}<span>›</span></Link>)}</div>}
           </div>
         </div>
       </dialog>

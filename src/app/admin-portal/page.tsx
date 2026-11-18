@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 import { aggregateReservationsByCountry } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminSupplier } from "@/services/ponyo-api.client";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
 import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
@@ -42,7 +42,7 @@ function date(value: string) {
 }
 
 export default function AdminPortalPage() {
-	const { formatPrice, language } = useLocalization();
+	const { formatPrice, language, t } = useLocalization();
 	const [admin, setAdmin] = useState<AdminIdentity | null>(null);
 	const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
 	const [orders, setOrders] = useState<OrderPage>({ items: [], total: 0, limit: 50, offset: 0 });
@@ -50,6 +50,10 @@ export default function AdminPortalPage() {
 	const [suppliers, setSuppliers] = useState<AdminSupplier[]>([]);
 	const [brands, setBrands] = useState<AdminBrand[]>([]);
 	const [reservationProducts, setReservationProducts] = useState<AdminProduct[]>([]);
+	const [reservationEntries, setReservationEntries] = useState<AdminReservationPage>({ items: [], total: 0, limit: 50, offset: 0 });
+	const [reservationFilters, setReservationFilters] = useState({ productId: "", country: "", query: "" });
+	const [reservationEntriesLoading, setReservationEntriesLoading] = useState(false);
+	const [reservationExporting, setReservationExporting] = useState(false);
 	const [makerApplications, setMakerApplications] = useState<AdminMakerApplication[]>([]);
 	const [customers, setCustomers] = useState<AdminCustomer[]>([]);
 	const [section, setSection] = useState<AdminSection>("dashboard");
@@ -64,6 +68,24 @@ export default function AdminPortalPage() {
 	const [notice, setNotice] = useState("");
 	const [selectedOrderId, setSelectedOrderId] = useState("");
 	const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
+
+	const loadReservationEntries = useCallback(async (offset: number) => {
+		setReservationEntriesLoading(true);
+		setError("");
+		try {
+			setReservationEntries(await ponyoApi.listAdminReservationEntries({
+				productId: reservationFilters.productId || undefined,
+				country: reservationFilters.country || undefined,
+				q: reservationFilters.query.trim() || undefined,
+				limit: 50,
+				offset,
+			}));
+		} catch (requestError) {
+			setError(messageFor(requestError));
+		} finally {
+			setReservationEntriesLoading(false);
+		}
+	}, [reservationFilters]);
 
 	const loadSection = useCallback(async (target: AdminSection, search = query) => {
 		setError("");
@@ -84,6 +106,7 @@ export default function AdminPortalPage() {
 				break;
 				case "reservations":
 					setReservationProducts(await ponyoApi.listAdminReservations());
+					await loadReservationEntries(0);
 					break;
 				case "maker-applications":
 					setMakerApplications(await ponyoApi.listAdminMakerApplications());
@@ -101,7 +124,7 @@ export default function AdminPortalPage() {
 		} catch (requestError) {
 			setError(messageFor(requestError));
 		}
-	}, [publishedFilter, query]);
+	}, [publishedFilter, query, loadReservationEntries]);
 
 	const refreshAll = useCallback(async () => {
 		setRefreshing(true);
@@ -142,6 +165,31 @@ export default function AdminPortalPage() {
 		setOrderDetail(null);
 		setError("");
 		if (target !== "dashboard") void loadSection(target, "");
+	}
+
+	async function exportReservationEntries() {
+		setReservationExporting(true);
+		setError("");
+		try {
+			const file = await ponyoApi.downloadAdminReservationCsv({
+				productId: reservationFilters.productId || undefined,
+				country: reservationFilters.country || undefined,
+				q: reservationFilters.query.trim() || undefined,
+			});
+			const url = URL.createObjectURL(file);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = "ponyo-reservations.csv";
+			document.body.append(link);
+			link.click();
+			link.remove();
+			window.setTimeout(() => URL.revokeObjectURL(url), 0);
+			setNotice(t("admin.reservations.export_ready", "Filtered reservation data downloaded."));
+		} catch (requestError) {
+			setError(messageFor(requestError));
+		} finally {
+			setReservationExporting(false);
+		}
 	}
 
 	async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -261,7 +309,78 @@ export default function AdminPortalPage() {
 			</>}
 			{section === "orders" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("orders", query); }} placeholder="Order number or customer email" /></label><button type="button" onClick={() => void loadSection("orders")}>Search orders</button><span>{orders.total} orders</span></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>PAYMENT</th><th>FULFILLMENT</th><th>SUPPLIER</th><th>TOTAL</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td><span className="ad-status">{order.paymentStatus}</span></td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td></tr>)}</tbody></table></div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL · {orderDetail.paymentStatus}</span><h2>{orderDetail.orderNumber}</h2><p>{orderDetail.customerEmail} · {orderDetail.fulfillmentStatus.replaceAll("_", " ")}</p></div><button type="button" onClick={() => { setOrderDetail(null); setSelectedOrderId(""); }}>Close</button></div><div className="ad-order-facts"><span>Subtotal <strong>{amount(orderDetail.subtotalAmount, orderDetail.currency, formatPrice)}</strong></span><span>Discount <strong>{amount(orderDetail.discountAmount, orderDetail.currency, formatPrice)}</strong></span><span>Shipping <strong>{amount(orderDetail.shippingAmount, orderDetail.currency, formatPrice)}</strong></span><span>Captured <strong>{amount(orderDetail.capturedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Refunded <strong>{amount(orderDetail.refundedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Total <strong>{amount(orderDetail.totalAmount, orderDetail.currency, formatPrice)}</strong></span></div><div className="ad-detail-columns"><section><h3>Customer order lines</h3>{orderDetail.items.map((line) => <article key={line.id}><span><strong>{line.name}</strong><small>Qty {line.quantity} · {line.supplierOfferId ? "Supplier linked" : "Legacy / not routed"}</small></span><b>{amount(line.unitPrice * line.quantity, line.currency, formatPrice)}</b></article>)}</section><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")} {po.supplierOrderId ? `· Ref ${po.supplierOrderId}` : ""}</small></span><small>{po.items.length} lines</small></article>)}{orderDetail.paymentStatus === "paid" && <button className="ad-row-action" type="button" disabled={busyId === orderDetail.id} onClick={() => { const row = orders.items.find((item) => item.id === orderDetail.id); if (row) void planSupplierOrders(row); }}>{busyId === orderDetail.id ? "Planning…" : "Plan / refresh supplier routing"}</button>}</section><section><h3>Shipments</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
 			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("products", query); }} placeholder="Product name, SKU or slug" /></label><select value={publishedFilter} onChange={(event) => { setPublishedFilter(event.target.value as typeof publishedFilter); }}><option value="all">All products</option><option value="pending">Unpublished</option><option value="published">Published</option></select><button type="button" onClick={() => void loadSection("products")}>Search catalog</button><span>{products.total} products</span></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION &amp; PROOF</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? "ad-status--published" : "ad-status--pending"}`}>{product.published ? "Published" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button><ProductProofEditor product={product} /></td></tr>)}</tbody></table></div></section></>}
-			{section === "reservations" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">NO-PAYMENT INTEREST</span><h2>Reservation counter</h2><p>Counts come from submitted reservations; no checkout or payment is involved.</p></div><span className="ad-count-pill">{reservationProducts.reduce((total, product) => total + (product.reservationCount ?? 0), 0)} reservations</span></div><div className="ad-reservation-country-summary" aria-label="Reservation totals by country across all products"><strong>Reservations by country</strong>{reservationCountryTotals.length ? <div className="ad-reservation-country-totals">{reservationCountryTotals.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}<strong>{entry.count}</strong></span>)}</div> : <p>No country totals yet.</p>}</div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>RESERVED</th><th>BY COUNTRY</th><th>STATUS</th><th>SETTINGS</th></tr></thead><tbody>{reservationProducts.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td><strong>{product.reservationCount ?? 0}</strong>{product.reservationTarget ? ` / ${product.reservationTarget}` : " · no target"}</td><td className="ad-reservation-country-list">{product.reservationsByCountry?.length ? product.reservationsByCountry.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}: <strong>{entry.count}</strong></span>) : <small>No reservations yet</small>}</td><td><span className={`ad-status ${product.reservationsOpen ? "ad-status--published" : "ad-status--pending"}`}>{product.reservationsOpen ? "Open" : "Closed"}</span></td><td><ReservationSettingsEditor product={product} /></td></tr>)}</tbody></table>{!reservationProducts.length && <div className="ad-empty">No products are available for reservation setup.</div>}</div></section>}
+			{section === "reservations" && (
+				<>
+					<section className="ad-panel">
+						<div className="ad-panel-heading">
+							<div><span className="ad-eyebrow">NO-PAYMENT INTEREST</span><h2>Reservation counter</h2><p>Counts come from submitted reservations; no checkout or payment is involved.</p></div>
+							<span className="ad-count-pill">{reservationProducts.reduce((total, product) => total + (product.reservationCount ?? 0), 0)} reservations</span>
+						</div>
+						<div className="ad-reservation-country-summary" aria-label="Reservation totals by country across all products">
+							<strong>Reservations by country</strong>
+							{reservationCountryTotals.length
+								? <div className="ad-reservation-country-totals">{reservationCountryTotals.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}<strong>{entry.count}</strong></span>)}</div>
+								: <p>No country totals yet.</p>}
+						</div>
+						<div className="ad-table-wrap">
+							<table className="ad-table"><thead><tr><th>PRODUCT</th><th>RESERVED</th><th>BY COUNTRY</th><th>STATUS</th><th>SETTINGS</th></tr></thead>
+								<tbody>{reservationProducts.map((product) => <tr key={product.id}>
+									<td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td>
+									<td><strong>{product.reservationCount ?? 0}</strong>{product.reservationTarget ? ` / ${product.reservationTarget}` : " · no target"}</td>
+									<td className="ad-reservation-country-list">{product.reservationsByCountry?.length ? product.reservationsByCountry.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}: <strong>{entry.count}</strong></span>) : <small>No reservations yet</small>}</td>
+									<td><span className={`ad-status ${product.reservationsOpen ? "ad-status--published" : "ad-status--pending"}`}>{product.reservationsOpen ? "Open" : "Closed"}</span></td>
+									<td><ReservationSettingsEditor product={product} /></td>
+								</tr>)}</tbody>
+							</table>
+							{!reservationProducts.length && <div className="ad-empty">No products are available for reservation setup.</div>}
+						</div>
+					</section>
+					<section className="ad-panel ad-reservation-entries-panel">
+						<div className="ad-panel-heading">
+							<div><span className="ad-eyebrow">ADMIN-ONLY DETAILS</span><h2>{t("admin.reservations.entries_title", "Individual reservations")}</h2><p>{t("admin.reservations.entries_note", "Emails are visible only to signed-in admins and are included in filtered exports.")}</p></div>
+							<span className="ad-count-pill">{reservationEntries.total} {t("admin.reservations.entries_count", "records")}</span>
+						</div>
+						<form className="ad-toolbar ad-reservation-entry-filters" onSubmit={(event) => { event.preventDefault(); void loadReservationEntries(0); }}>
+							<label><span>{t("admin.reservations.filter_product", "Product")}</span>
+								<select value={reservationFilters.productId} onChange={(event) => setReservationFilters((current) => ({ ...current, productId: event.target.value }))}>
+									<option value="">{t("admin.reservations.all_products", "All products")}</option>
+									{reservationProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+								</select>
+							</label>
+							<label><span>{t("admin.reservations.filter_country", "Country")}</span>
+								<select value={reservationFilters.country} onChange={(event) => setReservationFilters((current) => ({ ...current, country: event.target.value }))}>
+									<option value="">{t("admin.reservations.all_countries", "All countries")}</option>
+									{reservationCountryTotals.map((entry) => <option key={entry.country} value={entry.country}>{regionName(entry.country, language, entry.country)}</option>)}
+								</select>
+							</label>
+							<label className="ad-search"><span>⌕</span><input value={reservationFilters.query} onChange={(event) => setReservationFilters((current) => ({ ...current, query: event.target.value }))} placeholder={t("admin.reservations.filter_search", "Search email or product")} maxLength={180} /></label>
+							<button type="submit" disabled={reservationEntriesLoading}>{t("admin.reservations.apply_filters", "Apply filters")}</button>
+							<button type="button" onClick={() => void exportReservationEntries()} disabled={reservationExporting || reservationEntries.total === 0}>{reservationExporting ? t("admin.reservations.exporting", "Preparing CSV…") : t("admin.reservations.export", "Export filtered CSV")}</button>
+						</form>
+						<div className="ad-table-wrap">
+							<table className="ad-table">
+								<thead><tr><th>{t("admin.reservations.product", "PRODUCT")}</th><th>{t("admin.reservations.email", "EMAIL")}</th><th>{t("admin.reservations.country", "COUNTRY")}</th><th>{t("admin.reservations.created", "RESERVED AT")}</th></tr></thead>
+								<tbody>{reservationEntries.items.map((entry) => <tr key={entry.id}>
+									<td><strong>{entry.productName}</strong></td><td>{entry.email}</td><td>{regionName(entry.country, language, entry.country)}</td><td>{date(entry.createdAt)}</td>
+								</tr>)}</tbody>
+							</table>
+							{reservationEntriesLoading && <div className="ad-empty" role="status">{t("admin.reservations.loading", "Loading reservations…")}</div>}
+							{!reservationEntriesLoading && !reservationEntries.items.length && <div className="ad-empty">{t("admin.reservations.empty", "No reservations match these filters.")}</div>}
+						</div>
+						<footer className="ad-reservation-entry-pagination">
+							<span>{t("admin.reservations.pagination", "Showing {{from}}–{{to}} of {{total}}", {
+								from: reservationEntries.total ? reservationEntries.offset + 1 : 0,
+								to: Math.min(reservationEntries.offset + reservationEntries.limit, reservationEntries.total),
+								total: reservationEntries.total,
+							})}</span>
+							<div>
+								<button type="button" onClick={() => void loadReservationEntries(Math.max(0, reservationEntries.offset - reservationEntries.limit))} disabled={reservationEntries.offset === 0 || reservationEntriesLoading}>{t("admin.reservations.previous", "Previous")}</button>
+								<button type="button" onClick={() => void loadReservationEntries(reservationEntries.offset + reservationEntries.limit)} disabled={reservationEntries.offset + reservationEntries.limit >= reservationEntries.total || reservationEntriesLoading}>{t("admin.reservations.next", "Next")}</button>
+							</div>
+						</footer>
+					</section>
+				</>
+			)}
 			{section === "maker-applications" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{makerApplications.map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td><td><select aria-label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} onChange={(event) => void updateMakerApplication(application, event.target.value as MakerApplicationStatus)}><option value="pending">Pending</option><option value="reviewing">Reviewing</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div></section>}
 			{section === "suppliers" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2></div><span className="ad-count-pill">{suppliers.length} suppliers</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{suppliers.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div></section>}
 			{section === "customers" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("customers", query); }} placeholder="Customer name or email" /></label><button type="button" onClick={() => void loadSection("customers")}>Search customers</button></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>CUSTOMER</th><th>EMAIL</th><th>VERIFICATION</th><th>JOINED</th></tr></thead><tbody>{customers.map((customer) => <tr key={customer.id}><td><strong>{customer.firstName} {customer.lastName}</strong></td><td>{customer.email}</td><td><span className={`ad-status ${customer.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{customer.emailVerified ? "Verified" : "Pending"}</span></td><td>{date(customer.createdAt)}</td></tr>)}</tbody></table></div></section></>}

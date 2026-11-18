@@ -26,7 +26,7 @@ const collectionPromos = [
 export function ProductGrid({ products, badges, rail = false, compact = false, fillSlots = false, fillColumns = [2, 3, 4, 5], promoOffset = 0, promoCount = collectionPromos.length }: ProductGridProps) {
   const { t } = useLocalization();
   if (products.length === 0 && !fillSlots) {
-    return <p className="empty-state">Belum ada produk yang ditampilkan. Coba kembali sebentar lagi.</p>;
+    return <p className="empty-state">{t("static.empty.products", "There are no products to show right now. Please check back soon.")}</p>;
   }
 
   const fillCounts = products.length === 0

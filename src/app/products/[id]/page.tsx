@@ -48,30 +48,34 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const hasWaitlist = product.availability === "unavailable"
     || ["Coming Soon", "Waitlist", "Unavailable"].includes(product.availabilityStatus ?? "");
   const isExample = product.isExampleData === true || product.tags?.includes("demo") === true;
-  const makerName = isExample ? null : product.makerName;
-  const makerStory = isExample
-    ? null
-    : [product.makerStory, product.makerPhilosophy, product.makerProcess].filter(Boolean).join(" ") || null;
+  const makerName = product.makerName;
+  const makerStory = [product.makerStory, product.makerPhilosophy, product.makerProcess].filter(Boolean).join(" ") || null;
   const sizeAndWeight = Array.from(new Set([
     product.sizeTier,
     product.size,
     product.dimensions,
-    !isExample && product.weightGrams !== null && product.weightGrams !== undefined ? `${product.weightGrams} g` : null,
+    product.weightGrams !== null && product.weightGrams !== undefined ? `${product.weightGrams} g` : null,
   ].filter(Boolean))).join(" · ");
   const proofFacts = [
     { key: "maker", labelKey: "product.proof.maker", label: "Maker", value: makerName },
     { key: "story", labelKey: "product.proof.story", label: "Maker story", value: makerStory },
-    { key: "materials", labelKey: "product.proof.materials", label: "Materials", value: isExample ? null : product.materials },
+    { key: "materials", labelKey: "product.proof.materials", label: "Materials", value: product.materials },
     { key: "size", labelKey: "product.proof.size_weight", label: "Size & weight", value: sizeAndWeight || null },
-    { key: "edition", labelKey: "product.proof.edition", label: "Edition", value: !isExample && product.editionCount ? `${product.editionCount}` : null },
-    { key: "delivery", labelKey: "product.proof.delivery", label: "Estimated delivery", value: !isExample ? product.estimatedDeliveryDate ?? product.dispatchTime : null },
+    { key: "edition", labelKey: "product.proof.edition", label: "Edition", value: product.editionCount ? `${product.editionCount}` : null },
+    { key: "delivery", labelKey: "product.proof.delivery", label: "Estimated delivery", value: product.estimatedDeliveryDate ?? product.dispatchTime },
   ];
 
   return (
     <SiteFrame className="store-page product-page">
       <section className="product-detail-layout">
         <div className="product-gallery-column">
-          <ProductGallery title={product.name} images={productImages} />
+          <div className="product-gallery-hero">
+            <ProductGallery title={product.name} images={productImages} />
+            {product.onlyAtPonyo && <span className="product-gallery-approval-badge">
+              <Image src="/ponyo-jellyfish.svg" width={22} height={22} alt="" aria-hidden="true" />
+              <LocalizedText translationKey="product.proof.only_at_ponyo" fallback="Only at Ponyo" />
+            </span>}
+          </div>
           <section className="product-proof product-proof-in-gallery" aria-labelledby="product-proof-title">
             <div className="product-proof-heading">
               <span className="product-proof-seal" aria-hidden="true">✦</span>
@@ -86,17 +90,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 <dt><LocalizedText translationKey={fact.labelKey} fallback={fact.label} /></dt>
                 <dd>{fact.value || <LocalizedText translationKey="product.proof.not_provided" fallback="Not provided by the maker yet." />}</dd>
               </div>)}
-              <div className="product-proof-fact product-proof-fact--exclusive">
-                <dt><LocalizedText translationKey="product.proof.only_at_ponyo" fallback="ONLY AT PONYO" /></dt>
-                <dd className="product-proof-exclusive-content">
-                  <Image src="/ponyo-jellyfish.svg" width={64} height={64} alt="" aria-hidden="true" />
-                  <span><strong>Ponyo</strong><small><LocalizedText translationKey="product.proof.exclusive_value" fallback="Exclusive to Ponyo" /></small></span>
-                </dd>
-              </div>
             </dl>
-            <Link className="product-proof-size-guide" href="/#sizes"><LocalizedText translationKey="product.proof.size_guide" fallback="Explore the Ponyo Size Guide" /> <span aria-hidden="true">→</span></Link>
+            <Link className="product-proof-size-guide" href="/size-guide"><LocalizedText translationKey="product.proof.size_guide" fallback="Explore the Ponyo Size Guide" /> <span aria-hidden="true">→</span></Link>
           </section>
-          {product.makerSlug && !isExample && <Link className="product-brand-story" href={`/makers/${encodeURIComponent(product.makerSlug)}`}>
+          {product.makerSlug && <Link className="product-brand-story" href={`/makers/${encodeURIComponent(product.makerSlug)}`}>
             <span className="product-brand-story-seal" aria-hidden="true">✧</span>
             <div className="product-brand-story-copy">
               <p className="eyebrow"><LocalizedText translationKey="product.proof.brand_spotlight" fallback="BRAND SPOTLIGHT" /></p>

@@ -1,7 +1,10 @@
-export default function ProductDetailLoading() {
+import { getTranslations } from "next-intl/server";
+
+export default async function ProductDetailLoading() {
+  const t = await getTranslations();
   return (
-    <section className="product-loading store-container" role="status" aria-label="Loading product details">
-      <span className="sr-only">Loading plush details…</span>
+    <section className="product-loading store-container" role="status" aria-label={t("static.loading.product_aria")}>
+      <span className="sr-only">{t("static.loading.product_text")}</span>
       <div className="product-loading-image" />
       <div className="product-loading-copy">
         <div className="product-loading-line product-loading-line--short" />

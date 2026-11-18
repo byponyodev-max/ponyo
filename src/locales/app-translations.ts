@@ -1091,8 +1091,8 @@ export const appTranslations: AppTranslations = {
 			"本書は確定した法的助言ではありません。公開前に、日本および韓国の要件に詳しい法律専門家に確認し、準拠法と消費者向け表示を確定してください。",
 		"home.footer.commercial": "特定商取引法に基づく表記",
 		"maker.for_makers.hero.eyebrow": "なぜPonyoで販売するのか",
-		"maker.for_makers.hero.title_lead": "ものづくりに向き合う人へ",
-		"maker.for_makers.hero.title_accent": "やさしい作品を。",
+		"maker.for_makers.hero.title_lead": "ぬいぐるみを",
+		"maker.for_makers.hero.title_accent": "敬意を込めて。",
 		"maker.for_makers.hero.body":
 			"Ponyoは、個性豊かなぬいぐるみやキャラクターを手がけるメイカーのためのセレクトショップです。作品に込めた物語や丁寧な仕事を大切にする人へ届けます。",
 		"maker.for_makers.hero.cta": "作品を紹介する",
@@ -1865,8 +1865,8 @@ export const appTranslations: AppTranslations = {
 			"이 문서는 최종 법률 자문이 아닙니다. 게시 전 일본과 한국의 규정에 정통한 법률 전문가에게 검토받고 적용 법률 및 소비자 고지 사항을 확인하세요.",
 		"home.footer.commercial": "특정상거래법에 따른 고지",
 		"maker.for_makers.hero.eyebrow": "왜 Ponyo에서 판매해야 할까요?",
-		"maker.for_makers.hero.title_lead": "부드러운 작품을 만드는 손길에",
-		"maker.for_makers.hero.title_accent": "주목합니다.",
+		"maker.for_makers.hero.title_lead": "포근한 작품을",
+		"maker.for_makers.hero.title_accent": "응원을 보냅니다.",
 		"maker.for_makers.hero.body":
 			"Ponyo는 특별한 봉제 인형과 캐릭터를 만드는 메이커를 위한 큐레이션 공간입니다. 작품에 담긴 이야기와 정성을 소중히 여기는 사람들에게 소개합니다.",
 		"maker.for_makers.hero.cta": "작품 소개하기",

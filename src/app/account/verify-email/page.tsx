@@ -102,7 +102,7 @@ export default function VerifyEmailPage() {
               <p>{t("account.auth.verify_resend_body", "Request a new link if you haven’t confirmed your email yet or your previous link has expired.")}</p>
               <form className={`account-auth-form ${styles.form}`} onSubmit={handleResend} aria-busy={resending}>
               <label htmlFor="verification-email">{t("account.auth.email", "Email address")}</label>
-              <input id="verification-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              <input id="verification-email" type="email" autoComplete="email" placeholder={t("static.account.email_placeholder", "you@example.com")} value={email} onChange={(event) => setEmail(event.target.value)} required />
               <button className={`account-auth-submit account-auth-submit--secondary ${styles.secondary}`} type="submit" disabled={resending}>{resending ? t("account.auth.sending", "Sending…") : t("account.auth.resend_verification", "Resend verification email")}</button>
               {resendNotice && <p role="status">{t("account.auth.resend_notice", "If this email belongs to a pending account, a new verification link has been sent. Check your inbox and spam folder.")}</p>}
               {resendError && <p className="api-form-error" role="alert">{t("account.auth.resend_failed", "Unable to resend the verification email.")}</p>}

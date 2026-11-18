@@ -1,5 +1,6 @@
 import asyncio
 import re
+from datetime import date
 from uuid import uuid5, NAMESPACE_URL
 
 from sqlalchemy import select
@@ -8,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.db import SessionLocal
 from app.models import Product, ProductTranslation, ProductVariant
 from app.config import settings
-from app.demo_translations import DEMO_FIELD_TRANSLATIONS, DEMO_PRODUCT_TRANSLATIONS
+from app.demo_translations import DEMO_FIELD_TRANSLATIONS, DEMO_MAKER_TRANSLATIONS, DEMO_PRODUCT_TRANSLATIONS
 from app.storefront_data import link_demo_catalog
 from app.translations import _product_translation_entries, _set_nested, source_hash
 
@@ -98,6 +99,20 @@ def _reviewed_demo_fields(product: Product, locale: str) -> dict:
             translated = source
         elif field == "dispatchTime":
             translated = fields["dispatch_time"]
+        elif field == "materials":
+            translated = fields["materials"]
+        elif field.startswith("maker"):
+            if product.brand is None:
+                raise ValueError(f"Missing demo maker for {product.slug}.")
+            maker = DEMO_MAKER_TRANSLATIONS[locale][product.brand.slug]
+            maker_field = {
+                "makerStory": "story",
+                "makerPhilosophy": "philosophy",
+                "makerProcess": "process",
+                "makerLocation": "location",
+                "makerSpecialties": "specialties",
+            }[field]
+            translated = maker[maker_field][int(path[-1])] if field == "makerSpecialties" else maker[maker_field]
         elif field in {"imageAlt", "imageAlts"}:
             translated = reviewed["image_alt"]
         elif field == "variants":
@@ -180,6 +195,11 @@ async def seed_products() -> None:
                     tags=item["tags"],
                     size_tier=item["size"],
                     dimensions=item["dimensions"],
+                    materials="Polyester plush; polyester fiber fill; embroidered details.",
+                    weight_grams={"Small": 240, "Medium": 420, "XL": 4800}[item["size"]],
+                    edition_count=240,
+                    estimated_delivery_date=date(2027, 1, 15),
+                    only_at_ponyo=True,
                     reservations_open=True,
                     dispatch_time="Ships in 1–3 business days",
                     published=True,
@@ -202,6 +222,11 @@ async def seed_products() -> None:
                 product.tags = item["tags"]
                 product.size_tier = item["size"]
                 product.dimensions = item["dimensions"]
+                product.materials = "Polyester plush; polyester fiber fill; embroidered details."
+                product.weight_grams = {"Small": 240, "Medium": 420, "XL": 4800}[item["size"]]
+                product.edition_count = 240
+                product.estimated_delivery_date = date(2027, 1, 15)
+                product.only_at_ponyo = True
                 product.reservations_open = True
                 product.dispatch_time = "Ships in 1–3 business days"
                 product.published = True

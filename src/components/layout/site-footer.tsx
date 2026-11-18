@@ -92,7 +92,7 @@ export function SiteFooter() {
             </nav>
           ))}
         </div>
-        <div className="footer-plush-lineup" role="img" aria-label="A gathering of Ponyo plush friends">
+        <div className="footer-plush-lineup" role="img" aria-label={t("static.footer.plush_friends", "A gathering of Ponyo plush friends")}>
           <Image src="/images/footer-plush-lineup.png" alt="" fill sizes="(max-width: 767px) 100vw, 1440px" />
         </div>
         <section className="footer-social" aria-labelledby="footer-social-title">

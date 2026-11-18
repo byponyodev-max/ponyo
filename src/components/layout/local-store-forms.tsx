@@ -51,7 +51,7 @@ export function HomeInterestForms() {
           setRequestSent(true);
         }
       } catch (error) {
-        setFormError(error instanceof Error ? error.message : "Unable to submit this form.");
+        setFormError(error instanceof Error ? error.message : t("static.forms.submit_failed", "Unable to submit this form."));
       } finally {
         setSubmitting(false);
       }
@@ -59,7 +59,7 @@ export function HomeInterestForms() {
   }
 
   return (
-    <section className="home-forms store-container" id="drops" aria-label="Rare drop alerts and plush requests">
+    <section className="home-forms store-container" id="drops" aria-label={t("static.forms.alerts_label", "Rare drop alerts and plush requests")}>
       <div className="rare-drop-form-panel">
         <span className="form-sparkle" aria-hidden="true">✦</span>
         <h2>{t("home.forms.drops_title", copy.v2.drops_title)}</h2>
@@ -75,7 +75,7 @@ export function HomeInterestForms() {
       <div className="plush-request-panel">
         <h2>{t("home.forms.request_title", copy.v2.request_title)}</h2>
         <p>{t("home.forms.request_body", copy.v2.request_body)}</p>
-        {requestSent ? <p className="local-form-success" role="status">{requestOutcome === "saved-notified" ? "Your request is saved, and an email notification was sent to Ponyo." : requestOutcome === "saved-no-email" ? "Your request is saved in the Ponyo database. Email notification is not set up yet." : "Preview only: this request was not sent to the backend or by email."}</p> : (
+        {requestSent ? <p className="local-form-success" role="status">{requestOutcome === "saved-notified" ? t("static.forms.request_saved_notified", "Your request is saved, and an email notification was sent to Ponyo.") : requestOutcome === "saved-no-email" ? t("static.forms.request_saved_no_email", "Your request is saved in the Ponyo database. Email notification is not set up yet.") : t("static.forms.request_preview", "Preview only: this request was not sent to the backend or by email.")}</p> : (
           <form onSubmit={submit("request")}>
             <div>
               <label className="sr-only" htmlFor="request-name">{t("home.forms.name_label", copy.v2.name_label)}</label>

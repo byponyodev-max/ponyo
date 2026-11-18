@@ -134,7 +134,7 @@ export function ProductCardAction({ product, productName }: ProductCardActionPro
           <p>{t("product.waitlist.card_body", `Leave your email and we’ll let you know when ${productName} is ready.`, { product: productName })}</p>
           <form onSubmit={submitGuestEmail}>
             <label htmlFor={`notify-email-${product.id}`}>{t("product.waitlist.email", "Email address")}</label>
-            <input id={`notify-email-${product.id}`} type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" required maxLength={320} autoFocus />
+            <input id={`notify-email-${product.id}`} type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} autoFocus />
             {error && <p className="product-notify-error" role="alert">{error}</p>}
             <button type="submit" disabled={saving}>{saving ? t("product.waitlist.saving", "Saving…") : t("product.action.notify_me", "Notify me")} <span aria-hidden="true">→</span></button>
           </form>

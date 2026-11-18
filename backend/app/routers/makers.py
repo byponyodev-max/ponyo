@@ -25,7 +25,7 @@ async def get_maker_profile(
 ):
     if locale not in {"en", *TRANSLATION_LOCALES}:
         raise HTTPException(422, "Unsupported maker locale.")
-    maker = await db.scalar(select(Brand).where(Brand.slug == slug, Brand.is_demo.is_(False)))
+    maker = await db.scalar(select(Brand).where(Brand.slug == slug, Brand.maker_story.is_not(None)))
     if maker is None:
         raise HTTPException(status_code=404, detail="Maker not found.")
     products = (await db.scalars(

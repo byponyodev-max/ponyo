@@ -63,6 +63,13 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
                 selectinload(Product.variants), selectinload(Product.category),
                 selectinload(Product.brand), selectinload(Product.images),
             ))
+            assert product.materials == "Polyester plush; polyester fiber fill; embroidered details."
+            assert product.weight_grams == 240
+            assert product.edition_count == 240
+            assert product.estimated_delivery_date.isoformat() == "2027-01-15"
+            assert product.only_at_ponyo is True
+            assert product.brand.is_demo is True
+            assert product.brand.maker_story.startswith("A fictional studio profile")
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id))
             assert variant.stock_quantity == 5
             offer = await db.scalar(select(SupplierOffer).where(SupplierOffer.variant_id == variant.id))
@@ -81,6 +88,8 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
                 assert translation.source_hash == source_hash(product)
                 assert translation.provider == "ponyo-reviewed"
                 assert translation.fields["categoryName"] == expected_category
+                assert translation.fields["materials"]
+                assert translation.fields["makerStory"]
                 assert translation.fields["variants"][str(variant.id)]["title"] == expected_variant_title
     finally:
         await engine.dispose()

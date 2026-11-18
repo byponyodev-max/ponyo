@@ -3,11 +3,15 @@ import Link from "next/link";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { LocalizedText } from "@/components/layout/localization-provider";
 import { MakerApplicationForm } from "@/components/makers/maker-application-form";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "For Makers | Ponyo",
-  description: "Meet Ponyo's maker program and share your plush creations for consideration.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations();
+  return {
+    title: t("static.maker.metadata.title"),
+    description: t("static.maker.metadata.description"),
+  };
+}
 
 const makerTests = [
   {
@@ -44,11 +48,11 @@ export default function ForMakersPage() {
     <section className="maker-hero store-container">
       <div className="maker-hero-copy">
         <p className="eyebrow"><LocalizedText translationKey="maker.for_makers.hero.eyebrow" fallback="WHY SELL WITH PONYO?" /></p>
-        <h1><LocalizedText translationKey="maker.for_makers.hero.title_lead" fallback="For the hands" /><br />behind the <em><LocalizedText translationKey="maker.for_makers.hero.title_accent" fallback="soft things." /></em></h1>
+        <h1><LocalizedText translationKey="maker.for_makers.hero.title_lead" fallback="For the hands" /><br /><LocalizedText translationKey="static.maker.title_connector" fallback="behind the" /> <em><LocalizedText translationKey="maker.for_makers.hero.title_accent" fallback="soft things." /></em></h1>
         <p><LocalizedText translationKey="maker.for_makers.hero.body" fallback="Ponyo is a curated home for exceptional plush and character makers. We introduce thoughtful creations to people who value the story and care behind them." /></p>
         <Link className="shop-button shop-button-orange" href="#maker-application"><LocalizedText translationKey="maker.for_makers.hero.cta" fallback="Share your work" /> <span aria-hidden="true">↓</span></Link>
       </div>
-      <div className="maker-hero-art" aria-hidden="true"><span className="maker-orbit maker-orbit--one" /><span className="maker-orbit maker-orbit--two" /><span className="maker-hero-star">✦</span><span className="maker-hero-stamp">MADE<br />WITH<br />INTENTION</span><span className="maker-hero-caption">A place for your next chapter</span></div>
+      <div className="maker-hero-art" aria-hidden="true"><span className="maker-orbit maker-orbit--one" /><span className="maker-orbit maker-orbit--two" /><span className="maker-hero-star">✦</span><span className="maker-hero-stamp"><LocalizedText translationKey="static.maker.stamp" fallback="MADE WITH INTENTION" /></span><span className="maker-hero-caption"><LocalizedText translationKey="static.maker.caption" fallback="A place for your next chapter" /></span></div>
     </section>
 
     <section className="maker-how store-container" aria-labelledby="maker-how-title">
