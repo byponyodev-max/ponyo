@@ -52,8 +52,10 @@ class Settings(BaseSettings):
     checkout_express_shipping_jpy: int = 1200
 
     aws_region: str = "ap-northeast-1"
-    translation_provider: Literal["disabled", "aws_translate"] = "aws_translate"
+    translation_provider: Literal["disabled", "libretranslate"] = "libretranslate"
     translation_timeout_seconds: int = 8
+    libretranslate_url: str = "http://localhost:5000"
+    libretranslate_api_key: str | None = None
     s3_bucket: str | None = None
     sqs_order_events_url: str | None = None
     eventbridge_bus_name: str | None = None

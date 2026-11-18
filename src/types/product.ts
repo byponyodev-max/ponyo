@@ -60,6 +60,8 @@ export type Product = {
 	makerStory?: string | null;
 	makerPhilosophy?: string | null;
 	makerProcess?: string | null;
+	makerLocation?: string | null;
+	makerSpecialties?: string[];
 	materials?: string | null;
 	weightGrams?: number | null;
 	editionCount?: number | null;

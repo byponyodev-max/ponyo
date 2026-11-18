@@ -41,6 +41,8 @@ class ProductOut(BaseModel):
     makerStory: str | None = None
     makerPhilosophy: str | None = None
     makerProcess: str | None = None
+    makerLocation: str | None = None
+    makerSpecialties: list[str] = Field(default_factory=list)
     materials: str | None = None
     weightGrams: int | None = None
     editionCount: int | None = None

@@ -5,6 +5,7 @@ import hashlib
 import json
 from collections.abc import Iterable
 from typing import Any
+from urllib.request import Request, urlopen
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,15 +14,11 @@ from app.config import settings
 from app.models import AppTranslation, Product, ProductTranslation
 
 
-AWS_TRANSLATE_CODES = {
-    "ar": "ar", "bg": "bg", "cs": "cs", "da": "da", "de": "de",
-    "el": "el", "es": "es", "es-ES": "es", "fi": "fi", "fr": "fr",
-    "he": "he", "hr": "hr", "hu": "hu", "id": "id", "it": "it",
-    "ja": "ja", "ko": "ko", "lt": "lt", "nb": "no", "nl": "nl",
-    "pl": "pl", "pt-BR": "pt", "pt-PT": "pt-PT", "ro": "ro", "ru": "ru",
-    "sk": "sk", "sl": "sl", "sv": "sv", "th": "th", "tr": "tr",
-    "ur": "ur", "vi": "vi", "zh-CN": "zh", "zh-TW": "zh-TW",
-}
+TRANSLATION_LOCALES = {"ja": "ja", "ko": "ko"}
+
+
+class TranslationUnavailableError(RuntimeError):
+    pass
 
 
 def _product_translation_entries(product: Product) -> list[tuple[tuple[str, ...], str]]:
@@ -49,6 +46,9 @@ def _product_translation_entries(product: Product) -> list[tuple[tuple[str, ...]
         add(("makerStory",), product.brand.maker_story)
         add(("makerPhilosophy",), product.brand.philosophy)
         add(("makerProcess",), product.brand.process)
+        add(("makerLocation",), product.brand.location)
+        for index, specialty in enumerate(product.brand.specialties or []):
+            add(("makerSpecialties", str(index)), specialty)
     return entries
 
 
@@ -86,32 +86,35 @@ def copy_source_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _aws_credentials_available() -> bool:
-    try:
-        import boto3
-
-        return boto3.Session().get_credentials() is not None
-    except Exception:
-        return False
-
-
-def _translate_with_aws(text: str, target_language: str) -> str:
-    import boto3
-
-    response = boto3.client("translate", region_name=settings.aws_region).translate_text(
-        Text=text,
-        SourceLanguageCode="en",
-        TargetLanguageCode=target_language,
+def _translate_with_libretranslate(text: str, target_language: str) -> str:
+    payload: dict[str, str] = {
+        "q": text,
+        "source": "auto",
+        "target": target_language,
+        "format": "text",
+    }
+    if settings.libretranslate_api_key:
+        payload["api_key"] = settings.libretranslate_api_key
+    request = Request(
+        f"{settings.libretranslate_url.rstrip('/')}/translate",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
-    return response["TranslatedText"]
+    with urlopen(request, timeout=settings.translation_timeout_seconds) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    translated = result.get("translatedText") if isinstance(result, dict) else None
+    if not isinstance(translated, str) or not translated.strip():
+        raise TranslationUnavailableError("LibreTranslate returned an empty translation.")
+    return translated.strip()
 
 
 async def _translate_product(
     product: Product,
     target_language: str,
-) -> tuple[str, str, dict[str, Any]] | None:
-    if settings.translation_provider != "aws_translate" or not _aws_credentials_available():
-        return None
+) -> tuple[str, str, dict[str, Any]]:
+    if settings.translation_provider != "libretranslate":
+        raise TranslationUnavailableError("LibreTranslate is not enabled.")
     try:
         entries = _product_translation_entries(product)
         source_texts = list(dict.fromkeys(
@@ -122,7 +125,7 @@ async def _translate_product(
         async def translate_one(text: str) -> tuple[str, str]:
             async with semaphore:
                 translated = await asyncio.wait_for(
-                    asyncio.to_thread(_translate_with_aws, text, target_language),
+                    asyncio.to_thread(_translate_with_libretranslate, text, target_language),
                     timeout=settings.translation_timeout_seconds,
                 )
                 return text, translated
@@ -136,9 +139,8 @@ async def _translate_product(
             translated_by_source.get(product.description, product.description),
             fields,
         )
-    except Exception:
-        # A provider outage should never make the storefront catalog unavailable.
-        return None
+    except Exception as error:
+        raise TranslationUnavailableError("LibreTranslate could not translate the product.") from error
 
 
 async def get_product_translation(
@@ -146,9 +148,9 @@ async def get_product_translation(
     locale: str,
     db: AsyncSession,
 ) -> ProductTranslation | None:
-    target_language = AWS_TRANSLATE_CODES.get(locale)
+    target_language = TRANSLATION_LOCALES.get(locale)
     if not target_language:
-        return None
+        raise TranslationUnavailableError(f"Unsupported product translation locale: {locale}")
 
     current_hash = source_hash(product)
     cached = await db.scalar(select(ProductTranslation).where(
@@ -159,16 +161,19 @@ async def get_product_translation(
         return cached
 
     translated = await _translate_product(product, target_language)
-    if translated is None:
-        return None
 
     if cached is None:
-        cached = ProductTranslation(product_id=product.id, locale=locale, source_hash=current_hash, provider="aws_translate")
+        cached = ProductTranslation(product_id=product.id, locale=locale, source_hash=current_hash, provider="libretranslate")
         db.add(cached)
     cached.name, cached.description, cached.fields = translated
     cached.source_hash = current_hash
-    cached.provider = "aws_translate"
+    cached.provider = "libretranslate"
     return cached
+
+
+async def ensure_product_translations(product: Product, db: AsyncSession) -> None:
+    for locale in ("ja", "ko"):
+        await get_product_translation(product, locale, db)
 
 
 async def get_app_translations(
@@ -176,8 +181,8 @@ async def get_app_translations(
     locale: str,
     db: AsyncSession,
 ) -> dict[str, str]:
-    target_language = AWS_TRANSLATE_CODES.get(locale)
-    if not target_language or settings.translation_provider != "aws_translate":
+    target_language = TRANSLATION_LOCALES.get(locale)
+    if not target_language or settings.translation_provider != "libretranslate":
         return {}
 
     unique_entries = dict(entries)
@@ -197,8 +202,7 @@ async def get_app_translations(
         else:
             pending.append((key, text, source_hash))
 
-    # Avoid repeated failing calls when local AWS credentials are not configured.
-    if not pending or not _aws_credentials_available():
+    if not pending:
         return translations
 
     semaphore = asyncio.Semaphore(6)
@@ -207,7 +211,7 @@ async def get_app_translations(
         async with semaphore:
             try:
                 result = await asyncio.wait_for(
-                    asyncio.to_thread(_translate_with_aws, text, target_language),
+                    asyncio.to_thread(_translate_with_libretranslate, text, target_language),
                     timeout=settings.translation_timeout_seconds,
                 )
                 return key, digest, result
@@ -227,12 +231,12 @@ async def get_app_translations(
                 translation_key=key,
                 source_hash=digest,
                 translated_text=translated_text,
-                provider="aws_translate",
+                provider="libretranslate",
             )
             db.add(row)
             cached_by_key[key] = row
         else:
             row.source_hash = digest
             row.translated_text = translated_text
-            row.provider = "aws_translate"
+            row.provider = "libretranslate"
     return translations

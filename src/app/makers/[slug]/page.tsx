@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { LocalizedText } from "@/components/layout/localization-provider";
 import { ProductGrid } from "@/components/product/product-grid";
@@ -14,9 +15,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function MakerProfilePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  const savedLanguage = (await cookies()).get("ponyo-language")?.value;
+  const locale = savedLanguage === "ja" || savedLanguage === "ko" ? savedLanguage : "en";
   let profileData;
   try {
-    profileData = await ponyoApi.getMakerProfile(slug);
+    profileData = await ponyoApi.getMakerProfile(slug, locale);
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 404) notFound();
     const isNotConfigured = error instanceof ApiNotConfiguredError;

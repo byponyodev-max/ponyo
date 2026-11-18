@@ -82,7 +82,7 @@ Availability returns `{ "data": { "productId", "availability", "availabilityStat
 
 ### Multilingual product data
 
-Listing/detail accept `locale`; supported locales use cached product-name/description translations, with the configured AWS Translate provider generating missing/stale translations when enabled. Unsupported locales, disabled provider without a valid cache, or provider failure fall back to English. Locale validation still applies. Cached translated search does not generate translations for unmatched products or perform universal cross-language search. Taxonomy labels, variant options, and image alt text are not automatically translated. Enabling locale support does not mean every demo product already has real translated data.
+Listing/detail accept `locale`; `en`, `ja`, and `ko` are supported. Japanese and Korean product responses use cached translations, and LibreTranslate generates and caches missing/stale product and storefront-field translations when enabled. Unsupported locales return 422; if a required translation is unavailable (including when translation is disabled and no valid cache exists), product requests return 503 rather than silently presenting English as the requested locale. Cached translated search does not generate translations for unmatched products or perform universal cross-language search. Normalized category/brand collection labels remain source-language labels. Translation coverage depends on the source fields present; model-backed translations should be reviewed before publication.
 
 ### Supplier inventory, synchronization, and reservation recovery
 

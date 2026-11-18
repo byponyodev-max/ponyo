@@ -5,10 +5,12 @@ FastAPI service for the Ponyo storefront. It is intentionally in the same reposi
 ## Local run
 
 1. Copy `.env.example` to `.env.local` and set a random local `JWT_SECRET`. Keep all real secrets out of Git and out of `NEXT_PUBLIC_*` variables.
-2. Start the local stack with Docker Compose (PostgreSQL, Redis, API). The API applies Alembic migrations and seeds a small development catalog at startup.
+2. Start the local stack with Docker Compose (PostgreSQL, Redis, LibreTranslate, and API). The API applies Alembic migrations and seeds a small development catalog at startup. LibreTranslate loads English, Japanese, and Korean models on first startup; allow time for those models to initialize.
 3. Set the frontend's `NEXT_PUBLIC_PONYO_API_BASE_URL` to `http://localhost:8000`, then run the frontend from the repository root.
 
 Interactive API docs are available at `http://localhost:8000/docs` in local development.
+
+The backend uses LibreTranslate for Japanese (`ja`) and Korean (`ko`) translations. In Compose, it is available only on the internal network; direct backend development defaults to `http://localhost:5000`. Set `LIBRETRANSLATE_URL` and, if required by the server, `LIBRETRANSLATE_API_KEY` in the backend environment. Set `TRANSLATION_PROVIDER=disabled` to turn off uncached translations. Product requests using a supported non-English locale return `503` if a required translation cannot be generated; cached translations continue to work.
 
 ### Contact notification email configuration
 

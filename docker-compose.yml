@@ -25,6 +25,18 @@ services:
       timeout: 3s
       retries: 20
 
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    command: ["--load-only", "en,ja,ko"]
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/languages', timeout=5)"]
+      interval: 20s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+
   api:
     build:
       context: ./backend
@@ -36,12 +48,16 @@ services:
       ENVIRONMENT: local
       DATABASE_URL: postgresql+asyncpg://ponyo:ponyo@postgres:5432/ponyo
       REDIS_URL: redis://redis:6379/0
+      TRANSLATION_PROVIDER: libretranslate
+      LIBRETRANSLATE_URL: http://libretranslate:5000
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      libretranslate:
         condition: service_healthy
     command:
       - sh

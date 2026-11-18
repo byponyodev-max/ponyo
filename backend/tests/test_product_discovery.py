@@ -28,7 +28,7 @@ def isolated_discovery(monkeypatch):
     monkeypatch.setattr(settings, "translation_provider", "disabled")
     blocked = Mock(side_effect=AssertionError("Discovery tests must not use external services"))
     monkeypatch.setattr(socket, "create_connection", blocked)
-    monkeypatch.setattr("app.translations._translate_with_aws", blocked)
+    monkeypatch.setattr("app.translations._translate_with_libretranslate", blocked)
 
 
 async def get_data(client, path="/v1/products", **params):
@@ -323,7 +323,7 @@ async def test_images_without_rows_use_safe_legacy_fallback(test_client):
     ]
 
 
-async def test_cached_japanese_search_and_disabled_provider_fallback(discovery_catalog):
+async def test_cached_japanese_search_and_disabled_provider_behavior(discovery_catalog):
     client, sessions, product_id, *_ = discovery_catalog
     async with sessions() as db:
         product = await db.scalar(select(Product).where(Product.id == product_id).options(
@@ -331,12 +331,12 @@ async def test_cached_japanese_search_and_disabled_provider_fallback(discovery_c
         ))
         db.add(ProductTranslation(
             product_id=product_id, locale="ja", source_hash=source_hash(product),
-            name="月のうさぎ", description="ふわふわの月光のおともだち", provider="aws_translate",
+            name="月のうさぎ", description="ふわふわの月光のおともだち", provider="libretranslate",
         ))
         # Another cached locale must not match a Japanese query.
         db.add(ProductTranslation(
             product_id=product_id, locale="fr", source_hash=source_hash(product),
-            name="Lapin lunaire", description="Compagnon doux", provider="aws_translate",
+            name="Lapin lunaire", description="Compagnon doux", provider="libretranslate",
         ))
         await db.commit()
     for query in ["月のうさぎ", "月光", "MOON BUNNY", "PNY-MOON-EXCLUSIVE", "Lunar Makers"]:
@@ -344,15 +344,16 @@ async def test_cached_japanese_search_and_disabled_provider_fallback(discovery_c
         assert [row["id"] for row in rows] == [str(product_id)]
         assert rows[0]["name"] == "月のうさぎ"
         assert rows[0]["description"] == "ふわふわの月光のおともだち"
-    for locale in ["en", "xx"]:
-        assert await get_data(client, q="月のうさぎ", locale=locale) == []
-        rows = await get_data(client, q="Moon Bunny", locale=locale)
-        assert rows[0]["name"] == "Moon Bunny"
-        assert rows[0]["description"] == "Velvet moonbeam companion"
-        detail = await get_data(client, f"/v1/products/{product_id}", locale=locale)
-        assert detail["name"] == "Moon Bunny"
+    assert await get_data(client, q="月のうさぎ", locale="en") == []
+    rows = await get_data(client, q="Moon Bunny", locale="en")
+    assert rows[0]["name"] == "Moon Bunny"
+    assert rows[0]["description"] == "Velvet moonbeam companion"
+    detail = await get_data(client, f"/v1/products/{product_id}", locale="en")
+    assert detail["name"] == "Moon Bunny"
+    unsupported_locale = await client.get("/v1/products", params={"locale": "xx"})
+    assert unsupported_locale.status_code == 422
     assert await get_data(client, q="Lapin lunaire", locale="ja") == []
     detail = await get_data(client, f"/v1/products/{product_id}", locale="ja")
     assert detail["name"] == "月のうさぎ"
-    untranslated = await get_data(client, "/v1/products/sun-bear", locale="ja")
-    assert untranslated["name"] == "Sun Bear"
+    untranslated = await client.get("/v1/products/sun-bear", params={"locale": "ja"})
+    assert untranslated.status_code == 503

@@ -171,6 +171,12 @@ test("every supplemental auth key is wired with a nonempty English fallback", ()
     for (const key of sharedKeys.filter((key) => key.startsWith("account.auth.") && key !== "account.auth.or")) assert.ok(wired.has(key), key);
 });
 
+test("static UI translations use locale dictionaries without runtime translation requests", () => {
+    const provider = read("src/components/layout/localization-provider.tsx");
+    assert.match(provider, /intlTranslate\.has\(key\)\s*\?\s*intlTranslate\(key, values\)\s*:\s*key/);
+    assert.doesNotMatch(provider, /automaticTranslations|queueTranslation|flushTranslations|\/api\/localization\/translations/);
+});
+
 const require = createRequire(
     import.meta.url);
 const optionsContext = { exports: {}, Intl };

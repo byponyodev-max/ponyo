@@ -7,7 +7,6 @@ import { currencies, deliveryCountries, getDeliveryLocalization, isDeliveryCount
 import { ponyoApi, PONYO_API_BASE_URL } from "@/services/ponyo-api.client";
 
 type RatePayload = { base: string; date: string; rates: Record<string, number> };
-type PendingTranslation = { language: string; key: string; text: string };
 type LocalizationContextValue = {
   language: string;
   currency: string;
@@ -29,11 +28,6 @@ type LocalizationContextValue = {
 };
 
 const LocalizationContext = createContext<LocalizationContextValue | null>(null);
-
-function substitute(value: string, values?: Record<string, string | number>) {
-  if (!values) return value;
-  return value.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => String(values[key] ?? match));
-}
 
 function hasRequiredRates(payload: RatePayload | undefined, symbols: string[]): payload is RatePayload {
   return Boolean(
@@ -66,13 +60,9 @@ export function LocalizationProvider({ children, initialLanguage = "ja", initial
   const [currency, setCurrencyState] = useState(currencies.some((item) => item.code === initialCurrency) ? initialCurrency : "JPY");
   const [country, setCountryState] = useState(isDeliveryCountryCode(initialCountry) ? initialCountry : "JP");
   const [deliveryNoticeDismissed, setDeliveryNoticeDismissed] = useState(initialDeliveryNoticeDismissed);
-  const [automaticTranslations, setAutomaticTranslations] = useState<Record<string, string>>({});
   const [rates, setRates] = useState<Record<string, number>>({ JPY: 1 });
   const [rateStatus, setRateStatus] = useState<"loading" | "ready" | "error">("loading");
   const rateRequest = useRef<Promise<void> | null>(null);
-  const pendingTranslations = useRef<Map<string, PendingTranslation>>(new Map());
-  const requestedTranslations = useRef<Set<string>>(new Set());
-  const translationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -175,65 +165,9 @@ export function LocalizationProvider({ children, initialLanguage = "ja", initial
     }
   }, [convertMajorAmount, currency, language, rates]);
 
-  const flushTranslations = useCallback(async () => {
-    translationTimer.current = null;
-    const queued = [...pendingTranslations.current.entries()];
-    pendingTranslations.current.clear();
-    const grouped = new Map<string, Array<{ requestId: string; key: string; text: string }>>();
-    for (const [requestId, entry] of queued) {
-      const entries = grouped.get(entry.language) ?? [];
-      entries.push({ requestId, key: entry.key, text: entry.text });
-      grouped.set(entry.language, entries);
-    }
-
-    for (const [locale, entries] of grouped) {
-      for (let index = 0; index < entries.length; index += 24) {
-        const batch = entries.slice(index, index + 24);
-        try {
-          const response = await fetch("/api/localization/translations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ locale, entries: batch.map(({ key, text }) => ({ key, text })) }),
-          });
-          if (!response.ok) continue;
-          const payload = await response.json() as { data?: { translations?: Record<string, string> } };
-          const translations = payload.data?.translations;
-          if (translations) {
-            setAutomaticTranslations((current) => {
-              const next = { ...current };
-              for (const [key, text] of Object.entries(translations)) {
-                next[`${locale}:${key}`] = text;
-              }
-              return next;
-            });
-          }
-        } catch {
-          // Keep the existing locale dictionary or English fallback when AWS is unavailable.
-        }
-      }
-    }
-  }, []);
-
-  const queueTranslation = useCallback((locale: string, key: string, text: string) => {
-    if (typeof window === "undefined" || locale === "en" || !text.trim()) return;
-    const requestId = `${locale}:${key}:${text}`;
-    if (requestedTranslations.current.has(requestId)) return;
-    requestedTranslations.current.add(requestId);
-    pendingTranslations.current.set(requestId, { language: locale, key, text });
-    if (translationTimer.current === null) {
-      translationTimer.current = setTimeout(() => { void flushTranslations(); }, 120);
-    }
-  }, [flushTranslations]);
-
-  const t = useCallback((key: string, fallback: string, values?: Record<string, string | number>) => {
-    const reviewedMessage = intlTranslate.has(key) ? intlTranslate.raw(key) : undefined;
-    const automaticValue = automaticTranslations[`${language}:${key}`];
-    if (typeof reviewedMessage === "string" && reviewedMessage.trim()) {
-      return intlTranslate(key, values);
-    }
-    if (!automaticValue) queueTranslation(language, key, fallback);
-    return substitute(automaticValue?.trim() ? automaticValue : fallback, values);
-  }, [automaticTranslations, intlTranslate, language, queueTranslation]);
+  const t = useCallback((key: string, _fallback: string, values?: Record<string, string | number>) => {
+    return intlTranslate.has(key) ? intlTranslate(key, values) : key;
+  }, [intlTranslate]);
 
   const contextValue = useMemo(() => ({ language, currency, country, deliveryNoticeDismissed, languages, currencies, deliveryCountries, rates, rateStatus, refreshRates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount }), [language, currency, country, deliveryNoticeDismissed, rates, rateStatus, refreshRates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount]);
   return <LocalizationContext.Provider value={contextValue}>{children}</LocalizationContext.Provider>;

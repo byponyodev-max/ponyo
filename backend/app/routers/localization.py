@@ -8,7 +8,7 @@ from app.db import get_db
 from app.models import AppTranslation
 from app.rate_limit import enforce_rate_limit
 from app.schemas import TranslationBatchRequest
-from app.translations import AWS_TRANSLATE_CODES, get_app_translations
+from app.translations import TRANSLATION_LOCALES, get_app_translations
 
 router = APIRouter(prefix="/localization", tags=["localization"])
 
@@ -34,7 +34,7 @@ async def translate_app_copy(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    if payload.locale not in AWS_TRANSLATE_CODES:
+    if payload.locale not in TRANSLATION_LOCALES:
         raise HTTPException(status_code=422, detail="The requested language is not supported.")
     await enforce_rate_limit(request, "ui-translation", 12, 60)
     translations = await get_app_translations(

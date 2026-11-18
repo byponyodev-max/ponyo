@@ -21,8 +21,9 @@ async def post(client, path, body):
 	return await client.post(path, json=body, headers={"X-CSRF-Token": await csrf_token(client)})
 
 
-async def test_admin_dashboard_orders_products_customers_and_supplier_controls(test_client):
+async def test_admin_dashboard_orders_products_customers_and_supplier_controls(test_client, monkeypatch):
 	client, factory = test_client
+	monkeypatch.setattr("app.translations._translate_with_libretranslate", lambda text, language: f"{language}:{text}")
 	await admin_session(client, factory)
 	product_id, _variant_id = await add_product(factory, slug="admin-review-plush", stock=4)
 	async with factory() as db:
@@ -68,6 +69,28 @@ async def test_admin_dashboard_orders_products_customers_and_supplier_controls(t
 	customers = await client.get("/v1/admin/customers?q=buyer@example.com")
 	assert customers.status_code == 200
 	assert any(row["email"] == "buyer@example.com" for row in customers.json()["data"])
+
+
+async def test_admin_cannot_publish_product_without_required_translations(test_client, monkeypatch):
+	client, factory = test_client
+	await admin_session(client, factory)
+	product_id, _variant_id = await add_product(factory, slug="untranslated-plush", stock=4)
+	async with factory() as db:
+		product = await db.get(Product, product_id)
+		product.published = False
+		await db.commit()
+	monkeypatch.setattr("app.config.settings.translation_provider", "disabled")
+
+	publication = await client.patch(
+		f"/v1/admin/products/{product_id}/publication",
+		json={"published": True},
+		headers={"X-CSRF-Token": await csrf_token(client)},
+	)
+
+	assert publication.status_code == 503
+	async with factory() as db:
+		product = await db.get(Product, product_id)
+		assert product.published is False
 
 
 async def test_admin_reads_and_writes_reject_non_admins(test_client):

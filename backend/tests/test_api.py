@@ -180,15 +180,14 @@ async def test_products_catalog_envelope(test_client):
 
 
 @pytest.mark.asyncio
-async def test_product_locale_falls_back_to_english_when_translation_is_disabled(test_client, monkeypatch):
+async def test_product_locale_does_not_fall_back_to_english_when_translation_is_unavailable(test_client, monkeypatch):
     client, session_factory = test_client
     await add_product(session_factory)
     monkeypatch.setattr(settings, "translation_provider", "disabled")
 
     response = await client.get("/v1/products?locale=ja")
 
-    assert response.status_code == 200
-    assert response.json()["data"][0]["name"] == "Test-Bunny"
+    assert response.status_code == 503
     async with session_factory() as db:
         assert await db.scalar(select(ProductTranslation.id)) is None
 
@@ -231,9 +230,8 @@ async def test_product_fields_translate_cache_and_keep_english_and_brand_names(t
         calls.append((text, target_language))
         return f"{target_language}:{text}"
 
-    monkeypatch.setattr(settings, "translation_provider", "aws_translate")
-    monkeypatch.setattr("app.translations._aws_credentials_available", lambda: True)
-    monkeypatch.setattr("app.translations._translate_with_aws", fake_translate)
+    monkeypatch.setattr(settings, "translation_provider", "libretranslate")
+    monkeypatch.setattr("app.translations._translate_with_libretranslate", fake_translate)
 
     english = (await client.get(f"/v1/products/{product_id}?locale=en")).json()["data"]
     assert english["name"] == "Test-Bunny"
@@ -294,9 +292,8 @@ async def test_product_translation_is_cached_and_invalidated_by_source_changes(t
         calls.append((text, target_language))
         return f"{target_language}:{text}"
 
-    monkeypatch.setattr(settings, "translation_provider", "aws_translate")
-    monkeypatch.setattr("app.translations._aws_credentials_available", lambda: True)
-    monkeypatch.setattr("app.translations._translate_with_aws", fake_translate)
+    monkeypatch.setattr(settings, "translation_provider", "libretranslate")
+    monkeypatch.setattr("app.translations._translate_with_libretranslate", fake_translate)
 
     first = await client.get("/v1/products?locale=ja")
     second = await client.get(f"/v1/products/{product_id}?locale=ja")
@@ -332,9 +329,8 @@ async def test_ui_copy_translation_is_cached_and_invalidated_by_source_changes(t
         calls.append((text, target_language))
         return f"{target_language}:{text}"
 
-    monkeypatch.setattr(settings, "translation_provider", "aws_translate")
-    monkeypatch.setattr("app.translations._aws_credentials_available", lambda: True)
-    monkeypatch.setattr("app.translations._translate_with_aws", fake_translate)
+    monkeypatch.setattr(settings, "translation_provider", "libretranslate")
+    monkeypatch.setattr("app.translations._translate_with_libretranslate", fake_translate)
     payload = {"locale": "ja", "entries": [{"key": "home.test", "text": "Find a friend"}]}
 
     first = await client.post("/v1/localization/translations", json=payload)

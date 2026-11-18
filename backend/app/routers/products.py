@@ -14,7 +14,7 @@ from app.catalog_stock import available_quantities, sellable_variant
 from app.schemas import ProductOut, ProductReservationRequest, ProductReviewCreate, ProductWaitlistRequest, VariantOut
 from app.security import get_current_customer, get_optional_customer, require_csrf
 from app.rate_limit import enforce_rate_limit
-from app.translations import AWS_TRANSLATE_CODES, get_product_translation
+from app.translations import TRANSLATION_LOCALES, TranslationUnavailableError, get_product_translation
 from app.translations import _get_nested
 
 router = APIRouter(prefix="/products", tags=["catalog"])
@@ -77,6 +77,11 @@ def product_response(product: Product, translation: ProductTranslation | None = 
         makerStory=localized(("makerStory",), product.brand.maker_story) if product.brand and not product.brand.is_demo else None,
         makerPhilosophy=localized(("makerPhilosophy",), product.brand.philosophy) if product.brand and not product.brand.is_demo else None,
         makerProcess=localized(("makerProcess",), product.brand.process) if product.brand and not product.brand.is_demo else None,
+        makerLocation=localized(("makerLocation",), product.brand.location) if product.brand and not product.brand.is_demo else None,
+        makerSpecialties=[
+            localized(("makerSpecialties", str(index)), specialty)
+            for index, specialty in enumerate(product.brand.specialties or [])
+        ] if product.brand and not product.brand.is_demo else [],
         materials=localized(("materials",), product.materials),
         weightGrams=product.weight_grams,
         editionCount=product.edition_count,
@@ -116,7 +121,8 @@ async def list_products(
     locale: str = Query(default="en", min_length=2, max_length=12),
     db: AsyncSession = Depends(get_db),
 ):
-    locale = locale if locale == "en" or locale in AWS_TRANSLATE_CODES else "en"
+    if locale not in {"en", *TRANSLATION_LOCALES}:
+        raise HTTPException(422, "Unsupported product locale.")
     query = select(Product).where(Product.published.is_(True)).options(selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images))
     if q:
         term = f"%{q.strip()}%"
@@ -175,7 +181,10 @@ async def list_products(
     data = []
     quantities = await available_quantities(db, [variant for product in rows for variant in product.variants])
     for product in rows:
-        translation = await get_product_translation(product, locale, db) if locale != "en" else None
+        try:
+            translation = await get_product_translation(product, locale, db) if locale != "en" else None
+        except TranslationUnavailableError as error:
+            raise HTTPException(503, "Product translation is unavailable.") from error
         data.append(product_response(product, translation, quantities).model_dump(mode="json"))
     if locale != "en":
         await db.commit()
@@ -188,7 +197,8 @@ async def get_product(
     locale: str = Query(default="en", min_length=2, max_length=12),
     db: AsyncSession = Depends(get_db),
 ):
-    locale = locale if locale == "en" or locale in AWS_TRANSLATE_CODES else "en"
+    if locale not in {"en", *TRANSLATION_LOCALES}:
+        raise HTTPException(422, "Unsupported product locale.")
     try:
         identifier = UUID(product_id)
         product_filter = Product.id == identifier
@@ -200,7 +210,10 @@ async def get_product(
     )
     if not product:
         raise HTTPException(status_code=404, detail="Product not found.")
-    translation = await get_product_translation(product, locale, db) if locale != "en" else None
+    try:
+        translation = await get_product_translation(product, locale, db) if locale != "en" else None
+    except TranslationUnavailableError as error:
+        raise HTTPException(503, "Product translation is unavailable.") from error
     if translation:
         await db.commit()
     return {"data": product_response(

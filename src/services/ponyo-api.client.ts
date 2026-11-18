@@ -652,9 +652,9 @@ export const ponyoApi = {
 		apiRequest<Product>(
 			`/products/${encodeURIComponent(id)}?locale=${encodeURIComponent(locale)}`,
 		),
-	getMakerProfile: (slug: string) =>
+	getMakerProfile: (slug: string, locale = "en") =>
 		apiRequest<{ maker: MakerProfile; products: Product[] }>(
-			`/makers/${encodeURIComponent(slug)}`,
+			`/makers/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
 		),
 	submitMakerApplication: (input: MakerApplicationInput) =>
 		apiRequest<{ id: string; status: MakerApplicationStatus }>(

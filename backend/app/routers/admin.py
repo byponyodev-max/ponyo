@@ -35,6 +35,7 @@ from app.schemas import (
     AdminSupplierStatusRequest,
 )
 from app.security import require_csrf, require_roles
+from app.translations import TranslationUnavailableError, ensure_product_translations
 
 router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
 
@@ -240,6 +241,11 @@ async def set_product_publication(product_id: UUID, payload: AdminProductPublica
         selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images)))
     if not product:
         raise HTTPException(404, "Product not found.")
+    if published:
+        try:
+            await ensure_product_translations(product, db)
+        except TranslationUnavailableError as error:
+            raise HTTPException(503, "Product cannot be published until Japanese and Korean translations are ready.") from error
     product.published = published
     await db.commit()
     await db.refresh(product)
