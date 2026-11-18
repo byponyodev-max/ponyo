@@ -165,8 +165,13 @@ export function LocalizationProvider({ children, initialLanguage = "ja", initial
     }
   }, [convertMajorAmount, currency, language, rates]);
 
-  const t = useCallback((key: string, _fallback: string, values?: Record<string, string | number>) => {
-    return intlTranslate.has(key) ? intlTranslate(key, values) : key;
+  const t = useCallback((key: string, fallback: string, values?: Record<string, string | number>) => {
+    if (intlTranslate.has(key)) return intlTranslate(key, values);
+    return fallback.replace(/\{\{\s*(\w+)\s*\}\}|\{(\w+)\}/g, (placeholder, doubleName: string | undefined, singleName: string | undefined) => {
+      const name = doubleName ?? singleName;
+      const value = name ? values?.[name] : undefined;
+      return value === undefined ? placeholder : String(value);
+    });
   }, [intlTranslate]);
 
   const contextValue = useMemo(() => ({ language, currency, country, deliveryNoticeDismissed, languages, currencies, deliveryCountries, rates, rateStatus, refreshRates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount }), [language, currency, country, deliveryNoticeDismissed, rates, rateStatus, refreshRates, setLanguage, setCurrency, setDeliveryCountry, dismissDeliveryNotice, t, formatPrice, convertMajorAmount]);

@@ -19,6 +19,12 @@ function loadTranslations(path, name) {
 const translations = loadTranslations("src/locales/storefront-translations.ts", "storefrontTranslations");
 const appTranslations = loadTranslations("src/locales/app-translations.ts", "appTranslations");
 const authTranslations = loadTranslations("src/locales/auth-translations.ts", "authTranslations");
+const contactTranslations = loadTranslations("src/locales/contact-translations.ts", "contactTranslations");
+const supportedMessages = Object.fromEntries(["en", "ja", "ko"].map((locale) => {
+    const filename = locale === "en" ? "en.default.json" : `${locale}.json`;
+    const source = read(`src/locales/${filename}`).replace(/^\/\*[\s\S]*?\*\/\s*/, "");
+    return [locale, JSON.parse(source)];
+}));
 const locales = ["es", "id", "ja", "ko", "zh-CN"];
 const sharedKeys = Object.keys(translations.es).sort();
 const placeholders = (text) => [...text.matchAll(/\{\{\s*\w+\s*\}\}/g)].map(([token]) => token).sort();
@@ -171,9 +177,48 @@ test("every supplemental auth key is wired with a nonempty English fallback", ()
     for (const key of sharedKeys.filter((key) => key.startsWith("account.auth.") && key !== "account.auth.or")) assert.ok(wired.has(key), key);
 });
 
+test("active static copy has local English, Japanese, and Korean messages", () => {
+    const requiredKeys = [
+        "general.retry",
+        "home.footer.social_eyebrow",
+        "home.footer.social_title",
+        "home.footer.social_body",
+        "home.size.eyebrow",
+        "home.size.domina_promo_title",
+        "home.size.domina_promo_body",
+        "home.size.domina_promo_link",
+        "home.size.domina_quote",
+        "home.pillars.collectibles_title",
+        "home.pillars.collectibles_body",
+        "home.slides.collectibles_eyebrow",
+        "home.slides.collectibles_cta",
+        "product.action.reserve_spot",
+        "product.status.preorder",
+    ];
+    const message = (locale, key) => {
+        const supplemental = appTranslations[locale]?.[key] ?? contactTranslations[locale]?.[key];
+        if (supplemental) return supplemental;
+        return key.split(".").reduce((value, part) => value?.[part], supportedMessages[locale]);
+    };
+
+    for (const key of requiredKeys) {
+        const english = message("en", key);
+        assert.equal(typeof english, "string", `en is missing ${key}`);
+        for (const locale of ["ja", "ko"]) {
+            const translated = message(locale, key);
+            assert.equal(typeof translated, "string", `${locale} is missing ${key}`);
+            assert.ok(translated.trim(), `${locale} has blank ${key}`);
+            assert.notEqual(translated, english, `${locale} is using English copy for ${key}`);
+        }
+    }
+});
+
 test("static UI translations use locale dictionaries without runtime translation requests", () => {
     const provider = read("src/components/layout/localization-provider.tsx");
-    assert.match(provider, /intlTranslate\.has\(key\)\s*\?\s*intlTranslate\(key, values\)\s*:\s*key/);
+    assert.match(provider, /if \(intlTranslate\.has\(key\)\) return intlTranslate\(key, values\)/);
+    assert.match(provider, /return fallback\.replace\(/);
+    assert.match(provider, /const name = doubleName \?\? singleName/);
+    assert.match(provider, /values\?\.\[name\]/);
     assert.doesNotMatch(provider, /automaticTranslations|queueTranslation|flushTranslations|\/api\/localization\/translations/);
 });
 
@@ -184,6 +229,15 @@ vm.runInNewContext(ts.transpileModule(read("src/lib/localization-options.ts"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText, optionsContext);
 const options = optionsContext.exports;
+
+test("product API uses only supported translation locales", () => {
+    assert.equal(options.productTranslationLocale("ja"), "ja");
+    assert.equal(options.productTranslationLocale("ko"), "ko");
+    assert.equal(options.productTranslationLocale("en"), "en");
+    assert.equal(options.productTranslationLocale("id"), "en");
+    assert.equal(options.productTranslationLocale("fr"), "en");
+});
+
 const pickerSource = ts.transpileModule(read("src/components/layout/localization-picker.tsx"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;

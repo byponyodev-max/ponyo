@@ -67,6 +67,10 @@ export const languages: LanguageOption[] = [
 	{ code: "en", label: "English", country: "United Kingdom", badge: "EN" },
 ];
 
+export function productTranslationLocale(locale: string) {
+	return locale === "ja" || locale === "ko" ? locale : "en";
+}
+
 export const currencies: CurrencyOption[] = [
 	{
 		code: "JPY",

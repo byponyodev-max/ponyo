@@ -31,7 +31,11 @@ services:
     expose:
       - "5000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/languages', timeout=5)"]
+      test:
+        - CMD
+        - python
+        - -c
+        - import json, urllib.request; payload=json.dumps({"q":"Ready","source":"en","target":"ja","format":"text"}).encode(); request=urllib.request.Request("http://127.0.0.1:5000/translate", data=payload, headers={"Content-Type":"application/json"}); result=json.load(urllib.request.urlopen(request, timeout=5)); assert isinstance(result.get("translatedText"), str) and result["translatedText"].strip()
       interval: 20s
       timeout: 10s
       retries: 30

@@ -45,15 +45,15 @@ async function localizePreviewProducts(products: Product[], locale: string) {
 		const reviewed = reviewedTranslations[product.slug] ?? {};
 		for (const field of previewTranslatableFields) {
 			const key = `preview.product.${product.slug}.${field}`;
-			const value = translated[key] || reviewed[field];
+			const value = reviewed[field] || translated[key];
 			if (value) Object.assign(localized, { [field]: value });
 		}
 		if (product.galleryImages) {
 			localized.galleryImages = product.galleryImages.map((image, index) => ({
 				...image,
 				alt:
-					translated[`preview.product.${product.slug}.gallery.${index}.alt`] ||
 					reviewed.imageAlt ||
+					translated[`preview.product.${product.slug}.gallery.${index}.alt`] ||
 					image.alt,
 			}));
 		}

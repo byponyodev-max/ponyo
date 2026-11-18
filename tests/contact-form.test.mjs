@@ -791,7 +791,7 @@ for (const framesBeforeUnmount of [0, 1]) {
 	});
 }
 
-test("all five reviewed dictionaries cover every contact form and page key", () => {
+test("all six reviewed dictionaries cover every contact form and page key", () => {
 	const formKeys = [
 		...componentText
 			.slice(componentText.indexOf("export function LocalContactForm"))
@@ -844,6 +844,7 @@ test("all five reviewed dictionaries cover every contact form and page key", () 
 	assert.match(contactPage, /href="\/pages\/faq"/);
 	assert.doesNotMatch(contactPage, /href="\/orders"|contact\.orders/);
 	assert.deepEqual(Object.keys(translations), [
+		"en",
 		"es",
 		"id",
 		"ja",

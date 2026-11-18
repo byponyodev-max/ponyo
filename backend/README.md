@@ -10,7 +10,7 @@ FastAPI service for the Ponyo storefront. It is intentionally in the same reposi
 
 Interactive API docs are available at `http://localhost:8000/docs` in local development.
 
-The backend uses LibreTranslate for Japanese (`ja`) and Korean (`ko`) translations. In Compose, it is available only on the internal network; direct backend development defaults to `http://localhost:5000`. Set `LIBRETRANSLATE_URL` and, if required by the server, `LIBRETRANSLATE_API_KEY` in the backend environment. Set `TRANSLATION_PROVIDER=disabled` to turn off uncached translations. Product requests using a supported non-English locale return `503` if a required translation cannot be generated; cached translations continue to work.
+The backend uses LibreTranslate for Japanese (`ja`) and Korean (`ko`) translations. In Compose, it is available only on the internal network; direct backend development defaults to `http://localhost:5000`. Set `LIBRETRANSLATE_URL` and, if required by the server, `LIBRETRANSLATE_API_KEY` in the backend environment. Set `TRANSLATION_PROVIDER=disabled` to turn off uncached translations. The development seed writes reviewed Japanese and Korean cache rows for all 20 demo products into `product_translations`; rerunning the seed refreshes those rows without changing the table schema. Real products are translated and cached before admin publication. Product requests return `503` if a required translation cannot be generated; they do not silently substitute English.
 
 ### Contact notification email configuration
 

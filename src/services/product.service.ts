@@ -1,5 +1,6 @@
 import type { Product } from "@/types/product";
 import { PONYO_API_BASE_URL, ponyoApi } from "@/services/ponyo-api.client";
+import { productTranslationLocale } from "@/lib/localization-options";
 
 const localImage = (filename: string) => `/images/catalog/${filename}`;
 const bearImage = localImage("maker-bear.jpg");
@@ -425,7 +426,7 @@ export async function getProducts(
 	query = "",
 	locale = "en",
 ): Promise<Product[]> {
-	if (PONYO_API_BASE_URL) return ponyoApi.listProducts(query, locale);
+	if (PONYO_API_BASE_URL) return ponyoApi.listProducts(query, productTranslationLocale(locale));
 	return storefrontPreviewProducts;
 }
 
@@ -435,7 +436,7 @@ export async function getProductById(
 ): Promise<Product | undefined> {
 	if (PONYO_API_BASE_URL) {
 		try {
-			return await ponyoApi.getProduct(id, locale);
+			return await ponyoApi.getProduct(id, productTranslationLocale(locale));
 		} catch {
 			return undefined;
 		}

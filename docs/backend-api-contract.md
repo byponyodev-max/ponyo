@@ -82,7 +82,7 @@ Availability returns `{ "data": { "productId", "availability", "availabilityStat
 
 ### Multilingual product data
 
-Listing/detail accept `locale`; `en`, `ja`, and `ko` are supported. Japanese and Korean product responses use cached translations, and LibreTranslate generates and caches missing/stale product and storefront-field translations when enabled. Unsupported locales return 422; if a required translation is unavailable (including when translation is disabled and no valid cache exists), product requests return 503 rather than silently presenting English as the requested locale. Cached translated search does not generate translations for unmatched products or perform universal cross-language search. Normalized category/brand collection labels remain source-language labels. Translation coverage depends on the source fields present; model-backed translations should be reviewed before publication.
+Listing/detail accept `locale`; `en`, `ja`, and `ko` are supported. Japanese and Korean product responses use cached translations. The development seed provides reviewed Japanese and Korean cache rows for its 20 demo products; LibreTranslate generates and caches missing/stale translations for real products before admin publication. Unsupported API locales return 422; if a required translation is unavailable (including when translation is disabled and no valid cache exists), product requests return 503 rather than silently presenting English as the requested locale. Cached translated search does not generate translations for unmatched products or perform universal cross-language search. Normalized category/brand collection labels remain source-language labels.
 
 ### Supplier inventory, synchronization, and reservation recovery
 

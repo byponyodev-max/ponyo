@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 
 from app import seed
-from app.models import Base, Product, ProductImage, ProductVariant, SupplierInventory, SupplierOffer
+from app.models import Base, Product, ProductImage, ProductTranslation, ProductVariant, SupplierInventory, SupplierOffer
+from app.translations import get_product_translation, source_hash
 
 
 def test_catalog_has_twenty_unique_products_and_ten_lineup_images():
@@ -45,17 +47,41 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
             inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == offer.id))
             variant.stock_quantity = 5
             inventory.on_hand = 5
+            bad_translation = await db.scalar(select(ProductTranslation).where(
+                ProductTranslation.product_id == product.id,
+                ProductTranslation.locale == "ja",
+            ))
+            bad_translation.name = "Bad cached output"
+            bad_translation.provider = "libretranslate"
             await db.commit()
         await seed.seed_products()
         async with sessions() as db:
             for model in (Product, ProductVariant, ProductImage, SupplierOffer, SupplierInventory):
                 assert await db.scalar(select(func.count()).select_from(model)) == 20
-            product = await db.scalar(select(Product).where(Product.slug == "mochi-cloud"))
+            assert await db.scalar(select(func.count()).select_from(ProductTranslation)) == 40
+            product = await db.scalar(select(Product).where(Product.slug == "mochi-cloud").options(
+                selectinload(Product.variants), selectinload(Product.category),
+                selectinload(Product.brand), selectinload(Product.images),
+            ))
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id))
             assert variant.stock_quantity == 5
             offer = await db.scalar(select(SupplierOffer).where(SupplierOffer.variant_id == variant.id))
             inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == offer.id))
             assert inventory.on_hand == 5
+            monkeypatch.setattr(
+                "app.translations._translate_with_libretranslate",
+                lambda *_args: pytest.fail("Demo product cache must not call LibreTranslate."),
+            )
+            for locale, expected_name, expected_category, expected_variant_title in (
+                ("ja", "もち雲", "キャラクター", "通常版"),
+                ("ko", "모찌 구름", "캐릭터", "기본형"),
+            ):
+                translation = await get_product_translation(product, locale, db)
+                assert translation.name == expected_name
+                assert translation.source_hash == source_hash(product)
+                assert translation.provider == "ponyo-reviewed"
+                assert translation.fields["categoryName"] == expected_category
+                assert translation.fields["variants"][str(variant.id)]["title"] == expected_variant_title
     finally:
         await engine.dispose()
 

@@ -3,11 +3,14 @@ import re
 from uuid import uuid5, NAMESPACE_URL
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.db import SessionLocal
-from app.models import Product, ProductVariant
+from app.models import Product, ProductTranslation, ProductVariant
 from app.config import settings
+from app.demo_translations import DEMO_FIELD_TRANSLATIONS, DEMO_PRODUCT_TRANSLATIONS
 from app.storefront_data import link_demo_catalog
+from app.translations import _product_translation_entries, _set_nested, source_hash
 
 PRODUCTS = [
     {"slug": "hoshi-cloud-bear", "name": "Hoshi Cloud Bear", "description": "A warm, squishy cream teddy bear with a classic gingham bow.", "price": 18800, "category": "Bears", "type": "Plush", "tags": ["bear", "new-arrival", "rare"], "size": "Medium", "dimensions": "30 cm", "supplier": "Ponyo", "image": "/images/catalog/maker-bear.jpg", "alt": "Warm cream teddy bear plush with a checkered bow", "stock": 20},
@@ -77,6 +80,72 @@ PRODUCT_STATUSES = {
     "clover-turtle": "Available",
     "pebble-otter": "Available",
 }
+
+
+def _reviewed_demo_fields(product: Product, locale: str) -> dict:
+    reviewed = DEMO_PRODUCT_TRANSLATIONS[locale][product.slug]
+    fields = DEMO_FIELD_TRANSLATIONS[locale]
+    translated_fields = {}
+    for path, source in _product_translation_entries(product):
+        field = path[0]
+        if field == "categoryName":
+            translated = fields["categories"][source]
+        elif field == "productType":
+            translated = fields["types"][source]
+        elif field == "sizeTier":
+            translated = fields["sizes"][source]
+        elif field == "dimensions":
+            translated = source
+        elif field == "dispatchTime":
+            translated = fields["dispatch_time"]
+        elif field in {"imageAlt", "imageAlts"}:
+            translated = reviewed["image_alt"]
+        elif field == "variants":
+            if path[-1] == "title":
+                translated = fields["variant_title"]
+            elif path[-1] == "key":
+                translated = fields["option_keys"][source]
+            elif source in fields["colors"]:
+                translated = fields["colors"][source]
+            else:
+                translated = fields["sizes"][source]
+        else:
+            raise ValueError(f"Missing reviewed demo translation for {product.slug}: {'.'.join(path)}")
+        _set_nested(translated_fields, path, translated)
+    return translated_fields
+
+
+async def _seed_demo_translations(db) -> None:
+    slugs = set(DEMO_PRODUCT_TRANSLATIONS["ja"])
+    products = (await db.scalars(
+        select(Product).where(Product.slug.in_(slugs)).options(
+            selectinload(Product.variants), selectinload(Product.category),
+            selectinload(Product.brand), selectinload(Product.images),
+        )
+    )).all()
+    if {product.slug for product in products} != slugs:
+        raise RuntimeError("The reviewed translation catalog does not match the seeded demo products.")
+    for product in products:
+        digest = source_hash(product)
+        for locale in ("ja", "ko"):
+            copy = DEMO_PRODUCT_TRANSLATIONS[locale][product.slug]
+            translation = await db.scalar(select(ProductTranslation).where(
+                ProductTranslation.product_id == product.id,
+                ProductTranslation.locale == locale,
+            ))
+            if translation is None:
+                translation = ProductTranslation(
+                    product_id=product.id, locale=locale, source_hash=digest,
+                    name=copy["name"], description=copy["description"],
+                    fields=_reviewed_demo_fields(product, locale), provider="ponyo-reviewed",
+                )
+                db.add(translation)
+            else:
+                translation.source_hash = digest
+                translation.name = copy["name"]
+                translation.description = copy["description"]
+                translation.fields = _reviewed_demo_fields(product, locale)
+                translation.provider = "ponyo-reviewed"
 
 
 def stable_id(value: str):
@@ -159,6 +228,7 @@ async def seed_products() -> None:
                 variant.active = True
         await db.flush()
         await link_demo_catalog(db)
+        await _seed_demo_translations(db)
         await db.commit()
 
 

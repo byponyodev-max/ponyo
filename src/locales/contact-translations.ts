@@ -1,5 +1,5 @@
-/** Reviewed contact copy: Spanish, Indonesian, Japanese, Korean, Simplified Chinese.
- * English is supplied by exact component/page fallbacks. Merge before other dictionaries.
+/** Reviewed contact copy for the supported locales and the existing secondary dictionaries.
+ * Merge before other dictionaries.
  * Topic values and the submitted "Phone: " prefix are stable API data, not UI copy.
  */
 const rows: ReadonlyArray<
@@ -412,14 +412,83 @@ const rows: ReadonlyArray<
 	],
 ];
 
-export const contactTranslations: Record<
-	string,
-	Record<string, string>
-> = Object.fromEntries(
-	["es", "id", "ja", "ko", "zh-CN"].map((language, index) => [
-		language,
-		Object.fromEntries(
-			rows.map(([key, ...values]) => [`contact.${key}`, values[index]]),
-		),
-	]),
-);
+const english: Record<string, string> = {
+	"contact.eyebrow": "A LITTLE HELP, A LOT OF HEART",
+	"contact.title": "How can we help?",
+	"contact.intro":
+		"Questions about an order, delivery, or finding a plush? You’re in the right place.",
+	"contact.hero_eyebrow": "THE PONYO TEAM, ALWAYS CLOSE BY",
+	"contact.hero_title": "Thoughtful help, from our world to yours.",
+	"contact.hero_body":
+		"From choosing a new companion to checking on an order or exploring a partnership, we’re here to listen.",
+	"contact.hero_options": "Explore contact options",
+	"contact.hero_message": "Send us a note",
+	"contact.channels_eyebrow": "HERE WHEN YOU NEED US",
+	"contact.channels_title": "A direct line to the right team.",
+	"contact.channels_body":
+		"Choose the way that feels right. Every little note helps us make Ponyo feel more personal.",
+	"contact.email_general_title": "Everyday questions",
+	"contact.email_general_body": "Questions, ideas, or simply a hello.",
+	"contact.email_support_title": "Orders & customer care",
+	"contact.email_support_body": "Order updates, delivery, and product help.",
+	"contact.email_partners_title": "Makers & partnerships",
+	"contact.email_partners_body": "Maker stories, partnerships, and collaborations.",
+	"contact.phone_title": "Call the Ponyo team",
+	"contact.phone_body": "Prefer a conversation? Give us a call.",
+	"contact.care_eyebrow": "A LITTLE PONYO POSTCARD",
+	"contact.care_title": "A little note is always welcome.",
+	"contact.care_body":
+		"Share a question, a story, or a hello. Our little crew is here to make it feel personal.",
+	"contact.care_email": "Email Ponyo",
+	"contact.care_phone": "Call our team",
+	"contact.team": "Real people. Thoughtful help.",
+	"contact.team_body":
+		"Send the Ponyo team a note. We’ll reply to the email address you share.",
+	"contact.faq": "A quick answer might be waiting",
+	"contact.faq_body": "Explore delivery, sizing, and care in our FAQs.",
+	"contact.faq_cta": "Explore FAQs",
+	"contact.form_kicker": "A NOTE TO PONYO",
+	"contact.form_title": "Send a little note",
+	"contact.required_note": "Fields marked * are required. The rest is up to you.",
+	"contact.name": "Name",
+	"contact.email": "Email",
+	"contact.phone": "Phone",
+	"contact.optional": "(optional)",
+	"contact.topic": "What’s your note about?",
+	"contact.topic_placeholder": "Choose a topic",
+	"contact.topic_required": "Please choose a topic before sending.",
+	"contact.topic_order": "An order",
+	"contact.topic_delivery": "Delivery",
+	"contact.topic_plush": "Finding a plush",
+	"contact.topic_general": "Something else",
+	"contact.message": "Message",
+	"contact.message_placeholder": "Tell us a little about how we can help…",
+	"contact.privacy":
+		"Please only share the details we need to help. Never include passwords or payment details.",
+	"contact.send": "Send message",
+	"contact.sending": "Sending…",
+	"contact.saved_title": "Your note is saved",
+	"contact.preview_title": "Your note is in preview",
+	"contact.saved_notified":
+		"Your message is saved, and an email notification was sent to Ponyo.",
+	"contact.saved_no_email":
+		"Your message is saved. Email notification could not be sent; the Ponyo team can still find your note.",
+	"contact.preview":
+		"Preview only: your message was not sent to the backend or by email.",
+	"contact.error_send":
+		"Unable to send this message. Please try again; your note is still here.",
+	"contact.error_length":
+		"Please keep your name under 160 characters, phone under 60, and message under 4,800.",
+};
+
+export const contactTranslations: Record<string, Record<string, string>> = {
+	en: english,
+	...Object.fromEntries(
+		["es", "id", "ja", "ko", "zh-CN"].map((language, index) => [
+			language,
+			Object.fromEntries(
+				rows.map(([key, ...values]) => [`contact.${key}`, values[index]]),
+			),
+		]),
+	),
+};
