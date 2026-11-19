@@ -15,7 +15,7 @@ from app.email_notifications import contact_notification_recipient, _smtp_ssl_co
 @pytest.fixture
 def isolated_email_settings(monkeypatch, tmp_path):
     for key in tuple(os.environ):
-        if key.lower() in Settings.model_fields:
+        if key.lower() in Settings.model_fields or key.lower().startswith("email_inbox_mailboxes__"):
             monkeypatch.delenv(key)
     backend = tmp_path / "backend"
     backend.mkdir()
@@ -82,6 +82,25 @@ def test_explicit_env_file_opt_out_still_works(isolated_email_settings):
     _, (_, local) = isolated_email_settings
     local.write_text("SMTP_HOST=smtp.example.test\n", encoding="utf-8")
     assert Settings(_env_file=None).smtp_host is None
+
+
+def test_per_mailbox_email_settings_load_nested_env_without_exposing_password(isolated_email_settings):
+    _, (_, local) = isolated_email_settings
+    local.write_text(
+        "EMAIL_INBOX_MAILBOXES__HELLO__ADDRESS=hello@example.test\n"
+        "EMAIL_INBOX_MAILBOXES__HELLO__USERNAME=hello@example.test\n"
+        "EMAIL_INBOX_MAILBOXES__HELLO__PASSWORD=mailbox-secret-test\n"
+        "EMAIL_INBOX_MAILBOXES__HELLO__IMAP_HOST=imap.example.test\n"
+        "EMAIL_INBOX_MAILBOXES__HELLO__SMTP_HOST=smtp.example.test\n"
+        "EMAIL_INBOX_MAILBOXES__HELLO__FROM_EMAIL=hello@example.test\n",
+        encoding="utf-8",
+    )
+    configured = Settings()
+    mailbox = configured.email_inbox_accounts["hello"]
+    assert mailbox.imap_configured is True
+    assert mailbox.smtp_configured is True
+    assert mailbox.password.get_secret_value() == "mailbox-secret-test"
+    assert "mailbox-secret-test" not in repr(configured)
 
 
 def test_smtp_context_keeps_chain_and_hostname_verification(monkeypatch):

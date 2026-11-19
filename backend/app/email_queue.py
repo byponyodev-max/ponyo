@@ -211,6 +211,7 @@ async def send_one(db: AsyncSession) -> bool:
             threading_headers = {
                 "in_reply_to": notification.payload.get("inReplyTo"),
                 "references": notification.payload.get("references"),
+                "mailbox_key": notification.payload.get("mailboxKey"),
             }
         sent = await send_transactional_email(
             notification.recipient, subject, text_body, html_body, message_id,

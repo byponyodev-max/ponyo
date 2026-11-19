@@ -8,7 +8,7 @@ from html import escape
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from app.config import settings
+from app.config import EmailInboxMailboxSettings, settings
 
 logger = logging.getLogger(__name__)
 
@@ -362,9 +362,26 @@ def _send_transactional_email(
     message_id: str,
     in_reply_to: str | None = None,
     references: str | None = None,
+    mailbox_profile: EmailInboxMailboxSettings | None = None,
 ) -> None:
-    sender = settings.smtp_from_email or settings.smtp_username
-    if not settings.contact_email_configured or not sender:
+    if mailbox_profile is not None:
+        smtp_host = mailbox_profile.smtp_host
+        smtp_port = mailbox_profile.smtp_port
+        smtp_username = mailbox_profile.username
+        smtp_password = mailbox_profile.password.get_secret_value()
+        smtp_from_email = mailbox_profile.from_email
+        smtp_starttls = mailbox_profile.smtp_starttls
+        configured = mailbox_profile.smtp_configured
+    else:
+        smtp_host = settings.smtp_host
+        smtp_port = settings.smtp_port
+        smtp_username = settings.smtp_username
+        smtp_password = settings.smtp_password or ""
+        smtp_from_email = settings.smtp_from_email or settings.smtp_username
+        smtp_starttls = settings.smtp_starttls
+        configured = settings.contact_email_configured
+    sender = smtp_from_email
+    if not configured or not sender:
         raise RuntimeError("Transactional email transport is not configured")
     message = EmailMessage()
     message["Subject"] = subject
@@ -377,25 +394,31 @@ def _send_transactional_email(
         message["References"] = references
     message.set_content(text_body)
     message.add_alternative(html_body, subtype="html")
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
         smtp.ehlo()
-        if settings.smtp_starttls:
+        if smtp_starttls:
             smtp.starttls(context=_smtp_ssl_context())
             smtp.ehlo()
-        if settings.smtp_username:
-            smtp.login(settings.smtp_username, settings.smtp_password or "")
+        if smtp_username:
+            smtp.login(smtp_username, smtp_password)
         smtp.send_message(message)
 
 
 async def send_transactional_email(
     recipient: str, subject: str, text_body: str, html_body: str, message_id: str,
     *, in_reply_to: str | None = None, references: str | None = None,
+    mailbox_key: str | None = None,
 ) -> bool:
     """Send a prepared transactional notice without logging recipient or message content."""
     try:
+        mailbox_profile = None
+        if mailbox_key is not None:
+            mailbox_profile = settings.email_inbox_accounts.get(mailbox_key)
+            if mailbox_profile is None:
+                raise RuntimeError("The reply mailbox is not configured")
         await asyncio.to_thread(
             _send_transactional_email, recipient, subject, text_body, html_body, message_id,
-            in_reply_to, references,
+            in_reply_to, references, mailbox_profile,
         )
         return True
     except Exception as error:

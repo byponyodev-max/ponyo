@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
         expiry_task = asyncio.create_task(recover_expired_reservations())
     if settings.supplier_forwarding_enabled:
         supplier_task = asyncio.create_task(supplier_order_worker())
-    if settings.contact_email_configured:
+    if settings.contact_email_configured or settings.email_inbox_reply_configured:
         email_task = asyncio.create_task(transactional_email_worker())
     if settings.email_inbox_imap_configured:
         inbox_task = asyncio.create_task(email_inbox_worker())

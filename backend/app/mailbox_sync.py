@@ -19,8 +19,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
+from app.config import EmailInboxMailboxSettings, get_settings
 from app.db import SessionLocal
+from app.email_notifications import contact_notification_recipient
 from app.models import ContactRequest, EmailInboxMessage, EmailInboxSyncState, MakerApplication, utc_now
 
 logger = logging.getLogger("ponyo.mailbox")
@@ -31,6 +32,12 @@ MESSAGE_ID_PATTERN = re.compile(r"<[^<>\s]+>")
 
 class MailboxSyncError(RuntimeError):
     pass
+
+
+def mailbox_sync_state_key(account_key: str, mailbox: EmailInboxMailboxSettings) -> str:
+    identity = f"{mailbox.username}:{mailbox.imap_mailbox}"
+    digest = hashlib.sha256(identity.encode()).hexdigest()[:32]
+    return f"{account_key}:{digest}"
 
 
 class _TextFromHtml(HTMLParser):
@@ -113,11 +120,11 @@ def _parse_remote_message(uid: int, raw: bytes) -> dict | None:
     if not from_email:
         logger.warning("Skipping mailbox message without sender uid=%s", uid)
         return None
-    own_addresses = {
-        address.casefold()
-        for address in (settings.smtp_from_email, settings.smtp_username)
-        if address
-    }
+    own_addresses = {address.casefold() for address in (
+        settings.smtp_from_email,
+        settings.smtp_username,
+        *(mailbox.from_email for mailbox in settings.email_inbox_accounts.values()),
+    ) if address}
     if from_email.casefold() in own_addresses:
         logger.debug("Skipping self-sent mailbox message uid=%s", uid)
         return None
@@ -147,29 +154,33 @@ def _parse_remote_message(uid: int, raw: bytes) -> dict | None:
     }
 
 
-def _fetch_messages_sync(cursor: int, old_uid_validity: str | None) -> tuple[str, int, list[FetchedMessage]]:
+def _fetch_messages_sync(
+    mailbox: EmailInboxMailboxSettings,
+    cursor: int,
+    old_uid_validity: str | None,
+) -> tuple[str, int, list[FetchedMessage]]:
     settings = get_settings()
-    if not settings.email_inbox_imap_configured:
+    if not mailbox.imap_configured:
         raise MailboxSyncError("IMAP inbox settings are incomplete.")
 
     client = None
     try:
-        if settings.email_inbox_imap_ssl:
+        if mailbox.imap_ssl:
             client = imaplib.IMAP4_SSL(
-                settings.email_inbox_imap_host,
-                settings.email_inbox_imap_port,
+                mailbox.imap_host,
+                mailbox.imap_port,
                 ssl_context=ssl.create_default_context(),
                 timeout=settings.smtp_timeout_seconds,
             )
         else:
             client = imaplib.IMAP4(
-                settings.email_inbox_imap_host,
-                settings.email_inbox_imap_port,
+                mailbox.imap_host,
+                mailbox.imap_port,
                 timeout=settings.smtp_timeout_seconds,
             )
             client.starttls(ssl_context=ssl.create_default_context())
-        client.login(settings.email_inbox_imap_username, settings.email_inbox_imap_password)
-        status, _ = client.select(settings.email_inbox_imap_mailbox, readonly=True)
+        client.login(mailbox.username, mailbox.password.get_secret_value())
+        status, _ = client.select(mailbox.imap_mailbox, readonly=True)
         if status != "OK":
             raise MailboxSyncError("Could not select the configured IMAP mailbox.")
         _, uid_data = client.response("UIDVALIDITY")
@@ -182,7 +193,7 @@ def _fetch_messages_sync(cursor: int, old_uid_validity: str | None) -> tuple[str
         return _fetch_selected_messages(client, uid_validity, cursor, old_uid_validity)
     except MailboxSyncError:
         raise
-    except (imaplib.IMAP4.error, OSError, ssl.SSLError, UnicodeError) as error:
+    except (imaplib.IMAP4.error, OSError, ssl.SSLError, UnicodeError, ValueError, TypeError) as error:
         raise MailboxSyncError(f"IMAP operation failed ({type(error).__name__}).") from error
     finally:
         if client is not None:
@@ -233,7 +244,7 @@ async def sync_portal_messages(db: AsyncSession) -> int:
             "direction": "inbound",
             "from_email": contact.email,
             "from_name": contact.name,
-            "to_email": "",
+            "to_email": contact_notification_recipient(contact.request_type or ""),
             "subject": (contact.request_type or "Website contact")[:998],
             "text_body": contact.message[:MAX_MESSAGE_TEXT],
             "received_at": contact.created_at,
@@ -263,7 +274,7 @@ async def sync_portal_messages(db: AsyncSession) -> int:
             "direction": "inbound",
             "from_email": application.email,
             "from_name": application.contact_person,
-            "to_email": "",
+            "to_email": settings.partners_notification_email,
             "subject": f"Maker application — {application.maker_name}"[:998],
             "text_body": body[:MAX_MESSAGE_TEXT],
             "received_at": application.created_at,
@@ -275,68 +286,93 @@ async def sync_portal_messages(db: AsyncSession) -> int:
 
 async def sync_mailbox_once(db: AsyncSession) -> dict:
     settings = get_settings()
-    if not settings.email_inbox_imap_configured:
+    mailboxes = {
+        key: mailbox for key, mailbox in settings.email_inbox_accounts.items()
+        if mailbox.imap_configured
+    }
+    if not mailboxes:
         raise MailboxSyncError("IMAP inbox settings are incomplete.")
-    mailbox_key = f"{settings.email_inbox_imap_username}:{settings.email_inbox_imap_mailbox}"
-    state = await db.get(EmailInboxSyncState, mailbox_key)
-    cursor = state.last_uid if state else 0
-    old_uid_validity = state.uid_validity if state else None
-
-    try:
-        uid_validity, last_uid, fetched = await asyncio.to_thread(
-            _fetch_messages_sync, cursor, old_uid_validity,
-        )
-    except MailboxSyncError as error:
-        if state is None:
-            state = EmailInboxSyncState(mailbox_name=mailbox_key)
-            db.add(state)
-        state.last_error = type(error).__name__
-        await db.commit()
-        raise
-
-    imported = 0
-    for remote in fetched:
-        parsed = _parse_remote_message(remote.uid, remote.raw)
-        if parsed is None:
-            continue
-        thread_key = None
-        if parsed["references"]:
-            thread_key = await db.scalar(
-                select(EmailInboxMessage.thread_key)
-                .where(EmailInboxMessage.message_id.in_(parsed["references"]))
-                .limit(1)
+    results = []
+    for account_key, mailbox in mailboxes.items():
+        state_key = mailbox_sync_state_key(account_key, mailbox)
+        state = await db.get(EmailInboxSyncState, state_key)
+        cursor = state.last_uid if state else 0
+        old_uid_validity = state.uid_validity if state else None
+        try:
+            uid_validity, last_uid, fetched = await asyncio.to_thread(
+                _fetch_messages_sync, mailbox, cursor, old_uid_validity,
             )
-        values = {
-            "id": uuid4(),
-            "thread_key": thread_key or f"mailbox:{uuid4()}",
-            "source_type": "imap",
-            "source_key": f"{uid_validity}:{remote.uid}",
-            "direction": "inbound",
-            "from_email": parsed["from_email"],
-            "from_name": parsed["from_name"],
-            "to_email": parsed["to_email"],
-            "subject": parsed["subject"],
-            "text_body": parsed["text_body"],
-            "message_id": parsed["message_id"],
-            "in_reply_to": parsed["in_reply_to"],
-            "references_header": parsed["references_header"],
-            "mailbox_name": mailbox_key,
-            "uid_validity": uid_validity,
-            "uid": remote.uid,
-            "received_at": parsed["received_at"],
-            "delivery_status": "received",
-        }
-        imported += await _insert_if_new(db, values)
+        except MailboxSyncError as error:
+            if state is None:
+                state = EmailInboxSyncState(mailbox_name=state_key)
+                db.add(state)
+            state.last_error = type(error).__name__
+            await db.commit()
+            results.append({
+                "key": account_key,
+                "imported": 0,
+                "lastSyncedAt": state.last_synced_at,
+                "error": type(error).__name__,
+            })
+            continue
 
-    if state is None:
-        state = EmailInboxSyncState(mailbox_name=mailbox_key)
-        db.add(state)
-    state.uid_validity = uid_validity
-    state.last_uid = last_uid
-    state.last_synced_at = utc_now()
-    state.last_error = None
-    await db.commit()
-    return {"imported": imported, "lastSyncedAt": state.last_synced_at}
+        imported = 0
+        for remote in fetched:
+            parsed = _parse_remote_message(remote.uid, remote.raw)
+            if parsed is None:
+                continue
+            thread_key = None
+            if parsed["references"]:
+                thread_key = await db.scalar(
+                    select(EmailInboxMessage.thread_key)
+                    .where(EmailInboxMessage.message_id.in_(parsed["references"]))
+                    .limit(1)
+                )
+            values = {
+                "id": uuid4(),
+                "thread_key": thread_key or f"mailbox:{uuid4()}",
+                "source_type": "imap",
+                "source_key": f"{account_key}:{uid_validity}:{remote.uid}",
+                "direction": "inbound",
+                "from_email": parsed["from_email"],
+                "from_name": parsed["from_name"],
+                "to_email": parsed["to_email"],
+                "subject": parsed["subject"],
+                "text_body": parsed["text_body"],
+                "message_id": parsed["message_id"],
+                "in_reply_to": parsed["in_reply_to"],
+                "references_header": parsed["references_header"],
+                "mailbox_name": account_key,
+                "uid_validity": uid_validity,
+                "uid": remote.uid,
+                "received_at": parsed["received_at"],
+                "delivery_status": "received",
+            }
+            imported += await _insert_if_new(db, values)
+
+        if state is None:
+            state = EmailInboxSyncState(mailbox_name=state_key)
+            db.add(state)
+        state.uid_validity = uid_validity
+        state.last_uid = last_uid
+        state.last_synced_at = utc_now()
+        state.last_error = None
+        await db.commit()
+        results.append({
+            "key": account_key,
+            "imported": imported,
+            "lastSyncedAt": state.last_synced_at,
+            "error": None,
+        })
+
+    return {
+        "imported": sum(result["imported"] for result in results),
+        "lastSyncedAt": max(
+            (result["lastSyncedAt"] for result in results if result["lastSyncedAt"]),
+            default=None,
+        ),
+        "mailboxes": results,
+    }
 
 
 def mailbox_message_id(notification_key: str) -> str:
@@ -350,7 +386,12 @@ async def email_inbox_worker() -> None:
         try:
             async with SessionLocal() as db:
                 await sync_portal_messages(db)
-                await sync_mailbox_once(db)
+                result = await sync_mailbox_once(db)
+                failed = [row["key"] for row in result["mailboxes"] if row["error"]]
+                if failed:
+                    logger.warning("Admin email inbox mailbox sync failed mailbox_count=%s", len(failed))
+        except MailboxSyncError:
+            logger.info("Admin email inbox worker is waiting for complete mailbox settings")
         except asyncio.CancelledError:
             raise
         except Exception as error:

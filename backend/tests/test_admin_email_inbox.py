@@ -4,10 +4,10 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.config import settings
+from app.config import EmailInboxMailboxSettings, settings
 from app.email_notifications import _send_transactional_email
 from app.email_queue import send_one
-from app.mailbox_sync import _parse_remote_message
+from app.mailbox_sync import FetchedMessage, _parse_remote_message, sync_mailbox_once
 from app.models import ContactRequest, EmailInboxMessage, EmailNotification
 from test_admin_dashboard import admin_session
 from test_api import (
@@ -40,9 +40,16 @@ async def test_contact_message_is_read_and_reply_uses_queued_email_transport(
     assert detail.json()["data"]["messages"][0]["body"] == "Can you help me?"
 
     monkeypatch.setattr(settings, "smtp_host", "smtp.example.test")
-    monkeypatch.setattr(settings, "smtp_username", None)
-    monkeypatch.setattr(settings, "smtp_password", None)
-    monkeypatch.setattr(settings, "smtp_from_email", "hello@example.com")
+    monkeypatch.setattr(settings, "email_inbox_mailboxes", {
+        "SUPPORT": EmailInboxMailboxSettings(
+            address="support@byponyo.com",
+            username="support@byponyo.com",
+            password="local-test-password",
+            imap_host="imap.example.test",
+            smtp_host="smtp.example.test",
+            from_email="support@byponyo.com",
+        ),
+    })
     idempotency_key = str(uuid4())
     reply = await client.post(
         f"/v1/admin/email/inbox/{thread['threadKey']}/reply",
@@ -80,10 +87,15 @@ async def test_contact_message_is_read_and_reply_uses_queued_email_transport(
             EmailInboxMessage.source_key == idempotency_key,
         ))
         assert outgoing.delivery_status == "sent"
+        assert outgoing.from_email == "support@byponyo.com"
         contact = await db.get(ContactRequest, contact_id)
         assert contact.status == "replied"
     assert delivered[0][0][0] == "mika@example.com"
-    assert delivered[0][1] == {"in_reply_to": None, "references": None}
+    assert delivered[0][1] == {
+        "in_reply_to": None,
+        "references": None,
+        "mailbox_key": "SUPPORT",
+    }
 
 
 def test_imap_message_parser_extracts_plain_body_and_thread_headers():
@@ -125,3 +137,54 @@ def test_transactional_reply_sets_threading_headers(monkeypatch):
     message = transport.return_value.__enter__.return_value.send_message.call_args.args[0]
     assert message["In-Reply-To"] == "<incoming@example.com>"
     assert message["References"] == "<root@example.com> <incoming@example.com>"
+
+
+@pytest.mark.asyncio
+async def test_imap_sync_persists_each_mailbox_and_advances_uid_cursors(test_client, monkeypatch):
+    _, factory = test_client
+    addresses = {
+        "HELLO": "hello@byponyo.com",
+        "SUPPORT": "support@byponyo.com",
+        "PARTNERS": "partners@byponyo.com",
+    }
+    monkeypatch.setattr(settings, "email_inbox_mailboxes", {
+        key: EmailInboxMailboxSettings(
+            address=address,
+            username=address,
+            password="local-test-password",
+            imap_host="imap.example.test",
+            smtp_host="smtp.example.test",
+            from_email=address,
+        )
+        for key, address in addresses.items()
+    })
+    monkeypatch.setattr(settings, "email_inbox_imap_host", None)
+    raw = (
+        b"From: Mika Example <mika@example.com>\r\n"
+        b"To: hello@example.com\r\n"
+        b"Subject: Inbox message\r\n"
+        b"Message-ID: <inbox-1@example.com>\r\n"
+        b"Content-Type: text/plain; charset=utf-8\r\n\r\n"
+        b"A first message.\r\n"
+    )
+    fetched = []
+
+    def fetch(mailbox, cursor, old_validity):
+        fetched.append(mailbox.username)
+        return "42", 9, [FetchedMessage(uid=9, raw=raw)]
+
+    monkeypatch.setattr("app.mailbox_sync._fetch_messages_sync", fetch)
+
+    async with factory() as db:
+        first = await sync_mailbox_once(db)
+    async with factory() as db:
+        second = await sync_mailbox_once(db)
+        messages = (await db.scalars(select(EmailInboxMessage).where(
+            EmailInboxMessage.source_type == "imap"
+        ))).all()
+    assert first["imported"] == 3
+    assert second["imported"] == 0
+    assert len(messages) == 3
+    assert {message.mailbox_name for message in messages} == set(addresses)
+    assert all(message.uid_validity == "42" and message.uid == 9 for message in messages)
+    assert set(fetched) == set(addresses.values())

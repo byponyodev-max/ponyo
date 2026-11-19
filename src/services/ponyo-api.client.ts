@@ -226,8 +226,14 @@ export type AdminEmailInboxStatus = {
 	imapConfigured: boolean;
 	smtpConfigured: boolean;
 	replyConfigured: boolean;
-	lastSyncedAt: string | null;
-	lastError: string | null;
+	mailboxes: Array<{
+		key: string;
+		address: string;
+		imapConfigured: boolean;
+		smtpConfigured: boolean;
+		lastSyncedAt: string | null;
+		lastError: string | null;
+	}>;
 };
 
 export type AdminEmailThread = {
@@ -259,6 +265,8 @@ export type AdminEmailMessage = {
 export type AdminEmailThreadDetail = {
 	threadKey: string;
 	subject: string;
+	replyConfigured: boolean;
+	replyFrom: string | null;
 	messages: AdminEmailMessage[];
 };
 
@@ -1107,7 +1115,7 @@ export const ponyoApi = {
 			imapConfigured: boolean;
 			importedPortalMessages: number;
 			importedMailboxMessages: number;
-			lastSyncedAt: string | null;
+			mailboxes: AdminEmailInboxStatus["mailboxes"];
 		}>("/admin/email/inbox/sync", { method: "POST", body: JSON.stringify({}) }),
 	replyAdminEmailThread: (
 		threadKey: string,

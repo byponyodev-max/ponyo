@@ -314,8 +314,9 @@ export default function AdminPortalPage() {
 			]);
 			setEmailInboxStatus(status);
 			setEmailThreads(inbox.items);
+			const failedMailboxes = result.mailboxes.filter((mailbox) => mailbox.lastError);
 			setNotice(result.imapConfigured
-				? ui("email_sync_complete", "Inbox sync complete. {{mailbox}} mailbox messages and {{portal}} storefront messages added.", { mailbox: result.importedMailboxMessages, portal: result.importedPortalMessages })
+				? ui("email_sync_complete", "Inbox sync complete. {{mailbox}} mailbox messages and {{portal}} storefront messages added; {{failed}} mailboxes failed.", { mailbox: result.importedMailboxMessages, portal: result.importedPortalMessages, failed: failedMailboxes.length })
 				: ui("email_portal_only", "Storefront messages are ready. Configure IMAP to sync your mailbox."));
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
@@ -600,16 +601,23 @@ export default function AdminPortalPage() {
 				<div className="ad-panel-heading">
 					<div><span className="ad-eyebrow">{ui("email_center_eyebrow", "CUSTOMER CARE")}</span><h2>{ui("email_center_title", "Email & messages")}</h2><p>{ui("email_center_note", "Storefront contact and maker messages, plus mail synced from your IMAP inbox.")}</p></div>
 					<div className="ad-email-heading-actions">
-						<span className={`ad-status ${emailInboxStatus?.imapConfigured ? "ad-status--published" : "ad-status--pending"}`}>{emailInboxStatus?.imapConfigured ? ui("email_imap_connected", "IMAP configured") : ui("email_imap_missing", "IMAP not configured")}</span>
+						<span className={`ad-status ${emailInboxStatus?.imapConfigured ? "ad-status--published" : "ad-status--pending"}`}>{ui("email_imap_progress", "{{configured}} / {{total}} mailboxes connected", { configured: emailInboxStatus?.mailboxes.filter((mailbox) => mailbox.imapConfigured).length ?? 0, total: emailInboxStatus?.mailboxes.length ?? 3 })}</span>
 						<button type="button" onClick={() => void syncEmailInbox()} disabled={busyId === "email-sync"}>{busyId === "email-sync" ? ui("email_syncing", "Syncing…") : ui("email_sync", "Sync inbox")}</button>
 					</div>
 				</div>
-				{(!emailInboxStatus?.imapConfigured || !emailInboxStatus.smtpConfigured) && <aside className="ad-email-config-note" role="note">
+				{emailInboxStatus?.mailboxes.some((mailbox) => !mailbox.imapConfigured || !mailbox.smtpConfigured) && <aside className="ad-email-config-note" role="note">
 					<strong>{ui("email_setup_title", "Mailbox setup")}</strong>
-					<p>{!emailInboxStatus?.imapConfigured ? ui("email_imap_setup", "Website contact and maker messages appear below. To receive other email, configure EMAIL_INBOX_IMAP_* in the backend environment.") : ""} {!emailInboxStatus?.smtpConfigured ? ui("email_smtp_setup", "Configure SMTP settings in the backend environment to send replies.") : ""}</p>
+					<p>{ui("email_account_setup_note", "Add the password for each address in backend/.env.local, then restart the API. A mailbox must have both IMAP and SMTP configured before its messages sync and can be replied to.")}</p>
 				</aside>}
-				{emailInboxStatus?.lastSyncedAt && <p className="ad-email-sync-note">{ui("email_last_synced", "Last synced {{date}}", { date: date(emailInboxStatus.lastSyncedAt) })}</p>}
-				{emailInboxStatus?.lastError && <p className="ad-email-sync-error" role="status">{ui("email_last_sync_error", "Last mailbox sync failed: {{error}}", { error: emailInboxStatus.lastError })}</p>}
+				<div className="ad-email-mailbox-status" aria-label={ui("email_mailbox_status", "Mailbox connection status")}>
+					{emailInboxStatus?.mailboxes.map((mailbox) => <article key={mailbox.key}>
+						<strong>{mailbox.address || mailbox.key}</strong>
+						<span className={mailbox.imapConfigured ? "is-ready" : ""}>{ui("email_status_imap", "IMAP")}: {mailbox.imapConfigured ? ui("email_connected", "Ready") : ui("email_not_configured", "Password needed")}</span>
+						<span className={mailbox.smtpConfigured ? "is-ready" : ""}>{ui("email_status_smtp", "SMTP")}: {mailbox.smtpConfigured ? ui("email_connected", "Ready") : ui("email_not_configured", "Password needed")}</span>
+						{mailbox.lastSyncedAt && <small>{ui("email_last_synced", "Last synced {{date}}", { date: date(mailbox.lastSyncedAt) })}</small>}
+						{mailbox.lastError && <small role="status">{ui("email_last_sync_error", "Last mailbox sync failed: {{error}}", { error: mailbox.lastError })}</small>}
+					</article>)}
+				</div>
 				<div className="ad-email-toolbar">
 					<form onSubmit={(event) => { event.preventDefault(); void loadEmailThreads(); }}>
 						<label className="ad-search"><span>⌕</span><input aria-label={ui("email_search", "Search inbox")} value={emailQuery} maxLength={180} onChange={(event) => setEmailQuery(event.target.value)} placeholder={ui("email_search_placeholder", "Search sender, subject or message")} /></label>
@@ -645,9 +653,10 @@ export default function AdminPortalPage() {
 							</article>)}</div>
 							<form className="ad-email-reply-form" onSubmit={(event) => void sendEmailReply(event)}>
 								<div className="ad-email-reply-heading"><h4>{ui("email_reply_title", "Reply")}</h4><label>{ui("email_template", "Reply template")}<select value={emailReplyTemplate} onChange={(event) => { const selected = emailReplyTemplates.find((template) => template.id === event.target.value); setEmailReplyTemplate(event.target.value); if (selected) setEmailReplyBody(selected.body); }}><option value="">{ui("email_template_custom", "Write a reply")}</option>{emailReplyTemplates.map((template) => <option value={template.id} key={template.id}>{template.label}</option>)}</select></label></div>
+								{emailThread.replyFrom && <p className="ad-email-reply-from">{ui("email_replying_from", "Replying from {{email}}", { email: emailThread.replyFrom })}</p>}
 								<label className="ad-email-reply-label" htmlFor="admin-email-reply">{ui("email_reply_body", "Message")}</label>
-								<textarea id="admin-email-reply" value={emailReplyBody} onChange={(event) => setEmailReplyBody(event.target.value)} maxLength={5000} rows={6} required disabled={!emailInboxStatus?.smtpConfigured} placeholder={ui("email_reply_placeholder", "Write your reply. Templates can be edited before sending.")} />
-								<div className="ad-email-reply-footer"><span>{emailThread.messages.find((message) => message.direction === "inbound")?.fromEmail}</span><button className="ad-primary-button" type="submit" disabled={!emailInboxStatus?.smtpConfigured || !emailReplyBody.trim() || busyId === "email-reply"}>{busyId === "email-reply" ? ui("email_sending", "Queueing…") : ui("email_send_reply", "Send reply")}<span>↗</span></button></div>
+								<textarea id="admin-email-reply" value={emailReplyBody} onChange={(event) => setEmailReplyBody(event.target.value)} maxLength={5000} rows={6} required disabled={!emailThread.replyConfigured} placeholder={emailThread.replyConfigured ? ui("email_reply_placeholder", "Write your reply. Templates can be edited before sending.") : ui("email_reply_unavailable", "Configure this address's IMAP and SMTP password to reply.")} />
+								<div className="ad-email-reply-footer"><span>{emailThread.messages.find((message) => message.direction === "inbound")?.fromEmail}</span><button className="ad-primary-button" type="submit" disabled={!emailThread.replyConfigured || !emailReplyBody.trim() || busyId === "email-reply"}>{busyId === "email-reply" ? ui("email_sending", "Queueing…") : ui("email_send_reply", "Send reply")}<span>↗</span></button></div>
 							</form>
 						</div>}
 						{!emailThreadLoading && !emailThread && <div className="ad-empty">{ui("email_select_conversation", "Select a conversation to view and reply.")}</div>}

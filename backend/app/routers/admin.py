@@ -18,7 +18,12 @@ from sqlalchemy.orm import selectinload
 from app.config import get_settings
 from app.db import get_db
 from app.email_queue import enqueue_email_notification
-from app.mailbox_sync import MailboxSyncError, mailbox_message_id, sync_mailbox_once, sync_portal_messages
+from app.mailbox_sync import (
+    mailbox_message_id,
+    mailbox_sync_state_key,
+    sync_mailbox_once,
+    sync_portal_messages,
+)
 from app.models import (
     Brand,
     Customer,
@@ -81,6 +86,30 @@ def safe_csv_cell(value: str) -> str:
     if value.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
         return f"'{value}"
     return value
+
+
+def reply_mailbox_for(settings, message: EmailInboxMessage):
+    accounts = settings.email_inbox_accounts
+    mailbox_key = message.mailbox_name
+    if message.source_type == "imap" and mailbox_key in accounts:
+        mailbox = accounts[mailbox_key]
+        return (mailbox_key, mailbox) if mailbox.smtp_configured else (None, None)
+    if mailbox_key in accounts and accounts[mailbox_key].smtp_configured:
+        return mailbox_key, accounts[mailbox_key]
+
+    recipient = message.to_email.strip().casefold()
+    if recipient:
+        for key, mailbox in accounts.items():
+            if mailbox.smtp_configured and recipient in {
+                mailbox.address.strip().casefold(),
+                mailbox.from_email.strip().casefold(),
+            }:
+                return key, mailbox
+
+    if message.source_type == "imap":
+        return None, None
+    configured = [(key, mailbox) for key, mailbox in accounts.items() if mailbox.smtp_configured]
+    return configured[0] if len(configured) == 1 else (None, None)
 
 
 async def reservation_export_data(db: AsyncSession, filters):
@@ -823,17 +852,23 @@ async def get_email_inbox_status(
 ):
     response.headers["Cache-Control"] = "no-store"
     settings = get_settings()
-    mailbox_key = (
-        f"{settings.email_inbox_imap_username}:{settings.email_inbox_imap_mailbox}"
-        if settings.email_inbox_imap_username else None
-    )
-    state = await db.get(EmailInboxSyncState, mailbox_key) if mailbox_key else None
+    mailboxes = []
+    for key, mailbox in settings.email_inbox_accounts.items():
+        state_key = mailbox_sync_state_key(key, mailbox)
+        state = await db.get(EmailInboxSyncState, state_key) if mailbox.username else None
+        mailboxes.append({
+            "key": key,
+            "address": mailbox.address or mailbox.username,
+            "imapConfigured": mailbox.imap_configured,
+            "smtpConfigured": mailbox.smtp_configured,
+            "lastSyncedAt": state.last_synced_at.isoformat() if state and state.last_synced_at else None,
+            "lastError": state.last_error if state else None,
+        })
     return {"data": {
         "imapConfigured": settings.email_inbox_imap_configured,
-        "smtpConfigured": settings.contact_email_configured,
-        "replyConfigured": settings.contact_email_configured,
-        "lastSyncedAt": state.last_synced_at.isoformat() if state and state.last_synced_at else None,
-        "lastError": state.last_error if state else None,
+        "smtpConfigured": settings.email_inbox_reply_configured,
+        "replyConfigured": settings.email_inbox_reply_configured,
+        "mailboxes": mailboxes,
     }}
 
 
@@ -852,24 +887,17 @@ async def sync_admin_email_inbox(
             "imapConfigured": False,
             "importedPortalMessages": imported_portal_messages,
             "importedMailboxMessages": 0,
-            "lastSyncedAt": None,
+            "mailboxes": [],
         }}
-    try:
-        result = await sync_mailbox_once(db)
-    except MailboxSyncError as error:
-        mailbox_key = f"{settings.email_inbox_imap_username}:{settings.email_inbox_imap_mailbox}"
-        state = await db.get(EmailInboxSyncState, mailbox_key)
-        if state is None:
-            state = EmailInboxSyncState(mailbox_name=mailbox_key)
-            db.add(state)
-        state.last_error = type(error).__name__
-        await db.commit()
-        raise HTTPException(503, "Mailbox sync failed. Check the IMAP settings and try again.") from error
+    result = await sync_mailbox_once(db)
     return {"data": {
         "imapConfigured": True,
         "importedPortalMessages": imported_portal_messages,
         "importedMailboxMessages": result["imported"],
-        "lastSyncedAt": result["lastSyncedAt"].isoformat(),
+        "mailboxes": [{
+            **mailbox,
+            "lastSyncedAt": mailbox["lastSyncedAt"].isoformat() if mailbox["lastSyncedAt"] else None,
+        } for mailbox in result["mailboxes"]],
     }}
 
 
@@ -951,9 +979,15 @@ async def get_admin_email_thread(
     )).all()
     if not rows:
         raise HTTPException(404, "Email thread not found.")
+    inbound = next((message for message in reversed(rows) if message.direction == "inbound"), None)
+    reply_mailbox_key, reply_mailbox = (
+        reply_mailbox_for(get_settings(), inbound) if inbound is not None else (None, None)
+    )
     return {"data": {
         "threadKey": thread_key,
         "subject": rows[-1].subject,
+        "replyConfigured": bool(reply_mailbox and reply_mailbox.smtp_configured),
+        "replyFrom": reply_mailbox.from_email if reply_mailbox and reply_mailbox.smtp_configured else None,
         "messages": [{
             "id": str(message.id),
             "direction": message.direction,
@@ -980,8 +1014,6 @@ async def reply_to_admin_email_thread(
     require_csrf(request)
     await enforce_rate_limit(request, "admin-email-reply", 30, 60)
     settings = get_settings()
-    if not settings.contact_email_configured:
-        raise HTTPException(503, "SMTP is not configured for sending email replies.")
     if len(thread_key) > 180:
         raise HTTPException(404, "Email thread not found.")
     existing = await db.scalar(select(EmailInboxMessage).where(
@@ -1010,8 +1042,11 @@ async def reply_to_admin_email_thread(
         recipient = str(TypeAdapter(EmailStr).validate_python(inbound.from_email))
     except ValidationError as error:
         raise HTTPException(400, "The sender address is not valid for a reply.") from error
+    mailbox_key, mailbox = reply_mailbox_for(settings, inbound)
+    if mailbox is None or not mailbox.smtp_configured:
+        raise HTTPException(503, "The matching mailbox is not configured to send replies.")
 
-    subject = messages[0].subject
+    subject = " ".join(messages[0].subject.split())[:998]
     if not subject.casefold().startswith("re:"):
         subject = f"Re: {subject}"
     reference_ids = []
@@ -1032,7 +1067,7 @@ async def reply_to_admin_email_thread(
         source_type="admin_reply",
         source_key=str(payload.idempotencyKey),
         direction="outbound",
-        from_email=settings.smtp_from_email or settings.smtp_username,
+        from_email=mailbox.from_email,
         from_name="Ponyo",
         to_email=recipient,
         subject=subject[:998],
@@ -1059,6 +1094,7 @@ async def reply_to_admin_email_thread(
             "idempotencyKey": str(payload.idempotencyKey),
             "subject": subject[:998],
             "body": payload.body,
+            "mailboxKey": mailbox_key,
             "inReplyTo": in_reply_to,
             "references": references,
         },

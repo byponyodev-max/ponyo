@@ -3,17 +3,56 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import quote_plus, urlparse
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BACKEND_ENV_FILES = tuple(Path(__file__).resolve().parents[1] / name for name in (".env", ".env.local"))
 
 
+class EmailInboxMailboxSettings(BaseModel):
+    address: str = ""
+    username: str = ""
+    password: SecretStr = SecretStr("")
+    imap_host: str = ""
+    imap_port: int = 993
+    imap_mailbox: str = "INBOX"
+    imap_ssl: bool = True
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_starttls: bool = True
+    from_email: str = ""
+
+    @property
+    def imap_configured(self) -> bool:
+        return bool(
+            self.imap_host.strip()
+            and self.username.strip()
+            and self.password.get_secret_value()
+            and self.imap_mailbox.strip()
+            and 1 <= self.imap_port <= 65535
+        )
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(
+            self.smtp_host.strip()
+            and self.username.strip()
+            and self.password.get_secret_value()
+            and self.from_email.strip()
+            and 1 <= self.smtp_port <= 65535
+        )
+
+
 class Settings(BaseSettings):
     # Never depend on uvicorn's working directory or read frontend-only env files.
     # Explicit Settings values and process variables still override these files.
-    model_config = SettingsConfigDict(env_file=BACKEND_ENV_FILES, env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=BACKEND_ENV_FILES,
+        env_file_encoding="utf-8",
+        env_nested_delimiter="__",
+        extra="ignore",
+    )
 
     environment: str = "local"
     api_host: str = "0.0.0.0"
@@ -85,6 +124,7 @@ class Settings(BaseSettings):
     email_inbox_imap_ssl: bool = True
     email_inbox_sync_interval_seconds: int = 60
     email_inbox_initial_sync_limit: int = 500
+    email_inbox_mailboxes: dict[str, EmailInboxMailboxSettings] = Field(default_factory=dict, repr=False)
 
     @property
     def cors_origins(self) -> list[str]:
@@ -104,17 +144,30 @@ class Settings(BaseSettings):
 
     @property
     def email_inbox_imap_configured(self) -> bool:
-        return bool(
-            self.email_inbox_imap_host
-            and self.email_inbox_imap_username
-            and self.email_inbox_imap_password
-            and self.email_inbox_imap_mailbox.strip()
-            and 1 <= self.email_inbox_imap_port <= 65535
-        )
+        return any(mailbox.imap_configured for mailbox in self.email_inbox_accounts.values())
 
     @property
     def email_inbox_reply_configured(self) -> bool:
-        return self.email_inbox_imap_configured and self.contact_email_configured
+        return any(mailbox.smtp_configured for mailbox in self.email_inbox_accounts.values())
+
+    @property
+    def email_inbox_accounts(self) -> dict[str, EmailInboxMailboxSettings]:
+        accounts = dict(self.email_inbox_mailboxes)
+        if self.email_inbox_imap_host and self.email_inbox_imap_username:
+            accounts.setdefault("default", EmailInboxMailboxSettings(
+                address=self.email_inbox_imap_username,
+                username=self.email_inbox_imap_username,
+                password=SecretStr(self.email_inbox_imap_password or ""),
+                imap_host=self.email_inbox_imap_host,
+                imap_port=self.email_inbox_imap_port,
+                imap_mailbox=self.email_inbox_imap_mailbox,
+                imap_ssl=self.email_inbox_imap_ssl,
+                smtp_host=self.smtp_host or "",
+                smtp_port=self.smtp_port,
+                smtp_starttls=self.smtp_starttls,
+                from_email=self.smtp_from_email or self.smtp_username or "",
+            ))
+        return accounts
 
     @model_validator(mode="after")
     def validate_production_security(self):
