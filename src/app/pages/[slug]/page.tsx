@@ -15,7 +15,6 @@ import locale from "@/locales/en.default.json";
 
 const faq = locale.pg.faq;
 const about = locale.pg.about;
-const domina = locale.home.domina_page;
 const sizeRows = [
   ["small", "Small", "Under 25 cm", "/shop?filter.p.m.ponyo.size_tier=Small"],
   ["medium", "Medium", "25–45 cm", "/shop?filter.p.m.ponyo.size_tier=Medium"],
@@ -98,8 +97,8 @@ const faqGroups = [
   { id: "help", title: faq.help_title, questions: [["help_q1", faq.help_q1, "help_a1", faq.help_a1], ["help_q2", faq.help_q2, "help_a2", faq.help_a2], ["help_q3", faq.help_q3, "help_a3", faq.help_a3]] },
 ];
 
-function PageCopy({ id, fallback, as, htmlId, ...props }: { id: string; fallback: string; as?: ElementType; htmlId?: string } & HTMLAttributes<HTMLElement>) {
-  return <LocalizedText translationKey={`pages.${id}`} fallback={fallback} as={as} id={htmlId} {...props} />;
+function PageCopy({ id, fallback, as, htmlId, values, ...props }: { id: string; fallback: string; as?: ElementType; htmlId?: string; values?: Record<string, string | number> } & HTMLAttributes<HTMLElement>) {
+  return <LocalizedText translationKey={`pages.${id}`} fallback={fallback} as={as} id={htmlId} values={values} {...props} />;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -130,7 +129,7 @@ async function AboutPage() {
     <section className="content-page store-container about-page">
       <div className="about-hero"><div><span className="about-eyebrow"><PageCopy id="about.eyebrow" fallback={about.eyebrow} /></span><h1><PageCopy as="span" id="about.heading" fallback={about.heading} /> <em><PageCopy as="span" id="about.heading_accent" fallback={about.heading_accent} /></em></h1><p><PageCopy as="span" id="about.intro" fallback={about.intro} /></p><p><PageCopy as="span" id="about.intro2" fallback={about.intro2} /></p><div className="about-actions"><Link className="shop-button shop-button-orange" href="/shop"><PageCopy id="about.cta_shop" fallback={about.cta_shop} /></Link><Link className="about-secondary-button" href="/pages/domina-xl"><PageCopy id="about.cta_domina" fallback={about.cta_domina} /></Link></div></div><Image src="/images/catalog/ponyo-5.png" alt={t("pages.about.image_alt")} width={600} height={700} priority /></div>
       <h2 className="about-section-title"><PageCopy id="about.promise_title" fallback={about.promise_title} /></h2><div className="about-promise-grid">{[["v1", about.v1_title, about.v1_body, "♡"], ["v2", about.v2_title, about.v2_body, "⌕"], ["v3", about.v3_title, about.v3_body, "↕"]].map(([key, title, body, icon]) => <article key={key}><span>{icon}</span><h3><PageCopy id={`about.${key}_title`} fallback={title} /></h3><p><PageCopy as="span" id={`about.${key}_body`} fallback={body} /></p></article>)}</div>
-      <h2 className="about-section-title"><PageCopy id="about.size_title" fallback="Shop by size" /></h2><div className="about-size-grid">{sizeRows.map(([key, name, range, href]) => <Link href={href} key={key}><strong><PageCopy id={`domina.size_${key}`} fallback={name} /></strong><span><PageCopy id={`domina.range_${key}`} fallback={range} /></span></Link>)}</div>
+      <h2 className="about-section-title"><PageCopy id="about.size_title" fallback="Shop by size" /></h2><div className="about-size-grid">{sizeRows.map(([key, name, range, href]) => <Link href={href} key={key}><strong><PageCopy id={key === "giant" ? "domina.size_domina_giant" : `domina.size_${key}`} fallback={name} /></strong><span><PageCopy id={`domina.range_${key}`} fallback={range} /></span></Link>)}</div>
       <section className="about-closing"><h2><PageCopy id="about.closing_title" fallback={about.closing_title} /></h2><p><PageCopy as="span" id="about.closing_body" fallback={about.closing_body} /></p><Link className="shop-button shop-button-orange" href="/shop"><PageCopy id="about.cta_shop" fallback={about.cta_shop} /></Link></section>
     </section>
   </>;
@@ -172,7 +171,7 @@ function FaqPage() {
         <article><span className="shipping-step-number">03</span><span className="shipping-step-icon" aria-hidden="true"><FaqIcon name="package" /></span><div><strong><PageCopy id="faq.follow_order" fallback="Follow your order" /></strong><small><PageCopy as="span" id="faq.follow_order_body" fallback="We email a dispatch update, with tracking when available." /></small></div></article>
       </div>}
       <div className="faq-topic-questions">{group.questions.map(([questionKey, question, answerKey, answer], index) => <details key={questionKey} open={group.id === "ordering" && index === 0}><summary><span className="faq-question-text"><PageCopy as="span" id={`faq.${questionKey}`} fallback={question} /></span><span className="faq-toggle" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg></span></summary><p><PageCopy as="span" id={`faq.${answerKey}`} fallback={answer} /></p></details>)}</div>
-      {group.id === "sizes" && <div className="faq-size-table"><table><caption className="sr-only"><PageCopy as="span" id="faq.size_ranges" fallback="Ponyo plush size ranges" /></caption><tbody>{sizeRows.map(([key, name, range]) => <tr key={key}><th scope="row"><PageCopy id={`domina.size_${key}`} fallback={name} /></th><td><PageCopy id={`domina.range_${key}`} fallback={range} /></td></tr>)}</tbody></table></div>}
+      {group.id === "sizes" && <div className="faq-size-table"><table><caption className="sr-only"><PageCopy as="span" id="faq.size_ranges" fallback="Ponyo plush size ranges" /></caption><tbody>{sizeRows.map(([key, name, range]) => <tr key={key}><th scope="row"><PageCopy id={key === "giant" ? "domina.size_domina_giant" : `domina.size_${key}`} fallback={name} /></th><td><PageCopy id={`domina.range_${key}`} fallback={range} /></td></tr>)}</tbody></table></div>}
     </section>)}</div>
     <section className="faq-contact-cta"><h2><PageCopy id="faq.contact_title" fallback={faq.contact_title} /></h2><p><PageCopy as="span" id="faq.contact_body" fallback={faq.contact_body} /></p><Link className="shop-button shop-button-orange" href="/pages/contact"><PageCopy id="faq.contact_cta" fallback={faq.contact_cta} /></Link></section>
   </div>;
