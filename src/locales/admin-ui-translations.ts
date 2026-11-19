@@ -224,7 +224,7 @@ const rows: ReadonlyArray<readonly [string, string, string, string]> = [
 	["admin.ui.analytics_activity_eyebrow", "MARKETPLACE ACTIVITY", "マーケットプレイスの動向", "마켓플레이스 활동"],
 	["admin.ui.analytics_activity_title", "Demand & customer trend", "需要と顧客の推移", "수요 및 고객 추이"],
 	["admin.ui.analytics_top_products_eyebrow", "PRODUCT MOMENTUM", "商品動向", "상품 동향"],
-	["admin.ui.analytics_top_products", "Top products by units ordered", "注文数の多い商品", "주문 수량이 많은 상품"],
+	["admin.ui.analytics_top_products", "Top products by captured units", "決済された購入数の多い商品", "결제된 구매 수량이 많은 상품"],
 	["admin.ui.analytics_units", "{{count}} units", "{{count}}点", "{{count}}개"],
 	["admin.ui.analytics_no_products", "No paid product orders in this range.", "この期間に支払い済みの商品注文はありません。", "이 기간에 결제 완료된 상품 주문이 없습니다."],
 	["admin.ui.analytics_revenue_eyebrow", "REVENUE & REFUNDS", "売上と返金", "매출 및 환불"],
@@ -238,6 +238,19 @@ const rows: ReadonlyArray<readonly [string, string, string, string]> = [
 	["admin.ui.analytics_interests_by_country", "Interest requests by country", "国別の関心登録", "국가별 관심 요청"],
 	["admin.ui.analytics_requests", "{{count}} requests", "{{count}}件", "{{count}}건"],
 	["admin.ui.analytics_no_country_data", "No country data in this range.", "この期間の国別データはありません。", "이 기간에 국가별 데이터가 없습니다."],
+	["admin.ui.analytics_item_sales", "Item sales", "商品売上", "상품 매출"],
+	["admin.ui.analytics_maker_eyebrow", "CONFIRMED MAKER PROFILES", "確認済みメイカープロフィール", "확인된 메이커 프로필"],
+	["admin.ui.analytics_makers", "Maker performance", "メイカー別実績", "메이커별 실적"],
+	["admin.ui.analytics_maker_note", "Only sales linked to a confirmed, non-demo maker profile are included. Item sales exclude order-level refunds.", "確認済みの非デモメイカープロフィールに紐づく売上のみを集計します。商品売上には注文単位の返金は反映されません。", "확인된 비데모 메이커 프로필에 연결된 매출만 포함합니다. 상품 매출에는 주문 단위 환불이 반영되지 않습니다."],
+	["admin.ui.analytics_maker_summary", "{{products}} products · {{units}} units", "商品 {{products}}点 · {{units}}点", "상품 {{products}}개 · {{units}}개"],
+	["admin.ui.analytics_no_makers", "No paid sales are linked to confirmed maker profiles in this range.", "この期間に確認済みメイカープロフィールに紐づく決済済み売上はありません。", "이 기간에 확인된 메이커 프로필과 연결된 결제 매출이 없습니다."],
+	["admin.ui.analytics_country_revenue_eyebrow", "SHIPPING DESTINATION", "配送先", "배송지"],
+	["admin.ui.analytics_country_revenue", "Captured revenue by country", "国別の決済売上", "국가별 결제 매출"],
+	["admin.ui.analytics_country_revenue_note", "Orders are grouped by shipping country. Each chart keeps currencies separate.", "注文を配送先の国別に集計します。通貨はグラフごとに分けて表示します。", "주문을 배송 국가별로 집계합니다. 통화는 차트별로 분리해 표시합니다."],
+	["admin.ui.analytics_country_orders", "{{count}} orders", "注文 {{count}}件", "주문 {{count}}건"],
+	["admin.ui.analytics_unknown_country", "Other / unknown", "その他・不明", "기타 / 알 수 없음"],
+	["admin.ui.analytics_item_sales_note", "Item sales are after line discounts; order-level refunds, shipping, and tax are not allocated to products.", "商品売上は商品行の割引後の金額です。注文単位の返金、送料、税は商品別に配賦していません。", "상품 매출은 품목별 할인 적용 후 금액입니다. 주문 단위 환불, 배송비, 세금은 상품별로 배분되지 않습니다."],
+	["admin.ui.analytics_country_currency_note", "Net captured · orders by country", "決済純額 · 国別注文", "순 결제액 · 국가별 주문"],
 ];
 
 export const adminUiTranslations: Record<string, Record<string, string>> = Object.fromEntries(

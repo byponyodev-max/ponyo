@@ -293,7 +293,30 @@ export type AdminAnalytics = {
 		refundedAmount: number;
 		netAmount: number;
 	}>;
-	topProducts: Array<{ name: string; unitsSold: number }>;
+	topProducts: Array<{
+		productId: string;
+		name: string;
+		unitsSold: number;
+		salesByCurrency: Array<{ currency: string; amount: number }>;
+	}>;
+	makerPerformance: Array<{
+		makerId: string;
+		name: string;
+		productCount: number;
+		unitsSold: number;
+		salesByCurrency: Array<{ currency: string; amount: number }>;
+	}>;
+	countrySales: Array<{
+		country: string;
+		orders: number;
+		paidOrders: number;
+		revenueByCurrency: Array<{
+			currency: string;
+			capturedAmount: number;
+			refundedAmount: number;
+			netAmount: number;
+		}>;
+	}>;
 	reservationsByCountry: Array<{ country: string; count: number }>;
 	interestsByCountry: Array<{ country: string; count: number }>;
 };

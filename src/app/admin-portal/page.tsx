@@ -136,6 +136,37 @@ function RevenueChart({ currency, data, formatPrice }: {
 	</div>;
 }
 
+function CountryRevenueChart({ countrySales, currency, formatPrice }: {
+	countrySales: AdminAnalytics["countrySales"];
+	currency: string;
+	formatPrice: (amount: number, currency: string) => string;
+}) {
+	const rows = countrySales.map((country) => ({
+		...country,
+		revenue: country.revenueByCurrency.find((row) => row.currency === currency),
+	}));
+	const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.revenue?.netAmount ?? 0)));
+	const step = 516 / Math.max(rows.length, 1);
+	return rows.length ? <div className="ad-analytics-chart">
+		<svg viewBox="0 0 600 220" role="img" aria-label={`Revenue by shipping country in ${currency}`}>
+			<title>Revenue by shipping country in {currency}</title>
+			{[25, 92, 159].map((lineY) => <line key={lineY} x1="42" x2="558" y1={lineY} y2={lineY} className="ad-chart-gridline" />)}
+			<line x1="42" x2="558" y1="159" y2="159" className="ad-chart-zero-line" />
+			{rows.map((row, index) => {
+				const value = row.revenue?.netAmount ?? 0;
+				const height = Math.abs(value) / maximum * 122;
+				const x = 42 + index * step + step * .2;
+				const y = value < 0 ? 159 : 159 - height;
+				return <g key={row.country}>
+					<title>{row.country} · {row.orders} orders · net {amount(value, currency, formatPrice)} · captured {amount(row.revenue?.capturedAmount ?? 0, currency, formatPrice)} · refunded {amount(row.revenue?.refundedAmount ?? 0, currency, formatPrice)}</title>
+					<rect x={x} y={y} width={Math.max(3, step * .6)} height={Math.max(1, height)} rx="3" className={value < 0 ? "ad-chart-bar ad-chart-bar--negative" : "ad-chart-bar"} />
+					<text x={x + Math.max(3, step * .3)} y="186" textAnchor="middle" className="ad-chart-axis-label">{row.country}</text>
+				</g>;
+			})}
+		</svg>
+	</div> : <div className="ad-empty">No country sales in this date range.</div>;
+}
+
 function revenueChartRows(
 	analytics: AdminAnalytics,
 	series: AdminAnalytics["series"],
@@ -765,8 +796,12 @@ export default function AdminPortalPage() {
 							}} />
 						</section>
 						<section className="ad-panel">
-							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_top_products_eyebrow", "PRODUCT MOMENTUM")}</span><h2>{ui("analytics_top_products", "Top products by units ordered")}</h2></div></div>
-							<div className="ad-analytics-ranking">{analytics.topProducts.map((product, index) => <div key={product.name}><span>{index + 1}</span><strong>{product.name}</strong><b>{ui("analytics_units", "{{count}} units", { count: product.unitsSold })}</b></div>)}{!analytics.topProducts.length && <div className="ad-empty">{ui("analytics_no_products", "No paid product orders in this range.")}</div>}</div>
+							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_top_products_eyebrow", "PRODUCT MOMENTUM")}</span><h2>{ui("analytics_top_products", "Top products by captured units")}</h2><p>{ui("analytics_item_sales_note", "Item sales are after line discounts; order-level refunds, shipping, and tax are not allocated to products.")}</p></div></div>
+							<div className="ad-analytics-ranking">{analytics.topProducts.map((product, index) => <div key={product.productId}><span>{index + 1}</span><strong>{product.name}</strong><span className="ad-ranking-details"><b>{ui("analytics_units", "{{count}} units", { count: product.unitsSold })}</b><small>{ui("analytics_item_sales", "Item sales")} · {product.salesByCurrency.map((row) => amount(row.amount, row.currency, formatPrice)).join(" / ")}</small></span></div>)}{!analytics.topProducts.length && <div className="ad-empty">{ui("analytics_no_products", "No paid product orders in this range.")}</div>}</div>
+						</section>
+						<section className="ad-panel">
+							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_maker_eyebrow", "CONFIRMED MAKER PROFILES")}</span><h2>{ui("analytics_makers", "Maker performance")}</h2><p>{ui("analytics_maker_note", "Only sales linked to a confirmed, non-demo maker profile are included. Item sales exclude order-level refunds.")}</p></div></div>
+							<div className="ad-analytics-ranking">{analytics.makerPerformance.map((maker, index) => <div key={maker.makerId}><span>{index + 1}</span><strong>{maker.name}</strong><span className="ad-ranking-details"><b>{ui("analytics_maker_summary", "{{products}} products · {{units}} units", { products: maker.productCount, units: maker.unitsSold })}</b><small>{ui("analytics_item_sales", "Item sales")} · {maker.salesByCurrency.map((row) => amount(row.amount, row.currency, formatPrice)).join(" / ")}</small></span></div>)}{!analytics.makerPerformance.length && <div className="ad-empty">{ui("analytics_no_makers", "No paid sales are linked to confirmed maker profiles in this range.")}</div>}</div>
 						</section>
 					</div>
 					<section className="ad-panel ad-analytics-revenue-panel">
@@ -775,6 +810,18 @@ export default function AdminPortalPage() {
 							<header><strong>{row.currency}</strong><span>{ui("analytics_net_revenue", "Net revenue · {{currency}}", { currency: row.currency })} <b>{amount(row.netAmount, row.currency, formatPrice)}</b></span></header>
 							<div className="ad-analytics-currency-totals"><span>{ui("analytics_captured", "Captured")} {amount(row.capturedAmount, row.currency, formatPrice)}</span><span>{ui("analytics_refunds", "Refunds")} {amount(row.refundedAmount, row.currency, formatPrice)}</span></div>
 							<RevenueChart currency={row.currency} data={revenueChartRows(analytics, analyticsTrendSeries, row.currency)} formatPrice={formatPrice} />
+						</article>)}
+						{!analytics.summary.revenueByCurrency.length && <div className="ad-empty">{ui("analytics_no_revenue", "No captured revenue in this date range.")}</div>}</div>
+					</section>
+					<section className="ad-panel ad-analytics-revenue-panel">
+						<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_country_revenue_eyebrow", "SHIPPING DESTINATION")}</span><h2>{ui("analytics_country_revenue", "Captured revenue by country")}</h2><p>{ui("analytics_country_revenue_note", "Orders are grouped by shipping country. Each chart keeps currencies separate.")}</p></div></div>
+						<div className="ad-analytics-revenue-grid">{analytics.summary.revenueByCurrency.map((row) => <article className="ad-analytics-currency" key={row.currency}>
+							<header><strong>{row.currency}</strong><span>{ui("analytics_country_currency_note", "Net captured · orders by country")}</span></header>
+							<CountryRevenueChart countrySales={analytics.countrySales} currency={row.currency} formatPrice={formatPrice} />
+							<div className="ad-analytics-country-list">{analytics.countrySales.map((country) => {
+								const revenue = country.revenueByCurrency.find((entry) => entry.currency === row.currency);
+								return <div key={country.country}><strong>{country.country === "OTHER" ? ui("analytics_unknown_country", "Other / unknown") : regionName(country.country, language, country.country)}</strong><span>{ui("analytics_country_orders", "{{count}} orders", { count: country.orders })}</span><b>{amount(revenue?.netAmount ?? 0, row.currency, formatPrice)}</b></div>;
+							})}</div>
 						</article>)}
 						{!analytics.summary.revenueByCurrency.length && <div className="ad-empty">{ui("analytics_no_revenue", "No captured revenue in this date range.")}</div>}</div>
 					</section>

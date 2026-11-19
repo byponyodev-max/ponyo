@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from sqlalchemy import select
 
-from app.models import Customer, Order, OrderItem, Product, ProductInterest, ProductReservation, Supplier
+from app.models import Brand, Customer, Order, OrderItem, Product, ProductInterest, ProductReservation, Supplier
 from app.security import hash_password, verify_password
 from test_api import (
 	add_product,
@@ -86,6 +86,11 @@ async def test_admin_analytics_filters_period_and_keeps_currency_totals_separate
 	now = datetime.now(timezone.utc)
 	jpy_order_id = uuid4()
 	async with factory() as db:
+		maker = Brand(slug="analytics-maker", name="Kuma Studio", is_demo=False)
+		db.add(maker)
+		await db.flush()
+		product = await db.get(Product, product_id)
+		product.brand_id = maker.id
 		db.add_all([
 			Order(
 				id=jpy_order_id,
@@ -190,7 +195,43 @@ async def test_admin_analytics_filters_period_and_keeps_currency_totals_separate
 		{"currency": "KRW", "capturedAmount": 15000, "refundedAmount": 0, "netAmount": 15000},
 	]
 	assert data["revenueSeries"]
-	assert data["topProducts"] == [{"name": "Analytics Plush", "unitsSold": 2}]
+	assert data["topProducts"] == [{
+		"productId": str(product_id),
+		"name": "Analytics Plush",
+		"unitsSold": 2,
+		"salesByCurrency": [{"currency": "JPY", "amount": 10000}],
+	}]
+	assert data["makerPerformance"] == [{
+		"makerId": str(maker.id),
+		"name": "Kuma Studio",
+		"productCount": 1,
+		"unitsSold": 2,
+		"salesByCurrency": [{"currency": "JPY", "amount": 10000}],
+	}]
+	assert data["countrySales"] == [
+		{
+			"country": "JP",
+			"orders": 2,
+			"paidOrders": 1,
+			"revenueByCurrency": [{
+				"currency": "JPY",
+				"capturedAmount": 10000,
+				"refundedAmount": 2000,
+				"netAmount": 8000,
+			}],
+		},
+		{
+			"country": "KR",
+			"orders": 1,
+			"paidOrders": 1,
+			"revenueByCurrency": [{
+				"currency": "KRW",
+				"capturedAmount": 15000,
+				"refundedAmount": 0,
+				"netAmount": 15000,
+			}],
+		},
+	]
 	assert data["reservationsByCountry"] == [{"country": "JP", "count": 1}]
 	assert data["interestsByCountry"] == [{"country": "KR", "count": 1}]
 

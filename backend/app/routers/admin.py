@@ -423,15 +423,133 @@ async def admin_analytics(
         .order_by(customer_period)
     )).all()
 
-    product_filters = [Order.payment_status == "paid", *order_filters]
-    top_products = (await db.execute(
-        select(OrderItem.product_name, func.sum(OrderItem.quantity).label("units_sold"))
+    product_filters = [Order.captured_amount > 0, *order_filters]
+    item_sales = OrderItem.unit_price * OrderItem.quantity - OrderItem.discount_amount
+    product_rows = (await db.execute(
+        select(
+            Product.id,
+            OrderItem.product_name,
+            OrderItem.currency,
+            func.sum(OrderItem.quantity),
+            func.sum(item_sales),
+        )
+        .join(ProductVariant, ProductVariant.id == OrderItem.variant_id)
+        .join(Product, Product.id == ProductVariant.product_id)
         .join(Order, Order.id == OrderItem.order_id)
         .where(*product_filters)
-        .group_by(OrderItem.product_name)
-        .order_by(func.sum(OrderItem.quantity).desc(), OrderItem.product_name)
-        .limit(10)
+        .group_by(Product.id, OrderItem.product_name, OrderItem.currency)
     )).all()
+    products_by_id: dict[UUID, dict] = {}
+    for product_id, name, currency, units_sold, sales_amount in product_rows:
+        product = products_by_id.setdefault(product_id, {
+            "productId": str(product_id),
+            "name": name,
+            "unitsSold": 0,
+            "salesByCurrency": [],
+        })
+        product["unitsSold"] += units_sold or 0
+        product["salesByCurrency"].append({"currency": currency, "amount": sales_amount or 0})
+    for product in products_by_id.values():
+        product["salesByCurrency"].sort(key=lambda row: row["currency"])
+    top_products = sorted(
+        products_by_id.values(),
+        key=lambda product: (-product["unitsSold"], product["name"]),
+    )[:10]
+
+    maker_rows = (await db.execute(
+        select(
+            Brand.id,
+            Brand.name,
+            Product.id,
+            OrderItem.currency,
+            func.sum(OrderItem.quantity),
+            func.sum(item_sales),
+        )
+        .join(Product, Product.brand_id == Brand.id)
+        .join(ProductVariant, ProductVariant.product_id == Product.id)
+        .join(OrderItem, OrderItem.variant_id == ProductVariant.id)
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(*product_filters, Brand.is_demo.is_(False))
+        .group_by(Brand.id, Brand.name, Product.id, OrderItem.currency)
+    )).all()
+    makers_by_id: dict[UUID, dict] = {}
+    for maker_id, name, product_id, currency, units_sold, sales_amount in maker_rows:
+        maker = makers_by_id.setdefault(maker_id, {
+            "makerId": str(maker_id),
+            "name": name,
+            "productIds": set(),
+            "unitsSold": 0,
+            "salesByCurrency": {},
+        })
+        maker["productIds"].add(product_id)
+        maker["unitsSold"] += units_sold or 0
+        maker["salesByCurrency"][currency] = maker["salesByCurrency"].get(currency, 0) + (sales_amount or 0)
+    maker_performance = sorted(
+        [{
+            "makerId": maker["makerId"],
+            "name": maker["name"],
+            "productCount": len(maker["productIds"]),
+            "unitsSold": maker["unitsSold"],
+            "salesByCurrency": [
+                {"currency": currency, "amount": sales_amount}
+                for currency, sales_amount in sorted(maker["salesByCurrency"].items())
+            ],
+        } for maker in makers_by_id.values()],
+        key=lambda maker: (-maker["unitsSold"], maker["name"]),
+    )[:10]
+
+    country_expr = func.coalesce(
+        func.nullif(Order.shipping_address["countryCode"].as_string(), ""),
+        func.nullif(Order.shipping_address["country_code"].as_string(), ""),
+        "OTHER",
+    )
+    country_order_rows = (await db.execute(
+        select(
+            country_expr.label("country"),
+            func.count(Order.id),
+            func.sum(case((Order.payment_status == "paid", 1), else_=0)),
+        )
+        .where(*order_filters)
+        .group_by(country_expr)
+        .order_by(func.count(Order.id).desc(), country_expr)
+    )).all()
+    country_revenue_rows = (await db.execute(
+        select(
+            country_expr.label("country"),
+            Order.currency,
+            func.sum(Order.captured_amount),
+            func.sum(Order.refunded_amount),
+            func.sum(Order.captured_amount - Order.refunded_amount),
+        )
+        .where(*order_filters, Order.captured_amount > 0)
+        .group_by(country_expr, Order.currency)
+        .order_by(country_expr, Order.currency)
+    )).all()
+    country_sales_by_code = {
+        country or "OTHER": {
+            "country": country or "OTHER",
+            "orders": order_count or 0,
+            "paidOrders": paid_count or 0,
+            "revenueByCurrency": [],
+        }
+        for country, order_count, paid_count in country_order_rows
+    }
+    for country, currency, captured, refunded, net in country_revenue_rows:
+        country_sales_by_code.setdefault(country or "OTHER", {
+            "country": country or "OTHER",
+            "orders": 0,
+            "paidOrders": 0,
+            "revenueByCurrency": [],
+        })["revenueByCurrency"].append({
+            "currency": currency,
+            "capturedAmount": captured or 0,
+            "refundedAmount": refunded or 0,
+            "netAmount": net or 0,
+        })
+    country_sales = sorted(
+        country_sales_by_code.values(),
+        key=lambda country: (-country["orders"], country["country"]),
+    )[:10]
     reservation_countries = (await db.execute(
         select(ProductReservation.country, func.count(ProductReservation.id))
         .where(*reservation_filters)
@@ -493,7 +611,9 @@ async def admin_analytics(
             "refundedAmount": refunded or 0,
             "netAmount": net or 0,
         } for row_period, currency, captured, refunded, net in revenue_rows],
-        "topProducts": [{"name": name, "unitsSold": count or 0} for name, count in top_products],
+        "topProducts": top_products,
+        "makerPerformance": maker_performance,
+        "countrySales": country_sales,
         "reservationsByCountry": [{"country": country, "count": count} for country, count in reservation_countries],
         "interestsByCountry": [{"country": country, "count": count} for country, count in interest_countries],
     }}

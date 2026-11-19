@@ -2814,6 +2814,55 @@
     font-size: 10px;
 }
 
+.ad-analytics-ranking > div > .ad-ranking-details {
+    width: auto;
+    height: auto;
+    margin-top: -3px;
+    padding: 0;
+    border-radius: 0;
+    grid-column: 2 / -1;
+    display: grid;
+    gap: 3px;
+    background: transparent;
+}
+
+.ad-ranking-details b {
+    color: #806b61;
+    font-size: 10px;
+}
+
+.ad-ranking-details small {
+    color: #948178;
+    font-size: 9px;
+    overflow-wrap: anywhere;
+}
+
+.ad-analytics-country-list {
+    margin-top: 6px;
+    display: grid;
+}
+
+.ad-analytics-country-list > div {
+    padding: 7px 0;
+    border-bottom: 1px solid #f0e9e4;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    color: #806b61;
+    font-size: 9px;
+}
+
+.ad-analytics-country-list > div > strong {
+    color: #59463b;
+    font-size: 10px;
+}
+
+.ad-analytics-country-list > div > b {
+    color: #4a7057;
+    text-align: right;
+}
+
 .ad-email-status-note {
     margin: -2px 0 11px;
     color: #89766d;
