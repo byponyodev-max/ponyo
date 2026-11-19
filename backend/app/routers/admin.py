@@ -2,7 +2,7 @@
 
 import csv
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO, StringIO
 from uuid import UUID, uuid4
 
@@ -10,7 +10,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import EmailStr, TypeAdapter, ValidationError
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -49,6 +49,7 @@ from app.models import (
 from app.rate_limit import enforce_rate_limit
 from app.schemas import (
     AdminAccountCreateRequest,
+    AdminAccountUpdateRequest,
     AdminBrandProfileRequest,
     AdminEmailReplyRequest,
     AdminMakerApplicationStatusRequest,
@@ -110,6 +111,22 @@ def reply_mailbox_for(settings, message: EmailInboxMessage):
         return None, None
     configured = [(key, mailbox) for key, mailbox in accounts.items() if mailbox.smtp_configured]
     return configured[0] if len(configured) == 1 else (None, None)
+
+
+def email_mailbox_key(settings, message: EmailInboxMessage) -> str:
+    accounts = settings.email_inbox_accounts
+    if message.mailbox_name in accounts:
+        return message.mailbox_name
+    recipient = message.to_email.strip().casefold()
+    if recipient:
+        for key, mailbox in accounts.items():
+            if recipient in {
+                mailbox.address.strip().casefold(),
+                mailbox.from_email.strip().casefold(),
+                mailbox.username.strip().casefold(),
+            }:
+                return key
+    return "other"
 
 
 async def reservation_export_data(db: AsyncSession, filters):
@@ -318,6 +335,167 @@ async def dashboard(_admin: Customer = Depends(require_roles("admin")), db: Asyn
         "suppliers": [{"id": str(supplier.id), "code": supplier.code, "name": supplier.name,
                        "active": supplier.active, "accountCount": account_count} for supplier, account_count in suppliers],
         "notice": "Supplier applications and sales history require dedicated workflows; no application or time-series sales records are currently stored.",
+    }}
+
+
+@router.get("/analytics", response_model=dict)
+async def admin_analytics(
+    period: str = Query(default="30d", alias="range", pattern="^(7d|30d|90d|all)$"),
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    now = utc_now()
+    days = {"7d": 7, "30d": 30, "90d": 90}.get(period)
+    cutoff = now - timedelta(days=days) if days is not None else None
+    order_filters = [Order.created_at <= now]
+    if cutoff is not None:
+        order_filters.append(Order.created_at >= cutoff)
+    bucket = "month" if period == "all" else "day"
+    if db.bind.dialect.name == "postgresql":
+        order_period = func.date_trunc(bucket, Order.created_at)
+        reservation_period = func.date_trunc(bucket, ProductReservation.created_at)
+        interest_period = func.date_trunc(bucket, ProductInterest.created_at)
+        customer_period = func.date_trunc(bucket, Customer.created_at)
+    else:
+        date_format = "%Y-%m-01" if bucket == "month" else "%Y-%m-%d"
+        order_period = func.strftime(date_format, Order.created_at)
+        reservation_period = func.strftime(date_format, ProductReservation.created_at)
+        interest_period = func.strftime(date_format, ProductInterest.created_at)
+        customer_period = func.strftime(date_format, Customer.created_at)
+
+    revenue_by_currency = (await db.execute(
+        select(
+            Order.currency,
+            func.sum(Order.captured_amount),
+            func.sum(Order.refunded_amount),
+            func.sum(Order.captured_amount - Order.refunded_amount),
+        )
+        .where(*order_filters, Order.captured_amount > 0)
+        .group_by(Order.currency)
+        .order_by(Order.currency)
+    )).all()
+    revenue_rows = (await db.execute(
+        select(
+            order_period.label("period"),
+            Order.currency,
+            func.sum(Order.captured_amount),
+            func.sum(Order.refunded_amount),
+            func.sum(Order.captured_amount - Order.refunded_amount),
+        )
+        .where(*order_filters, Order.captured_amount > 0)
+        .group_by(order_period, Order.currency)
+        .order_by(order_period, Order.currency)
+    )).all()
+    order_rows = (await db.execute(
+        select(
+            order_period.label("period"),
+            func.count(Order.id),
+            func.sum(case((Order.payment_status == "paid", 1), else_=0)),
+        )
+        .where(*order_filters)
+        .group_by(order_period)
+        .order_by(order_period)
+    )).all()
+
+    reservation_filters = [ProductReservation.created_at <= now]
+    interest_filters = [ProductInterest.created_at <= now]
+    customer_filters = [Customer.role == "customer", Customer.created_at <= now]
+    if cutoff is not None:
+        reservation_filters.append(ProductReservation.created_at >= cutoff)
+        interest_filters.append(ProductInterest.created_at >= cutoff)
+        customer_filters.append(Customer.created_at >= cutoff)
+    reservation_rows = (await db.execute(
+        select(reservation_period.label("period"), func.count(ProductReservation.id))
+        .where(*reservation_filters)
+        .group_by(reservation_period)
+        .order_by(reservation_period)
+    )).all()
+    interest_rows = (await db.execute(
+        select(interest_period.label("period"), func.count(ProductInterest.id))
+        .where(*interest_filters)
+        .group_by(interest_period)
+        .order_by(interest_period)
+    )).all()
+    customer_rows = (await db.execute(
+        select(customer_period.label("period"), func.count(Customer.id))
+        .where(*customer_filters)
+        .group_by(customer_period)
+        .order_by(customer_period)
+    )).all()
+
+    product_filters = [Order.payment_status == "paid", *order_filters]
+    top_products = (await db.execute(
+        select(OrderItem.product_name, func.sum(OrderItem.quantity).label("units_sold"))
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(*product_filters)
+        .group_by(OrderItem.product_name)
+        .order_by(func.sum(OrderItem.quantity).desc(), OrderItem.product_name)
+        .limit(10)
+    )).all()
+    reservation_countries = (await db.execute(
+        select(ProductReservation.country, func.count(ProductReservation.id))
+        .where(*reservation_filters)
+        .group_by(ProductReservation.country)
+        .order_by(func.count(ProductReservation.id).desc(), ProductReservation.country)
+        .limit(10)
+    )).all()
+    interest_countries = (await db.execute(
+        select(ProductInterest.country, func.count(ProductInterest.id))
+        .where(*interest_filters)
+        .group_by(ProductInterest.country)
+        .order_by(func.count(ProductInterest.id).desc(), ProductInterest.country)
+        .limit(10)
+    )).all()
+
+    series_by_period: dict[str, dict[str, int]] = {}
+    def period_key(value) -> str:
+        return value.isoformat()[:10] if isinstance(value, datetime) else str(value)
+
+    for row_period, count, paid_count in order_rows:
+        series_by_period[period_key(row_period)] = {"orders": count or 0, "paidOrders": paid_count or 0}
+    for rows_for_metric, metric in (
+        (reservation_rows, "reservations"),
+        (interest_rows, "interests"),
+        (customer_rows, "newCustomers"),
+    ):
+        for row_period, count in rows_for_metric:
+            series_by_period.setdefault(period_key(row_period), {"orders": 0, "paidOrders": 0})[metric] = count or 0
+    series = [
+        {"period": row_period, **{
+            "orders": values.get("orders", 0),
+            "paidOrders": values.get("paidOrders", 0),
+            "reservations": values.get("reservations", 0),
+            "interests": values.get("interests", 0),
+            "newCustomers": values.get("newCustomers", 0),
+        }}
+        for row_period, values in sorted(series_by_period.items())
+    ]
+    return {"data": {
+        "period": {"range": period, "bucket": bucket, "from": cutoff.isoformat() if cutoff else None, "to": now.isoformat()},
+        "summary": {
+            "orders": sum(row["orders"] for row in series),
+            "paidOrders": sum(row["paidOrders"] for row in series),
+            "reservations": sum(row["reservations"] for row in series),
+            "interests": sum(row["interests"] for row in series),
+            "newCustomers": sum(row["newCustomers"] for row in series),
+            "revenueByCurrency": [{
+                "currency": currency,
+                "capturedAmount": captured or 0,
+                "refundedAmount": refunded or 0,
+                "netAmount": net or 0,
+            } for currency, captured, refunded, net in revenue_by_currency],
+        },
+        "series": series,
+        "revenueSeries": [{
+            "period": period_key(row_period),
+            "currency": currency,
+            "capturedAmount": captured or 0,
+            "refundedAmount": refunded or 0,
+            "netAmount": net or 0,
+        } for row_period, currency, captured, refunded, net in revenue_rows],
+        "topProducts": [{"name": name, "unitsSold": count or 0} for name, count in top_products],
+        "reservationsByCountry": [{"country": country, "count": count} for country, count in reservation_countries],
+        "interestsByCountry": [{"country": country, "count": count} for country, count in interest_countries],
     }}
 
 
@@ -844,6 +1022,90 @@ async def create_admin_account(
     }}
 
 
+@router.patch("/admins/{admin_id}", response_model=dict)
+async def update_admin_account(
+    admin_id: UUID,
+    payload: AdminAccountUpdateRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-account-update", 10, 60)
+    account = await db.scalar(
+        select(Customer)
+        .where(Customer.id == admin_id, Customer.role == "admin")
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if account is None:
+        raise HTTPException(404, "Admin account not found.")
+
+    email = str(payload.email).strip().lower()
+    existing = await db.scalar(select(Customer.id).where(
+        func.lower(Customer.email) == email,
+        Customer.id != account.id,
+    ))
+    if existing is not None:
+        raise HTTPException(409, "An account with this email already exists.")
+
+    credentials_changed = email != account.email.lower() or payload.password is not None
+    account.first_name = payload.firstName
+    account.last_name = payload.lastName
+    account.email = email
+    if payload.password is not None:
+        account.password_hash = hash_password(payload.password)
+    if credentials_changed:
+        account.auth_version += 1
+    try:
+        await db.commit()
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(409, "An account with this email already exists.") from error
+    await db.refresh(account)
+    return {"data": {
+        "id": str(account.id),
+        "firstName": account.first_name,
+        "lastName": account.last_name,
+        "email": account.email,
+        "emailVerified": account.email_verified,
+        "createdAt": account.created_at.isoformat(),
+    }}
+
+
+@router.delete("/admins/{admin_id}", response_model=dict)
+async def revoke_admin_access(
+    admin_id: UUID,
+    request: Request,
+    current_admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-account-revoke", 10, 60)
+    admins = (await db.scalars(
+        select(Customer)
+        .where(Customer.role == "admin")
+        .order_by(Customer.id.asc())
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )).all()
+    admin_by_id = {account.id: account for account in admins}
+    if current_admin.id not in admin_by_id:
+        raise HTTPException(403, "Admin access is no longer active.")
+    account = admin_by_id.get(admin_id)
+    if account is None:
+        raise HTTPException(404, "Admin account not found.")
+    if account.id == current_admin.id:
+        raise HTTPException(409, "You cannot revoke your own admin access.")
+    if len(admins) <= 1:
+        raise HTTPException(409, "The last admin account cannot be removed.")
+
+    account.role = "customer"
+    account.auth_version += 1
+    await db.commit()
+    return {"data": {"id": str(account.id), "role": account.role}}
+
+
 @router.get("/email/inbox/status", response_model=dict)
 async def get_email_inbox_status(
     response: Response,
@@ -905,6 +1167,8 @@ async def sync_admin_email_inbox(
 async def list_admin_email_threads(
     response: Response,
     q: str | None = Query(default=None, max_length=180),
+    mailbox_key: str | None = Query(default=None, alias="mailboxKey", max_length=80),
+    status: str = Query(default="all", pattern="^(all|unread|needs_reply|replied|pending|failed)$"),
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     _admin: Customer = Depends(require_roles("admin")),
@@ -912,43 +1176,93 @@ async def list_admin_email_threads(
 ):
     response.headers["Cache-Control"] = "no-store"
     await sync_portal_messages(db)
-    query = select(EmailInboxMessage)
+    thread_keys = None
     if q and q.strip():
         term = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{term}%"
-        query = query.where(or_(
+        matching_keys = await db.scalars(select(EmailInboxMessage.thread_key).where(or_(
             EmailInboxMessage.subject.ilike(pattern, escape="\\"),
             EmailInboxMessage.from_email.ilike(pattern, escape="\\"),
             EmailInboxMessage.from_name.ilike(pattern, escape="\\"),
             EmailInboxMessage.text_body.ilike(pattern, escape="\\"),
-        ))
-    rows = (await db.scalars(
-        query.order_by(EmailInboxMessage.received_at.desc(), EmailInboxMessage.id.desc()).limit(5000)
-    )).all()
+        )).distinct().limit(5000))
+        thread_keys = set(matching_keys)
+    query = select(EmailInboxMessage)
+    if thread_keys is not None:
+        if not thread_keys:
+            rows = []
+        else:
+            query = query.where(EmailInboxMessage.thread_key.in_(thread_keys))
+            rows = (await db.scalars(
+                query.order_by(EmailInboxMessage.received_at.desc(), EmailInboxMessage.id.desc()).limit(5000)
+            )).all()
+    else:
+        rows = (await db.scalars(
+            query.order_by(EmailInboxMessage.received_at.desc(), EmailInboxMessage.id.desc()).limit(5000)
+        )).all()
     grouped: dict[str, list[EmailInboxMessage]] = {}
     for row in rows:
         grouped.setdefault(row.thread_key, []).append(row)
     threads = []
+    settings = get_settings()
     for thread_key, messages in grouped.items():
         latest = messages[0]
+        inbound = next((message for message in messages if message.direction == "inbound"), None)
+        reply_status = "unreplied" if latest.direction == "inbound" else latest.delivery_status
         preview = " ".join(latest.text_body.split())[:220]
+        unread_count = sum(1 for message in messages if message.direction == "inbound" and not message.is_read)
         threads.append({
             "threadKey": thread_key,
             "subject": latest.subject,
-            "fromEmail": latest.from_email,
-            "fromName": latest.from_name,
+            "fromEmail": inbound.from_email if inbound else latest.from_email,
+            "fromName": inbound.from_name if inbound else latest.from_name,
             "latestAt": latest.received_at.isoformat(),
             "preview": preview,
             "messageCount": len(messages),
-            "unreadCount": sum(1 for message in messages if message.direction == "inbound" and not message.is_read),
-            "source": latest.source_type,
+            "unreadCount": unread_count,
+            "source": inbound.source_type if inbound else latest.source_type,
+            "mailboxKey": email_mailbox_key(settings, inbound) if inbound else "other",
+            "replyStatus": reply_status,
             "deliveryStatus": latest.delivery_status,
         })
+    counts_by_mailbox: dict[str, dict[str, int]] = {}
+    summary = {"total": len(threads), "unread": 0, "needsReply": 0, "replied": 0, "pending": 0, "failed": 0}
+    for thread in threads:
+        reply_status = thread["replyStatus"]
+        counts = counts_by_mailbox.setdefault(thread["mailboxKey"], {
+            "total": 0, "unread": 0, "needsReply": 0, "replied": 0, "pending": 0, "failed": 0,
+        })
+        summary["unread"] += int(thread["unreadCount"] > 0)
+        summary["needsReply"] += int(reply_status in {"unreplied", "failed"})
+        summary["replied"] += int(reply_status == "sent")
+        summary["pending"] += int(reply_status in {"queued", "sending"})
+        summary["failed"] += int(reply_status == "failed")
+        counts["total"] += 1
+        counts["unread"] += int(thread["unreadCount"] > 0)
+        counts["needsReply"] += int(reply_status in {"unreplied", "failed"})
+        counts["replied"] += int(reply_status == "sent")
+        counts["pending"] += int(reply_status in {"queued", "sending"})
+        counts["failed"] += int(reply_status == "failed")
+
+    filtered_threads = threads
+    if mailbox_key:
+        filtered_threads = [thread for thread in filtered_threads if thread["mailboxKey"] == mailbox_key]
+    if status == "unread":
+        filtered_threads = [thread for thread in filtered_threads if thread["unreadCount"] > 0]
+    elif status == "needs_reply":
+        filtered_threads = [thread for thread in filtered_threads if thread["replyStatus"] in {"unreplied", "failed"}]
+    elif status == "replied":
+        filtered_threads = [thread for thread in filtered_threads if thread["replyStatus"] == "sent"]
+    elif status == "pending":
+        filtered_threads = [thread for thread in filtered_threads if thread["replyStatus"] in {"queued", "sending"}]
+    elif status == "failed":
+        filtered_threads = [thread for thread in filtered_threads if thread["replyStatus"] == "failed"]
     return {"data": {
-        "items": threads[offset:offset + limit],
-        "total": len(threads),
+        "items": filtered_threads[offset:offset + limit],
+        "total": len(filtered_threads),
         "limit": limit,
         "offset": offset,
+        "summary": {**summary, "byMailbox": counts_by_mailbox},
     }}
 
 

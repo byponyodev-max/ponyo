@@ -246,7 +246,56 @@ export type AdminEmailThread = {
 	messageCount: number;
 	unreadCount: number;
 	source: string;
+	mailboxKey: string;
+	replyStatus: string;
 	deliveryStatus: string;
+};
+
+export type AdminEmailInboxSummary = {
+	total: number;
+	unread: number;
+	needsReply: number;
+	replied: number;
+	pending: number;
+	failed: number;
+	byMailbox: Record<string, {
+		total: number;
+		unread: number;
+		needsReply: number;
+		replied: number;
+		pending: number;
+		failed: number;
+	}>;
+};
+
+export type AdminAnalytics = {
+	period: { range: "7d" | "30d" | "90d" | "all"; bucket: "day" | "month"; from: string | null; to: string };
+	summary: {
+		orders: number;
+		paidOrders: number;
+		reservations: number;
+		interests: number;
+		newCustomers: number;
+		revenueByCurrency: Array<{ currency: string; capturedAmount: number; refundedAmount: number; netAmount: number }>;
+	};
+	series: Array<{
+		period: string;
+		orders: number;
+		paidOrders: number;
+		reservations: number;
+		interests: number;
+		newCustomers: number;
+	}>;
+	revenueSeries: Array<{
+		period: string;
+		currency: string;
+		capturedAmount: number;
+		refundedAmount: number;
+		netAmount: number;
+	}>;
+	topProducts: Array<{ name: string; unitsSold: number }>;
+	reservationsByCountry: Array<{ country: string; count: number }>;
+	interestsByCountry: Array<{ country: string; count: number }>;
 };
 
 export type AdminEmailMessage = {
@@ -953,6 +1002,8 @@ export const ponyoApi = {
 		return result;
 	},
 	getAdminDashboard: () => apiRequest<AdminDashboard>("/admin/dashboard"),
+	getAdminAnalytics: (range: AdminAnalytics["period"]["range"] = "30d") =>
+		apiRequest<AdminAnalytics>(`/admin/analytics?range=${range}`),
 	listAdminOrders: (
 		query = "",
 		limit = 50,
@@ -1099,12 +1150,32 @@ export const ponyoApi = {
 			method: "POST",
 			body: JSON.stringify(input),
 		}),
+	updateAdminAccount: (
+		id: string,
+		input: { firstName: string; lastName: string; email: string; password?: string },
+	) =>
+		apiRequest<AdminAccount>(`/admin/admins/${encodeURIComponent(id)}`, {
+			method: "PATCH",
+			body: JSON.stringify(input),
+		}),
+	revokeAdminAccess: (id: string) =>
+		apiRequest<{ id: string; role: "customer" }>(
+			`/admin/admins/${encodeURIComponent(id)}`,
+			{ method: "DELETE" },
+		),
 	getAdminEmailInboxStatus: () =>
 		apiRequest<AdminEmailInboxStatus>("/admin/email/inbox/status"),
-	listAdminEmailThreads: (query = "", limit = 100, offset = 0) => {
+	listAdminEmailThreads: (
+		query = "",
+		limit = 100,
+		offset = 0,
+		filters: { mailboxKey?: string; status?: string } = {},
+	) => {
 		const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
 		if (query.trim()) params.set("q", query.trim());
-		return apiRequest<{ items: AdminEmailThread[]; total: number; limit: number; offset: number }>(
+		if (filters.mailboxKey) params.set("mailboxKey", filters.mailboxKey);
+		if (filters.status) params.set("status", filters.status);
+		return apiRequest<{ items: AdminEmailThread[]; total: number; limit: number; offset: number; summary: AdminEmailInboxSummary }>(
 			`/admin/email/inbox?${params.toString()}`,
 		);
 	},

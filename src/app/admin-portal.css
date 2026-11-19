@@ -2116,6 +2116,44 @@
     align-self: end;
 }
 
+.ad-admin-account-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ad-admin-account-actions .ad-row-action--danger {
+    border-color: #efc9c2;
+    background: #fff3f0;
+    color: #a34f42;
+}
+
+.ad-admin-account-actions .ad-row-action:disabled {
+    cursor: not-allowed;
+}
+
+.ad-admin-account-edit-form {
+    margin: 14px 16px 16px;
+    padding: 14px;
+    border: 1px solid #eadfd7;
+    border-radius: 14px;
+    background: #fffdfa;
+}
+
+.ad-admin-account-edit-heading {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ad-admin-account-edit-heading h3 {
+    margin: 0;
+    color: var(--ad-ink);
+    font-size: 15px;
+}
+
 .ad-product-intake-note {
     margin: 18px 0 0;
     padding: 14px 16px;
@@ -2593,5 +2631,299 @@
 
     .ad-email-toolbar .ad-search {
         width: 100%;
+    }
+}
+
+.ad-analytics-toolbar {
+    align-items: center;
+}
+
+.ad-analytics-toolbar > label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #806b61;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.ad-analytics-toolbar select {
+    min-height: 38px;
+    padding: 7px 30px 7px 10px;
+    border: 1px solid #e8ddd6;
+    border-radius: 10px;
+    background: #fff;
+    color: #59463b;
+    font: inherit;
+}
+
+.ad-analytics-toolbar > span,
+.ad-analytics-currency-totals {
+    color: #89766d;
+    font-size: 10px;
+}
+
+.ad-analytics-grid {
+    margin-top: 16px;
+}
+
+.ad-analytics-grid > .ad-panel,
+.ad-analytics-currency {
+    min-width: 0;
+}
+
+.ad-analytics-revenue-panel {
+    margin-top: 16px;
+}
+
+.ad-analytics-revenue-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.ad-analytics-currency {
+    padding: 12px;
+    border: 1px solid #eee3dc;
+    border-radius: 13px;
+    background: #fffdfa;
+}
+
+.ad-analytics-currency > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    color: #59463b;
+    font-size: 11px;
+}
+
+.ad-analytics-currency > header span {
+    color: #806b61;
+    text-align: right;
+}
+
+.ad-analytics-currency > header b {
+    display: block;
+    margin-top: 4px;
+    color: #4a7057;
+    font-size: 15px;
+}
+
+.ad-analytics-currency-totals {
+    margin: 8px 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 7px 14px;
+}
+
+.ad-analytics-chart {
+    min-width: 0;
+}
+
+.ad-analytics-chart > svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.ad-chart-gridline {
+    stroke: #eee7e2;
+    stroke-dasharray: 4 5;
+    stroke-width: 1;
+}
+
+.ad-chart-zero-line {
+    stroke: #cbbdb5;
+    stroke-width: 1.5;
+}
+
+.ad-chart-axis-label {
+    fill: #947f74;
+    font-size: 10px;
+}
+
+.ad-chart-bar {
+    fill: #d58362;
+}
+
+.ad-chart-bar--negative {
+    fill: #a45b62;
+}
+
+.ad-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    color: #806b61;
+    font-size: 10px;
+}
+
+.ad-chart-legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ad-chart-legend > span > i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+
+.ad-chart-bar-key {
+    background: #d58362;
+}
+
+.ad-analytics-ranking {
+    display: grid;
+}
+
+.ad-analytics-ranking > div {
+    min-width: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0e9e4;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    color: #59463b;
+    font-size: 11px;
+}
+
+.ad-analytics-ranking > div > span {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #fff1e8;
+    color: #9c6549;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.ad-analytics-ranking > div > strong {
+    overflow-wrap: anywhere;
+}
+
+.ad-analytics-ranking > div > b {
+    color: #806b61;
+    font-size: 10px;
+}
+
+.ad-email-status-note {
+    margin: -2px 0 11px;
+    color: #89766d;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.ad-email-mailbox-tabs {
+    margin: 14px 0 10px;
+    border-bottom: 1px solid #eee3dc;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.ad-email-mailbox-tabs button {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #eee3dc;
+    border-bottom: 0;
+    border-radius: 12px 12px 0 0;
+    display: grid;
+    gap: 4px;
+    background: #fcfaf8;
+    color: #59463b;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.ad-email-mailbox-tabs button.is-active {
+    background: #fff4eb;
+    border-color: #dfc7b7;
+    box-shadow: inset 0 3px #d5805a;
+}
+
+.ad-email-mailbox-tabs button strong {
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ad-email-mailbox-tabs button span {
+    color: #947f74;
+    font-size: 9px;
+}
+
+.ad-email-filters {
+    margin: 8px 0 12px;
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.ad-email-filters button {
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid #eee3dc;
+    border-radius: 20px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    background: #fffdfa;
+    color: #806b61;
+    font: inherit;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.ad-email-filters button.is-active {
+    border-color: #d9b8a5;
+    background: #fff1e8;
+    color: #80543e;
+}
+
+.ad-email-filters button b {
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: #f1e7e0;
+    font-size: 9px;
+}
+
+.ad-email-thread-meta small {
+    color: #70816d;
+    font-size: 9px;
+}
+
+@media (max-width: 760px) {
+    .ad-analytics-revenue-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ad-analytics-toolbar {
+        align-items: flex-start;
+    }
+
+    .ad-email-mailbox-tabs {
+        grid-template-columns: 1fr;
+        border-bottom: 0;
+    }
+
+    .ad-email-mailbox-tabs button {
+        border-bottom: 1px solid #eee3dc;
+        border-radius: 11px;
     }
 }

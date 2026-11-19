@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -96,6 +97,140 @@ async def test_contact_message_is_read_and_reply_uses_queued_email_transport(
         "references": None,
         "mailbox_key": "SUPPORT",
     }
+
+
+@pytest.mark.asyncio
+async def test_inbox_filters_by_mailbox_and_reply_delivery_state(test_client, monkeypatch):
+    client, factory = test_client
+    await admin_session(client, factory, email="inbox-filter-admin@example.com")
+    addresses = {
+        "HELLO": "hello@byponyo.com",
+        "SUPPORT": "support@byponyo.com",
+        "PARTNERS": "partners@byponyo.com",
+    }
+    monkeypatch.setattr(settings, "email_inbox_mailboxes", {
+        key: EmailInboxMailboxSettings(
+            address=address,
+            username=address,
+            password="local-test-password",
+            imap_host="imap.example.test",
+            smtp_host="smtp.example.test",
+            from_email=address,
+        )
+        for key, address in addresses.items()
+    })
+    now = datetime.now(timezone.utc)
+    async with factory() as db:
+        db.add_all([
+            EmailInboxMessage(
+                thread_key="support-failed",
+                source_type="imap",
+                source_key="support-failed-inbound",
+                direction="inbound",
+                from_email="customer@example.com",
+                to_email=addresses["SUPPORT"],
+                subject="Delivery issue",
+                text_body="Could you help?",
+                mailbox_name="SUPPORT",
+                is_read=False,
+                received_at=now - timedelta(minutes=3),
+            ),
+            EmailInboxMessage(
+                thread_key="support-failed",
+                source_type="admin_reply",
+                source_key="support-failed-reply",
+                direction="outbound",
+                from_email=addresses["SUPPORT"],
+                to_email="customer@example.com",
+                subject="Re: Delivery issue",
+                text_body="We are checking.",
+                mailbox_name="SUPPORT",
+                delivery_status="failed",
+                received_at=now - timedelta(minutes=1),
+            ),
+            EmailInboxMessage(
+                thread_key="support-unreplied",
+                source_type="imap",
+                source_key="support-unreplied-inbound",
+                direction="inbound",
+                from_email="another@example.com",
+                to_email=addresses["SUPPORT"],
+                subject="Product question",
+                text_body="Is it available?",
+                mailbox_name="SUPPORT",
+                is_read=True,
+                received_at=now - timedelta(minutes=2),
+            ),
+            EmailInboxMessage(
+                thread_key="support-follow-up",
+                source_type="admin_reply",
+                source_key="support-follow-up-old-reply",
+                direction="outbound",
+                from_email=addresses["SUPPORT"],
+                to_email="customer-follow-up@example.com",
+                subject="Re: Earlier question",
+                text_body="The first response.",
+                mailbox_name="SUPPORT",
+                delivery_status="sent",
+                received_at=now - timedelta(minutes=2),
+            ),
+            EmailInboxMessage(
+                thread_key="support-follow-up",
+                source_type="imap",
+                source_key="support-follow-up-new-inbound",
+                direction="inbound",
+                from_email="customer-follow-up@example.com",
+                to_email=addresses["SUPPORT"],
+                subject="Re: Earlier question",
+                text_body="I have one more question.",
+                mailbox_name="SUPPORT",
+                is_read=True,
+                received_at=now - timedelta(minutes=1),
+            ),
+            EmailInboxMessage(
+                thread_key="hello-replied",
+                source_type="imap",
+                source_key="hello-replied-inbound",
+                direction="inbound",
+                from_email="third@example.com",
+                to_email=addresses["HELLO"],
+                subject="Hello",
+                text_body="Hello Ponyo",
+                mailbox_name="HELLO",
+                is_read=True,
+                received_at=now - timedelta(minutes=2),
+            ),
+            EmailInboxMessage(
+                thread_key="hello-replied",
+                source_type="admin_reply",
+                source_key="hello-replied-outbound",
+                direction="outbound",
+                from_email=addresses["HELLO"],
+                to_email="third@example.com",
+                subject="Re: Hello",
+                text_body="Hello!",
+                mailbox_name="HELLO",
+                delivery_status="sent",
+                received_at=now - timedelta(minutes=1),
+            ),
+        ])
+        await db.commit()
+
+    unread = await client.get("/v1/admin/email/inbox?mailboxKey=SUPPORT&status=unread")
+    assert unread.status_code == 200
+    unread_data = unread.json()["data"]
+    assert [row["threadKey"] for row in unread_data["items"]] == ["support-failed"]
+    assert unread_data["items"][0]["replyStatus"] == "failed"
+    assert unread_data["summary"]["byMailbox"]["SUPPORT"] == {
+        "total": 3, "unread": 1, "needsReply": 3, "replied": 0, "pending": 0, "failed": 1,
+    }
+
+    needs_reply = await client.get("/v1/admin/email/inbox?mailboxKey=SUPPORT&status=needs_reply")
+    assert {row["threadKey"] for row in needs_reply.json()["data"]["items"]} == {
+        "support-failed", "support-unreplied", "support-follow-up",
+    }
+    replied = await client.get("/v1/admin/email/inbox?mailboxKey=HELLO&status=replied")
+    assert [row["threadKey"] for row in replied.json()["data"]["items"]] == ["hello-replied"]
 
 
 def test_imap_message_parser_extracts_plain_body_and_thread_headers():

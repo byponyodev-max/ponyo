@@ -6,16 +6,19 @@ import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 import { aggregateReservationsByCountry } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
 import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
-type AdminSection = "dashboard" | "orders" | "products" | "reservations" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
+type AdminSection = "dashboard" | "analytics" | "orders" | "products" | "reservations" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
+type EmailStatusFilter = "all" | "unread" | "needs_reply" | "replied" | "pending" | "failed";
 type OrderPage = { items: AdminOrder[]; total: number; limit: number; offset: number };
 type ProductPage = { items: AdminProduct[]; total: number; limit: number; offset: number };
+type AdminAccountEditDraft = Pick<AdminAccount, "id" | "firstName" | "lastName" | "email"> & { password: string };
 
 const navigation: Array<{ id: AdminSection; label: string; labelKey: string; icon: string; hint: string; hintKey: string }> = [
 	{ id: "dashboard", label: "Dashboard", labelKey: "dashboard", icon: "⌂", hint: "Marketplace overview", hintKey: "dashboard_hint" },
+	{ id: "analytics", label: "Analytics", labelKey: "analytics", icon: "◷", hint: "Orders, demand & revenue", hintKey: "analytics_hint" },
 	{ id: "orders", label: "Orders", labelKey: "orders", icon: "▤", hint: "Customer orders", hintKey: "orders_hint" },
 	{ id: "products", label: "Products", labelKey: "products", icon: "♡", hint: "Catalog & approval", hintKey: "products_hint" },
 	{ id: "reservations", label: "Reservations & interests", labelKey: "reservations_interest", icon: "✦", hint: "Reservation targets and unshipped demand", hintKey: "reservations_hint" },
@@ -69,11 +72,94 @@ function AdminLanguageSelect({ language, setLanguage, label }: {
 	</label>;
 }
 
+function periodLabel(value: string) {
+	const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+	return Number.isNaN(parsed.getTime())
+		? value
+		: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(parsed);
+}
+
+function AnalyticsTrendChart({ series, labels }: {
+	series: AdminAnalytics["series"];
+	labels: Record<"orders" | "reservations" | "interests" | "newCustomers", string>;
+}) {
+	const metrics = ["orders", "reservations", "interests", "newCustomers"] as const;
+	const maximum = Math.max(1, ...series.flatMap((row) => metrics.map((metric) => row[metric])));
+	const x = (index: number) => series.length <= 1 ? 310 : 42 + (index * 516) / (series.length - 1);
+	const y = (value: number) => 158 - (value / maximum) * 126;
+	const colors = { orders: "#d37c5a", reservations: "#7c9b83", interests: "#9684b8", newCustomers: "#6b9db2" };
+	return <div className="ad-analytics-chart">
+		{series.length ? <svg viewBox="0 0 600 205" role="img" aria-label={labels.orders}>
+			<title>{labels.orders}</title>
+			{[32, 95, 158].map((lineY) => <line key={lineY} x1="42" x2="558" y1={lineY} y2={lineY} className="ad-chart-gridline" />)}
+			{metrics.map((metric) => <polyline
+				key={metric}
+				points={series.map((row, index) => `${x(index)},${y(row[metric])}`).join(" ")}
+				fill="none"
+				stroke={colors[metric]}
+				strokeWidth="3"
+				strokeLinejoin="round"
+				strokeLinecap="round"
+			/>)}
+			<text x="42" y="190" className="ad-chart-axis-label">{periodLabel(series[0].period)}</text>
+			{series.length > 1 && <text x="558" y="190" textAnchor="end" className="ad-chart-axis-label">{periodLabel(series[series.length - 1].period)}</text>}
+		</svg> : <div className="ad-empty">No activity in this date range.</div>}
+		<div className="ad-chart-legend">{metrics.map((metric) => <span key={metric}><i style={{ backgroundColor: colors[metric] }} />{labels[metric]}</span>)}</div>
+	</div>;
+}
+
+function RevenueChart({ currency, data, formatPrice }: {
+	currency: string;
+	data: AdminAnalytics["revenueSeries"];
+	formatPrice: (amount: number, currency: string) => string;
+}) {
+	const maximum = Math.max(1, ...data.map((row) => Math.abs(row.netAmount)));
+	const step = 516 / Math.max(data.length, 1);
+	return <div className="ad-analytics-chart">
+		<svg viewBox="0 0 600 210" role="img" aria-label={`Net revenue in ${currency}`}>
+			<title>Net revenue in {currency}</title>
+			{[24, 92, 160].map((lineY) => <line key={lineY} x1="42" x2="558" y1={lineY} y2={lineY} className="ad-chart-gridline" />)}
+			<line x1="42" x2="558" y1="92" y2="92" className="ad-chart-zero-line" />
+			{data.map((row, index) => {
+				const height = Math.abs(row.netAmount) / maximum * 65;
+				const x = 42 + index * step + step * .2;
+				const y = row.netAmount < 0 ? 92 : 92 - height;
+				return <g key={row.period}>
+					<rect x={x} y={y} width={Math.max(3, step * .6)} height={Math.max(1, height)} rx="3" className={row.netAmount < 0 ? "ad-chart-bar ad-chart-bar--negative" : "ad-chart-bar"} />
+					<title>{periodLabel(row.period)} · net {amount(row.netAmount, currency, formatPrice)} · captured {amount(row.capturedAmount, currency, formatPrice)} · refunded {amount(row.refundedAmount, currency, formatPrice)}</title>
+				</g>;
+			})}
+			{data.length > 0 && <text x="42" y="194" className="ad-chart-axis-label">{periodLabel(data[0].period)}</text>}
+			{data.length > 1 && <text x="558" y="194" textAnchor="end" className="ad-chart-axis-label">{periodLabel(data[data.length - 1].period)}</text>}
+		</svg>
+		<div className="ad-chart-legend"><span><i className="ad-chart-bar-key" />Net captured</span><span>{data.length} periods</span></div>
+	</div>;
+}
+
+function revenueChartRows(
+	analytics: AdminAnalytics,
+	series: AdminAnalytics["series"],
+	currency: string,
+) {
+	const byPeriod = new Map(analytics.revenueSeries
+		.filter((row) => row.currency === currency)
+		.map((row) => [row.period.slice(0, 10), row]));
+	return series.map((row) => byPeriod.get(row.period.slice(0, 10)) ?? {
+		period: row.period,
+		currency,
+		capturedAmount: 0,
+		refundedAmount: 0,
+		netAmount: 0,
+	});
+}
+
 export default function AdminPortalPage() {
 	const { formatPrice, language, setLanguage, t } = useLocalization();
 	const ui = (key: string, fallback: string, values?: Record<string, string | number>) => t(`admin.ui.${key}`, fallback, values);
 	const [admin, setAdmin] = useState<AdminIdentity | null>(null);
 	const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
+	const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
+	const [analyticsRange, setAnalyticsRange] = useState<AdminAnalytics["period"]["range"]>("30d");
 	const [orders, setOrders] = useState<OrderPage>({ items: [], total: 0, limit: 50, offset: 0 });
 	const [products, setProducts] = useState<ProductPage>({ items: [], total: 0, limit: 100, offset: 0 });
 	const [suppliers, setSuppliers] = useState<AdminSupplier[]>([]);
@@ -88,6 +174,10 @@ export default function AdminPortalPage() {
 	const [reservationExporting, setReservationExporting] = useState(false);
 	const [emailInboxStatus, setEmailInboxStatus] = useState<AdminEmailInboxStatus | null>(null);
 	const [emailThreads, setEmailThreads] = useState<AdminEmailThread[]>([]);
+	const [emailInboxSummary, setEmailInboxSummary] = useState<AdminEmailInboxSummary | null>(null);
+	const [emailThreadTotal, setEmailThreadTotal] = useState(0);
+	const [emailMailboxKey, setEmailMailboxKey] = useState("");
+	const [emailStatusFilter, setEmailStatusFilter] = useState<EmailStatusFilter>("all");
 	const [emailThreadKey, setEmailThreadKey] = useState("");
 	const [emailThread, setEmailThread] = useState<AdminEmailThreadDetail | null>(null);
 	const [emailThreadLoading, setEmailThreadLoading] = useState(false);
@@ -95,10 +185,12 @@ export default function AdminPortalPage() {
 	const [emailReplyBody, setEmailReplyBody] = useState("");
 	const [emailReplyTemplate, setEmailReplyTemplate] = useState("");
 	const [emailReplyIdempotencyKey, setEmailReplyIdempotencyKey] = useState("");
+	const [emailReplyIdempotencyScope, setEmailReplyIdempotencyScope] = useState("");
 	const [makerApplications, setMakerApplications] = useState<AdminMakerApplication[]>([]);
 	const [customers, setCustomers] = useState<AdminCustomer[]>([]);
 	const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
 	const [newAdmin, setNewAdmin] = useState({ firstName: "", lastName: "", email: "", password: "" });
+	const [editingAdmin, setEditingAdmin] = useState<AdminAccountEditDraft | null>(null);
 	const [section, setSection] = useState<AdminSection>("dashboard");
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [query, setQuery] = useState("");
@@ -143,6 +235,9 @@ export default function AdminPortalPage() {
 				case "dashboard":
 					setDashboard(await ponyoApi.getAdminDashboard());
 					break;
+				case "analytics":
+					setAnalytics(await ponyoApi.getAdminAnalytics(analyticsRange));
+					break;
 				case "orders":
 				setOrders(await ponyoApi.listAdminOrders(search));
 				break;
@@ -180,19 +275,54 @@ export default function AdminPortalPage() {
 					setAdminAccounts(await ponyoApi.listAdminAccounts());
 					break;
 				case "email-inbox": {
-					const [status, inbox] = await Promise.all([
-						ponyoApi.getAdminEmailInboxStatus(),
-						ponyoApi.listAdminEmailThreads(),
-					]);
+					const status = await ponyoApi.getAdminEmailInboxStatus();
 					setEmailInboxStatus(status);
+					const mailboxKey = status.mailboxes.some((mailbox) => mailbox.key === emailMailboxKey)
+						? emailMailboxKey
+						: status.mailboxes[0]?.key ?? "";
+					setEmailMailboxKey(mailboxKey);
+					const inbox = await ponyoApi.listAdminEmailThreads(emailQuery, 100, 0, {
+						mailboxKey: mailboxKey || undefined,
+						status: emailStatusFilter,
+					});
 					setEmailThreads(inbox.items);
+					setEmailInboxSummary(inbox.summary);
+					setEmailThreadTotal(inbox.total);
 					break;
 				}
 			}
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
 		}
-	}, [publishedFilter, query, loadReservationEntries, t]);
+	}, [analyticsRange, emailMailboxKey, emailQuery, emailStatusFilter, publishedFilter, query, loadReservationEntries, t]);
+
+	const loadAnalytics = useCallback(async (range = analyticsRange) => {
+		setError("");
+		try {
+			setAnalytics(await ponyoApi.getAdminAnalytics(range));
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		}
+	}, [analyticsRange, t]);
+
+	const loadEmailThreads = useCallback(async (
+		search = emailQuery,
+		mailboxKey = emailMailboxKey,
+		filter = emailStatusFilter,
+	) => {
+		setError("");
+		try {
+			const inbox = await ponyoApi.listAdminEmailThreads(search, 100, 0, {
+				mailboxKey: mailboxKey || undefined,
+				status: filter,
+			});
+			setEmailThreads(inbox.items);
+			setEmailInboxSummary(inbox.summary);
+			setEmailThreadTotal(inbox.total);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		}
+	}, [emailMailboxKey, emailQuery, emailStatusFilter, t]);
 
 	const refreshAll = useCallback(async () => {
 		setRefreshing(true);
@@ -223,8 +353,34 @@ export default function AdminPortalPage() {
 		return () => { active = false; };
 	}, [admin, section, selectedOrderId, t]);
 
+	useEffect(() => {
+		if (!admin || section !== "email-inbox" || !emailInboxSummary?.pending) return;
+		const timer = window.setInterval(() => { void loadEmailThreads(); }, 5000);
+		return () => window.clearInterval(timer);
+	}, [admin, section, emailInboxSummary?.pending, loadEmailThreads]);
+
 	const productView = useMemo(() => publishedFilter === "pending" ? products.items.filter((product) => !product.published) : products.items, [products.items, publishedFilter]);
 	const reservationCountryTotals = useMemo(() => aggregateReservationsByCountry(reservationProducts), [reservationProducts]);
+	const analyticsTrendSeries = useMemo(() => {
+		if (!analytics) return [];
+		const existing = new Map(analytics.series.map((row) => [row.period.slice(0, 10), row]));
+		const end = analytics.period.to.slice(0, 10);
+		const start = analytics.period.bucket === "month"
+			? analytics.series[0]?.period.slice(0, 10) ?? `${end.slice(0, 7)}-01`
+			: analytics.period.from?.slice(0, 10) ?? end;
+		const cursor = new Date(`${start}T00:00:00.000Z`);
+		const last = new Date(`${end}T00:00:00.000Z`);
+		if (analytics.period.bucket === "month") cursor.setUTCDate(1);
+		const periods: string[] = [];
+		while (cursor <= last) {
+			periods.push(cursor.toISOString().slice(0, 10));
+			if (analytics.period.bucket === "month") cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+			else cursor.setUTCDate(cursor.getUTCDate() + 1);
+		}
+		return periods.map((period) => existing.get(period) ?? {
+			period, orders: 0, paidOrders: 0, reservations: 0, interests: 0, newCustomers: 0,
+		});
+	}, [analytics]);
 
 	function navigateSection(target: AdminSection) {
 		setSection(target);
@@ -276,13 +432,84 @@ export default function AdminPortalPage() {
 		}
 	}
 
-	async function loadEmailThreads(search = emailQuery) {
+	function startAdminAccountEdit(account: AdminAccount) {
+		setEditingAdmin({
+			id: account.id,
+			firstName: account.firstName,
+			lastName: account.lastName,
+			email: account.email,
+			password: "",
+		});
+		setError("");
+		setNotice("");
+	}
+
+	async function saveAdminAccount(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (!editingAdmin) return;
+		const previousAccount = adminAccounts.find((account) => account.id === editingAdmin.id);
+		if (!previousAccount) {
+			setError(ui("admin_account_missing", "That admin account is no longer available. Refresh and try again."));
+			return;
+		}
+		const credentialsChanged =
+			editingAdmin.email.trim().toLowerCase() !== previousAccount.email.toLowerCase() ||
+			Boolean(editingAdmin.password);
+		setBusyId(editingAdmin.id);
 		setError("");
 		try {
-			const inbox = await ponyoApi.listAdminEmailThreads(search);
-			setEmailThreads(inbox.items);
+			const updated = await ponyoApi.updateAdminAccount(editingAdmin.id, {
+				firstName: editingAdmin.firstName,
+				lastName: editingAdmin.lastName,
+				email: editingAdmin.email,
+				...(editingAdmin.password ? { password: editingAdmin.password } : {}),
+			});
+			setAdminAccounts((current) => current.map((account) => account.id === updated.id ? updated : account));
+			setEditingAdmin(null);
+			if (updated.id === admin?.id && credentialsChanged) {
+				setAdmin(null);
+				setNotice(ui("admin_account_updated_sign_in", "Your sign-in details changed. Sign in again with the updated credentials."));
+			} else {
+				if (updated.id === admin?.id) {
+					setAdmin((current) => current ? {
+						...current,
+						firstName: updated.firstName,
+						lastName: updated.lastName,
+						email: updated.email,
+					} : current);
+				}
+				setNotice(ui("admin_account_updated", "Admin account updated for {{email}}.", { email: updated.email }));
+			}
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
+	}
+
+	async function revokeAdminAccount(account: AdminAccount) {
+		if (account.id === admin?.id || adminAccounts.length <= 1) {
+			setError(ui("admin_access_protected_hint", "You cannot revoke your own or the last admin account."));
+			return;
+		}
+		if (!window.confirm(ui(
+			"revoke_admin_confirm",
+			"Revoke admin access for {{email}}? The account and its history will be kept.",
+			{ email: account.email },
+		))) return;
+		setBusyId(account.id);
+		setError("");
+		try {
+			await ponyoApi.revokeAdminAccess(account.id);
+			setAdminAccounts((current) => current.filter((entry) => entry.id !== account.id));
+			if (editingAdmin?.id === account.id) setEditingAdmin(null);
+			setNotice(ui("admin_access_revoked", "Admin access revoked for {{email}}. The account and history were kept.", {
+				email: account.email,
+			}));
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
 		}
 	}
 
@@ -308,12 +535,15 @@ export default function AdminPortalPage() {
 		setError("");
 		try {
 			const result = await ponyoApi.syncAdminEmailInbox();
-			const [status, inbox] = await Promise.all([
-				ponyoApi.getAdminEmailInboxStatus(),
-				ponyoApi.listAdminEmailThreads(emailQuery),
-			]);
+			const status = await ponyoApi.getAdminEmailInboxStatus();
 			setEmailInboxStatus(status);
+			const inbox = await ponyoApi.listAdminEmailThreads(emailQuery, 100, 0, {
+				mailboxKey: emailMailboxKey || undefined,
+				status: emailStatusFilter,
+			});
 			setEmailThreads(inbox.items);
+			setEmailInboxSummary(inbox.summary);
+			setEmailThreadTotal(inbox.total);
 			const failedMailboxes = result.mailboxes.filter((mailbox) => mailbox.lastError);
 			setNotice(result.imapConfigured
 				? ui("email_sync_complete", "Inbox sync complete. {{mailbox}} mailbox messages and {{portal}} storefront messages added; {{failed}} mailboxes failed.", { mailbox: result.importedMailboxMessages, portal: result.importedPortalMessages, failed: failedMailboxes.length })
@@ -335,16 +565,22 @@ export default function AdminPortalPage() {
 		if (!emailThread || !emailReplyBody.trim()) return;
 		setBusyId("email-reply");
 		setError("");
-		const idempotencyKey = emailReplyIdempotencyKey || crypto.randomUUID();
+		const body = emailReplyBody.trim();
+		const scope = JSON.stringify([emailThread.threadKey, body]);
+		const idempotencyKey = emailReplyIdempotencyScope === scope && emailReplyIdempotencyKey
+			? emailReplyIdempotencyKey
+			: crypto.randomUUID();
 		setEmailReplyIdempotencyKey(idempotencyKey);
+		setEmailReplyIdempotencyScope(scope);
 		try {
 			const result = await ponyoApi.replyAdminEmailThread(emailThread.threadKey, {
-				body: emailReplyBody.trim(),
+				body,
 				idempotencyKey,
 			});
 			setEmailReplyBody("");
 			setEmailReplyTemplate("");
 			setEmailReplyIdempotencyKey("");
+			setEmailReplyIdempotencyScope("");
 			setNotice(result.alreadyQueued
 				? ui("email_reply_already_queued", "This reply was already queued.")
 				: ui("email_reply_queued", "Reply queued for delivery."));
@@ -464,6 +700,15 @@ export default function AdminPortalPage() {
 		[ui("metric_fulfillment_queue", "FULFILLMENT QUEUE"), metrics?.ordersAwaitingFulfillment ?? 0, ui("metric_paid_followup", "Paid orders to follow up"), "peach"],
 		[ui("metric_low_availability", "LOW AVAILABILITY"), metrics?.lowAvailabilityVariants ?? 0, ui("metric_low_stock", "Variants at 3 units or less"), "mint"],
 	] as const;
+	const emailStatusCounts = emailInboxSummary?.byMailbox[emailMailboxKey];
+	const emailFilterOptions: Array<{ key: EmailStatusFilter; label: string; count: number }> = [
+		{ key: "all", label: ui("email_filter_all", "All"), count: emailStatusCounts?.total ?? emailThreadTotal },
+		{ key: "unread", label: ui("email_filter_unread", "Unread"), count: emailStatusCounts?.unread ?? 0 },
+		{ key: "needs_reply", label: ui("email_filter_needs_reply", "Needs reply"), count: emailStatusCounts?.needsReply ?? 0 },
+		{ key: "replied", label: ui("email_filter_replied", "Replied"), count: emailStatusCounts?.replied ?? 0 },
+		{ key: "pending", label: ui("email_filter_pending", "Pending"), count: emailStatusCounts?.pending ?? 0 },
+		{ key: "failed", label: ui("email_filter_failed", "Failed"), count: emailStatusCounts?.failed ?? 0 },
+	];
 
 	return <main className={`ad-layout ${sidebarCollapsed ? "ad-layout--collapsed" : ""}`}>
 		<aside className="ad-sidebar">
@@ -485,6 +730,59 @@ export default function AdminPortalPage() {
 					<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("partner_pulse", "PONYO PARTNERS")}</span><h2>{ui("supplier_pulse", "Supplier pulse")}</h2></div><button type="button" onClick={() => setSection("suppliers")}>{ui("suppliers", "Suppliers")} ↗</button></div><div className="ad-supplier-list">{dashboard?.suppliers.map((supplier) => <div className="ad-supplier-row" key={supplier.id}><span className="ad-supplier-mark">✿</span><span><strong>{supplier.name}</strong><small>{supplier.code} · {ui("supplier_accounts", "{{count}} accounts", { count: supplier.accountCount })}</small></span><i className={supplier.active ? "is-live" : ""}>{supplier.active ? ui("active", "Active") : ui("paused", "Paused")}</i></div>)}</div><div className="ad-revenue-block"><small>{ui("revenue_heading", "CAPTURED LESS REFUNDS · BY CURRENCY")}</small>{dashboard?.revenueByCurrency.length ? dashboard.revenueByCurrency.map((row) => <strong key={row.currency}>{amount(row.amount, row.currency, formatPrice)}</strong>) : <strong>{ui("no_captured_revenue", "No captured revenue yet")}</strong>}<span>{ui("currency_totals_note", "Currency totals stay separate; no implicit FX conversion.")}</span></div></section>
 				</div>
 				<section className="ad-panel ad-pending-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("curated_by_ponyo", "CURATED BY PONYO")}</span><h2>{ui("unpublished_catalog", "Unpublished catalog")}</h2></div><button type="button" onClick={() => navigateSection("products")}>{ui("open_catalog", "Open catalog")} ↗</button></div><div className="ad-pending-list">{dashboard?.unpublishedProducts.map((product) => <article key={product.id}><Image src={product.image} alt="" width={54} height={54} /><span><strong>{product.name}</strong><small>{product.sku} · {ui("variants", "{{count}} variants", { count: product.variantCount })}</small></span><button type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{busyId === product.id ? ui("saving", "Saving…") : ui("publish_listing", "Publish listing")}</button></article>)}{!dashboard?.unpublishedProducts.length && <div className="ad-empty">{ui("no_unpublished", "No unpublished products in the catalog.")}</div>}</div></section>
+			</>}
+			{section === "analytics" && <>
+				<div className="ad-toolbar ad-analytics-toolbar">
+					<label>{ui("analytics_range", "Date range")}
+						<select value={analyticsRange} onChange={(event) => {
+							const range = event.target.value as AdminAnalytics["period"]["range"];
+							setAnalyticsRange(range);
+							void loadAnalytics(range);
+						}}>
+							<option value="7d">{ui("analytics_7d", "Last 7 days")}</option>
+							<option value="30d">{ui("analytics_30d", "Last 30 days")}</option>
+							<option value="90d">{ui("analytics_90d", "Last 90 days")}</option>
+							<option value="all">{ui("analytics_all", "All time")}</option>
+						</select>
+					</label>
+					<span>{ui("analytics_currency_note", "Currencies are shown separately; no exchange-rate conversion is applied.")}</span>
+				</div>
+				{analytics && <>
+					<div className="ad-metrics ad-analytics-metrics">
+						<article className="ad-metric ad-metric--peach"><small>{ui("analytics_orders", "ORDERS")}</small><strong>{analytics.summary.orders}</strong><span>{ui("analytics_paid_orders", "{{count}} paid", { count: analytics.summary.paidOrders })}</span></article>
+						<article className="ad-metric ad-metric--mint"><small>{ui("analytics_reservations", "RESERVATIONS")}</small><strong>{analytics.summary.reservations}</strong><span>{ui("analytics_reservation_interest", "{{count}} interest requests", { count: analytics.summary.interests })}</span></article>
+						<article className="ad-metric ad-metric--lilac"><small>{ui("analytics_customers", "NEW CUSTOMERS")}</small><strong>{analytics.summary.newCustomers}</strong><span>{ui("analytics_period_hint", "In the selected period")}</span></article>
+						{analytics.summary.revenueByCurrency.map((row) => <article className="ad-metric ad-metric--blue" key={row.currency}><small>{ui("analytics_net_revenue", "NET REVENUE · {{currency}}", { currency: row.currency })}</small><strong>{amount(row.netAmount, row.currency, formatPrice)}</strong><span>{ui("analytics_refunds", "Refunds {{amount}}", { amount: amount(row.refundedAmount, row.currency, formatPrice) })}</span></article>)}
+					</div>
+					<div className="ad-dashboard-grid ad-analytics-grid">
+						<section className="ad-panel">
+							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_activity_eyebrow", "MARKETPLACE ACTIVITY")}</span><h2>{ui("analytics_activity_title", "Demand & customer trend")}</h2></div></div>
+							<AnalyticsTrendChart series={analyticsTrendSeries} labels={{
+								orders: ui("analytics_orders", "Orders"),
+								reservations: ui("analytics_reservations", "Reservations"),
+								interests: ui("analytics_interests", "Interests"),
+								newCustomers: ui("analytics_customers", "New customers"),
+							}} />
+						</section>
+						<section className="ad-panel">
+							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_top_products_eyebrow", "PRODUCT MOMENTUM")}</span><h2>{ui("analytics_top_products", "Top products by units ordered")}</h2></div></div>
+							<div className="ad-analytics-ranking">{analytics.topProducts.map((product, index) => <div key={product.name}><span>{index + 1}</span><strong>{product.name}</strong><b>{ui("analytics_units", "{{count}} units", { count: product.unitsSold })}</b></div>)}{!analytics.topProducts.length && <div className="ad-empty">{ui("analytics_no_products", "No paid product orders in this range.")}</div>}</div>
+						</section>
+					</div>
+					<section className="ad-panel ad-analytics-revenue-panel">
+						<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_revenue_eyebrow", "REVENUE & REFUNDS")}</span><h2>{ui("analytics_revenue_title", "Captured revenue by currency")}</h2><p>{ui("analytics_revenue_note", "Each chart uses its own currency scale. Refunds are subtracted from captured payments.")}</p></div></div>
+						<div className="ad-analytics-revenue-grid">{analytics.summary.revenueByCurrency.map((row) => <article className="ad-analytics-currency" key={row.currency}>
+							<header><strong>{row.currency}</strong><span>{ui("analytics_net_revenue", "Net revenue · {{currency}}", { currency: row.currency })} <b>{amount(row.netAmount, row.currency, formatPrice)}</b></span></header>
+							<div className="ad-analytics-currency-totals"><span>{ui("analytics_captured", "Captured")} {amount(row.capturedAmount, row.currency, formatPrice)}</span><span>{ui("analytics_refunds", "Refunds")} {amount(row.refundedAmount, row.currency, formatPrice)}</span></div>
+							<RevenueChart currency={row.currency} data={revenueChartRows(analytics, analyticsTrendSeries, row.currency)} formatPrice={formatPrice} />
+						</article>)}
+						{!analytics.summary.revenueByCurrency.length && <div className="ad-empty">{ui("analytics_no_revenue", "No captured revenue in this date range.")}</div>}</div>
+					</section>
+					<div className="ad-dashboard-grid ad-analytics-grid">
+						<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_country_eyebrow", "CUSTOMER DEMAND")}</span><h2>{ui("analytics_reservations_by_country", "Reservations by country")}</h2></div></div><div className="ad-analytics-ranking">{analytics.reservationsByCountry.map((row, index) => <div key={row.country}><span>{index + 1}</span><strong>{regionName(row.country, language, row.country)}</strong><b>{ui("analytics_requests", "{{count}} requests", { count: row.count })}</b></div>)}{!analytics.reservationsByCountry.length && <div className="ad-empty">{ui("analytics_no_country_data", "No country data in this range.")}</div>}</div></section>
+						<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_interests_by_country_eyebrow", "EARLY INTEREST")}</span><h2>{ui("analytics_interests_by_country", "Interest requests by country")}</h2></div></div><div className="ad-analytics-ranking">{analytics.interestsByCountry.map((row, index) => <div key={row.country}><span>{index + 1}</span><strong>{regionName(row.country, language, row.country)}</strong><b>{ui("analytics_requests", "{{count}} requests", { count: row.count })}</b></div>)}{!analytics.interestsByCountry.length && <div className="ad-empty">{ui("analytics_no_country_data", "No country data in this range.")}</div>}</div></section>
+					</div>
+				</>}
 			</>}
 			{section === "orders" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("orders", query); }} placeholder="Order number or customer email" /></label><button type="button" onClick={() => void loadSection("orders")}>Search orders</button><span>{orders.total} orders</span></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>PAYMENT</th><th>FULFILLMENT</th><th>SUPPLIER</th><th>TOTAL</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td><span className="ad-status">{order.paymentStatus}</span></td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td></tr>)}</tbody></table></div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL · {orderDetail.paymentStatus}</span><h2>{orderDetail.orderNumber}</h2><p>{orderDetail.customerEmail} · {orderDetail.fulfillmentStatus.replaceAll("_", " ")}</p></div><button type="button" onClick={() => { setOrderDetail(null); setSelectedOrderId(""); }}>Close</button></div><div className="ad-order-facts"><span>Subtotal <strong>{amount(orderDetail.subtotalAmount, orderDetail.currency, formatPrice)}</strong></span><span>Discount <strong>{amount(orderDetail.discountAmount, orderDetail.currency, formatPrice)}</strong></span><span>Shipping <strong>{amount(orderDetail.shippingAmount, orderDetail.currency, formatPrice)}</strong></span><span>Captured <strong>{amount(orderDetail.capturedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Refunded <strong>{amount(orderDetail.refundedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Total <strong>{amount(orderDetail.totalAmount, orderDetail.currency, formatPrice)}</strong></span></div><div className="ad-detail-columns"><section><h3>Customer order lines</h3>{orderDetail.items.map((line) => <article key={line.id}><span><strong>{line.name}</strong><small>Qty {line.quantity} · {line.supplierOfferId ? "Supplier linked" : "Legacy / not routed"}</small></span><b>{amount(line.unitPrice * line.quantity, line.currency, formatPrice)}</b></article>)}</section><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")} {po.supplierOrderId ? `· Ref ${po.supplierOrderId}` : ""}</small></span><small>{po.items.length} lines</small></article>)}{orderDetail.paymentStatus === "paid" && <button className="ad-row-action" type="button" disabled={busyId === orderDetail.id} onClick={() => { const row = orders.items.find((item) => item.id === orderDetail.id); if (row) void planSupplierOrders(row); }}>{busyId === orderDetail.id ? "Planning…" : "Plan / refresh supplier routing"}</button>}</section><section><h3>Shipments</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
 			{section === "products" && <aside className="ad-product-intake-note" role="note"><strong>{ui("catalog_intake_title", "Product intake status")}</strong><p>{ui("catalog_intake_note", "This catalog lists products already in the database. Supplier accounts update offers and inventory; they do not submit new products. Maker applications are separate. New products need an approved data/import workflow before they appear here for review and publishing.")}</p></aside>}
@@ -601,7 +899,7 @@ export default function AdminPortalPage() {
 				<div className="ad-panel-heading">
 					<div><span className="ad-eyebrow">{ui("email_center_eyebrow", "CUSTOMER CARE")}</span><h2>{ui("email_center_title", "Email & messages")}</h2><p>{ui("email_center_note", "Storefront contact and maker messages, plus mail synced from your IMAP inbox.")}</p></div>
 					<div className="ad-email-heading-actions">
-						<span className={`ad-status ${emailInboxStatus?.imapConfigured ? "ad-status--published" : "ad-status--pending"}`}>{ui("email_imap_progress", "{{configured}} / {{total}} mailboxes connected", { configured: emailInboxStatus?.mailboxes.filter((mailbox) => mailbox.imapConfigured).length ?? 0, total: emailInboxStatus?.mailboxes.length ?? 3 })}</span>
+						<span className={`ad-status ${emailInboxStatus?.imapConfigured ? "ad-status--published" : "ad-status--pending"}`}>{ui("email_imap_progress", "IMAP configured: {{configured}} / {{total}} mailboxes", { configured: emailInboxStatus?.mailboxes.filter((mailbox) => mailbox.imapConfigured).length ?? 0, total: emailInboxStatus?.mailboxes.length ?? 3 })}</span>
 						<button type="button" onClick={() => void syncEmailInbox()} disabled={busyId === "email-sync"}>{busyId === "email-sync" ? ui("email_syncing", "Syncing…") : ui("email_sync", "Sync inbox")}</button>
 					</div>
 				</div>
@@ -612,18 +910,46 @@ export default function AdminPortalPage() {
 				<div className="ad-email-mailbox-status" aria-label={ui("email_mailbox_status", "Mailbox connection status")}>
 					{emailInboxStatus?.mailboxes.map((mailbox) => <article key={mailbox.key}>
 						<strong>{mailbox.address || mailbox.key}</strong>
-						<span className={mailbox.imapConfigured ? "is-ready" : ""}>{ui("email_status_imap", "IMAP")}: {mailbox.imapConfigured ? ui("email_connected", "Ready") : ui("email_not_configured", "Password needed")}</span>
-						<span className={mailbox.smtpConfigured ? "is-ready" : ""}>{ui("email_status_smtp", "SMTP")}: {mailbox.smtpConfigured ? ui("email_connected", "Ready") : ui("email_not_configured", "Password needed")}</span>
+						<span className={mailbox.imapConfigured ? "is-ready" : ""}>{ui("email_status_imap", "IMAP")}: {mailbox.imapConfigured ? ui("email_configured", "Configured") : ui("email_not_configured", "Not configured")}</span>
+						<span className={mailbox.smtpConfigured ? "is-ready" : ""}>{ui("email_status_smtp", "SMTP")}: {mailbox.smtpConfigured ? ui("email_configured", "Configured") : ui("email_not_configured", "Not configured")}</span>
 						{mailbox.lastSyncedAt && <small>{ui("email_last_synced", "Last synced {{date}}", { date: date(mailbox.lastSyncedAt) })}</small>}
 						{mailbox.lastError && <small role="status">{ui("email_last_sync_error", "Last mailbox sync failed: {{error}}", { error: mailbox.lastError })}</small>}
 					</article>)}
+				</div>
+				<p className="ad-email-status-note">{ui("email_status_note", "Configured means settings are present; it does not confirm a live connection or successful delivery. Actual reply status appears in each conversation.")}</p>
+				<div className="ad-email-mailbox-tabs" role="tablist" aria-label={ui("email_mailbox_tabs", "Mailboxes")}>
+					{emailInboxStatus?.mailboxes.map((mailbox) => {
+						const count = emailInboxSummary?.byMailbox[mailbox.key];
+						return <button key={mailbox.key} type="button" role="tab" aria-selected={emailMailboxKey === mailbox.key} className={emailMailboxKey === mailbox.key ? "is-active" : ""} onClick={() => {
+							setEmailMailboxKey(mailbox.key);
+							void loadEmailThreads(emailQuery, mailbox.key, emailStatusFilter);
+						}}>
+							<strong>{mailbox.address || mailbox.key}</strong>
+							<span>{ui("email_thread_count", "{{count}} conversations", { count: count?.total ?? 0 })}</span>
+						</button>;
+					})}
+					{(emailInboxSummary?.byMailbox.other?.total ?? 0) > 0 && <button type="button" role="tab" aria-selected={emailMailboxKey === "other"} className={emailMailboxKey === "other" ? "is-active" : ""} onClick={() => {
+						setEmailMailboxKey("other");
+						void loadEmailThreads(emailQuery, "other", emailStatusFilter);
+					}}>
+						<strong>{ui("email_other_mailbox", "Other messages")}</strong>
+						<span>{ui("email_thread_count", "{{count}} conversations", { count: emailInboxSummary?.byMailbox.other.total ?? 0 })}</span>
+					</button>}
 				</div>
 				<div className="ad-email-toolbar">
 					<form onSubmit={(event) => { event.preventDefault(); void loadEmailThreads(); }}>
 						<label className="ad-search"><span>⌕</span><input aria-label={ui("email_search", "Search inbox")} value={emailQuery} maxLength={180} onChange={(event) => setEmailQuery(event.target.value)} placeholder={ui("email_search_placeholder", "Search sender, subject or message")} /></label>
 						<button type="submit">{ui("email_search", "Search inbox")}</button>
 					</form>
-					<span>{ui("email_thread_count", "{{count}} conversations", { count: emailThreads.length })}</span>
+					<span>{ui("email_thread_count", "{{count}} conversations", { count: emailThreadTotal })}</span>
+				</div>
+				<div className="ad-email-filters" role="group" aria-label={ui("email_status_filters", "Filter conversations")}>
+					{emailFilterOptions.map((filter) => <button key={filter.key} type="button" className={emailStatusFilter === filter.key ? "is-active" : ""} aria-pressed={emailStatusFilter === filter.key} onClick={() => {
+						setEmailStatusFilter(filter.key);
+						void loadEmailThreads(emailQuery, emailMailboxKey, filter.key);
+					}}>
+						<span>{filter.label}</span><b>{filter.count}</b>
+					</button>)}
 				</div>
 				<div className="ad-email-workspace">
 					<div className="ad-email-threads" aria-label={ui("email_conversations", "Conversations")}>
@@ -638,7 +964,7 @@ export default function AdminPortalPage() {
 							<span className="ad-email-thread-address">{thread.fromEmail}</span>
 							<strong className="ad-email-thread-subject">{thread.subject}</strong>
 							<span className="ad-email-thread-preview">{thread.preview || ui("email_no_preview", "No text preview available.")}</span>
-							<span className="ad-email-thread-meta"><span>{ui(`email_source_${thread.source}`, thread.source.replaceAll("_", " "))}</span>{thread.unreadCount > 0 && <b>{ui("email_unread", "{{count}} unread", { count: thread.unreadCount })}</b>}{thread.deliveryStatus !== "received" && <small>{thread.deliveryStatus}</small>}</span>
+							<span className="ad-email-thread-meta"><span>{ui(`email_source_${thread.source}`, thread.source.replaceAll("_", " "))}</span><small>{ui(`email_reply_status_${thread.replyStatus}`, thread.replyStatus.replaceAll("_", " "))}</small>{thread.unreadCount > 0 && <b>{ui("email_unread", "{{count}} unread", { count: thread.unreadCount })}</b>}</span>
 						</button>)}
 						{!emailThreads.length && <div className="ad-empty">{ui("email_empty", "No conversations found.")}</div>}
 					</div>
@@ -678,7 +1004,27 @@ export default function AdminPortalPage() {
 					</form>
 				</section>
 				<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("current_admins", "CURRENT ADMINS")}</span><h2>{ui("admin_accounts_title", "Admin accounts")}</h2></div><span className="ad-count-pill">{ui("admin_count", "{{count}} accounts", { count: adminAccounts.length })}</span></div>
-					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>{ui("admin_table_name", "ADMIN")}</th><th>{ui("admin_table_email", "EMAIL")}</th><th>{ui("admin_table_access", "ACCESS")}</th><th>{ui("admin_table_created", "CREATED")}</th></tr></thead><tbody>{adminAccounts.map((account) => <tr key={account.id}><td><strong>{account.firstName} {account.lastName}</strong></td><td>{account.email}</td><td><span className={`ad-status ${account.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{account.emailVerified ? ui("verified_admin", "Verified admin") : ui("admin_email_unverified", "Email not verified")}</span></td><td>{date(account.createdAt)}</td></tr>)}</tbody></table>{!adminAccounts.length && <div className="ad-empty">{ui("no_admin_accounts", "No admin accounts were returned.")}</div>}</div>
+					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>{ui("admin_table_name", "ADMIN")}</th><th>{ui("admin_table_email", "EMAIL")}</th><th>{ui("admin_table_access", "ACCESS")}</th><th>{ui("admin_table_created", "CREATED")}</th><th>{ui("admin_table_actions", "ACTIONS")}</th></tr></thead><tbody>{adminAccounts.map((account) => {
+						const revokeDisabled = account.id === admin?.id || adminAccounts.length <= 1;
+						return <tr key={account.id}>
+							<td><strong>{account.firstName} {account.lastName}</strong></td>
+							<td>{account.email}</td>
+							<td><span className={`ad-status ${account.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{account.emailVerified ? ui("verified_admin", "Verified admin") : ui("admin_email_unverified", "Email not verified")}</span></td>
+							<td>{date(account.createdAt)}</td>
+							<td><div className="ad-admin-account-actions">
+								<button className="ad-row-action" type="button" disabled={busyId === account.id} onClick={() => startAdminAccountEdit(account)}>{ui("edit_admin_account", "Edit")}</button>
+								<button className="ad-row-action ad-row-action--danger" type="button" disabled={busyId === account.id || revokeDisabled} title={revokeDisabled ? ui("admin_access_protected_hint", "You cannot revoke your own or the last admin account.") : undefined} onClick={() => void revokeAdminAccount(account)}>{ui("revoke_admin_access", "Revoke access")}</button>
+							</div>{revokeDisabled && <small>{ui("admin_access_protected_hint", "You cannot revoke your own or the last admin account.")}</small>}</td>
+						</tr>;
+					})}</tbody></table>{!adminAccounts.length && <div className="ad-empty">{ui("no_admin_accounts", "No admin accounts were returned.")}</div>}</div>
+					{editingAdmin && <form className="ad-admin-account-form ad-admin-account-edit-form" onSubmit={saveAdminAccount}>
+						<div className="ad-admin-account-edit-heading"><h3>{ui("admin_edit_title", "Edit admin account")}</h3><button className="ad-row-action" type="button" onClick={() => setEditingAdmin(null)}>{ui("cancel_admin_edit", "Cancel")}</button></div>
+						<label>{ui("first_name", "First name")}<input value={editingAdmin.firstName} onChange={(event) => setEditingAdmin((current) => current ? { ...current, firstName: event.target.value } : current)} autoComplete="given-name" maxLength={120} required /></label>
+						<label>{ui("last_name", "Last name")}<input value={editingAdmin.lastName} onChange={(event) => setEditingAdmin((current) => current ? { ...current, lastName: event.target.value } : current)} autoComplete="family-name" maxLength={120} /></label>
+						<label>{ui("email", "Email")}<input type="email" value={editingAdmin.email} onChange={(event) => setEditingAdmin((current) => current ? { ...current, email: event.target.value } : current)} autoComplete="email" maxLength={320} required /></label>
+						<label>{ui("new_admin_password", "New password (optional)")}<input type="password" value={editingAdmin.password} onChange={(event) => setEditingAdmin((current) => current ? { ...current, password: event.target.value } : current)} autoComplete="new-password" minLength={8} maxLength={128} /><small>{ui("new_admin_password_hint", "Leave blank to keep the current password. A new password needs at least 8 characters, a number, and a special character.")}</small></label>
+						<button className="ad-primary-button" type="submit" disabled={busyId === editingAdmin.id}>{busyId === editingAdmin.id ? ui("saving_admin_changes", "Saving…") : ui("save_admin_changes", "Save changes")}<span>↗</span></button>
+					</form>}
 				</section>
 			</>}
 			{section === "fulfillment" && <><div className="ad-fulfillment-summary"><strong>{metrics?.ordersAwaitingFulfillment ?? 0}</strong><span>paid orders awaiting fulfillment action</span><p>Customer orders may split across suppliers. Select an order to inspect supplier confirmations and shipment tracking.</p></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>FULFILLMENT</th><th>SUPPLIER ROUTING</th><th>TOTAL</th><th>ACTION</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td><td><button className="ad-row-action" type="button" disabled={busyId === order.id || order.paymentStatus !== "paid"} onClick={(event) => { event.stopPropagation(); void planSupplierOrders(order); }}>{busyId === order.id ? "Planning…" : "Plan suppliers"}</button></td></tr>)}</tbody></table>{!orders.items.length && <div className="ad-empty">No paid orders need fulfillment right now.</div>}</div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL</span><h2>{orderDetail.orderNumber}</h2></div><button type="button" onClick={() => setOrderDetail(null)}>Close</button></div><div className="ad-detail-columns"><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")}</small></span><small>{po.items.length} lines</small></article>)}{!orderDetail.supplierFulfillments.length && <p className="ad-detail-empty">No supplier PO has been planned yet.</p>}</section><section><h3>Shipments &amp; tracking</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
