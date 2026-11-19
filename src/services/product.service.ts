@@ -393,34 +393,52 @@ const storefrontPreviewStatuses: Record<
 	"clement-the-fox-xl": "Coming Soon",
 };
 
-export const storefrontPreviewProducts = sampleProducts.map((product) => ({
-	...product,
-	isExampleData: true,
-	color: storefrontPreviewColors[product.slug],
-	sku: `PNY-${product.slug
-		.toUpperCase()
-		.replace(/[^A-Z0-9]+/g, "-")
-		.replace(/^-|-$/g, "")}`,
-	...storefrontPreviewMetadata[product.slug],
-	availabilityStatus: storefrontPreviewStatuses[product.slug],
-	publishedAt: "2026-11-05T15:00:00+09:00",
-	isNew: true,
-	galleryImages: [
-		{
-			src:
-				typeof storefrontPreviewMetadata[product.slug]?.image === "string"
-					? (storefrontPreviewMetadata[product.slug].image as string)
-					: product.image instanceof Object
-						? product.image.src
-						: String(product.image),
-			alt: product.imageAlt,
-		},
-	],
-	availability: (storefrontPreviewMetadata[product.slug]?.availabilityStatus ===
-		"Available" || !storefrontPreviewMetadata[product.slug]?.availabilityStatus
-		? "available"
-		: "unavailable") as Product["availability"],
-}));
+export const storefrontPreviewProducts = sampleProducts.map((product) => {
+	const metadata = storefrontPreviewMetadata[product.slug];
+	const supplierName = metadata?.supplierName ?? product.supplierName;
+	const [makerName, makerLocation] = supplierName.split(" · ");
+	const makerSlug = supplierName
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+
+	return {
+		...product,
+		...metadata,
+		isExampleData: true,
+		color: storefrontPreviewColors[product.slug],
+		sku: `PNY-${product.slug
+			.toUpperCase()
+			.replace(/[^A-Z0-9]+/g, "-")
+			.replace(/^-|-$/g, "")}`,
+		supplierName,
+		makerName: makerName.trim(),
+		makerSlug,
+		makerLocation: makerLocation ?? null,
+		onlyAtPonyo: true,
+		reservationsOpen: true,
+		availabilityStatus: storefrontPreviewStatuses[product.slug],
+		publishedAt: "2026-11-05T15:00:00+09:00",
+		isNew: true,
+		galleryImages: [
+			{
+				src:
+					typeof metadata?.image === "string"
+						? metadata.image
+						: product.image instanceof Object
+							? product.image.src
+							: String(product.image),
+				alt: product.imageAlt,
+			},
+		],
+		availability: (metadata?.availabilityStatus === "Available" ||
+		!metadata?.availabilityStatus
+			? "available"
+			: "unavailable") as Product["availability"],
+	};
+});
 
 export async function getProducts(
 	query = "",

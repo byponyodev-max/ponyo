@@ -5,13 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { saveWishlist, useWishlistHandles } from "@/lib/wishlist";
+import { regionName } from "@/lib/localization-options";
+import { getProductShippingStatus } from "@/lib/product-shipping";
 import { storefrontFeatures } from "@/lib/storefront-features";
 import type { CartItem } from "@/lib/cart";
 import type { Product } from "@/types/product";
 
 export function ProductPurchasePanel({ product }: { product: Product }) {
   const router = useRouter();
-  const { formatPrice, t } = useLocalization();
+  const { country, formatPrice, language, t } = useLocalization();
   const productName = t(`product.names.${product.slug}`, product.name);
   const productDescription = t(`product.descriptions.${product.slug}`, product.description);
   const [quantity, setQuantity] = useState(1);
@@ -24,6 +26,13 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
   const currency = selectedVariant?.currency ?? product.currency;
   const compareAtAmount = selectedVariant?.compareAtAmount ?? product.compareAtAmount;
   const availability = selectedVariant?.availability ?? product.availability;
+  const shippingStatus = getProductShippingStatus(product, country);
+  const shippingCountry = regionName(country, language, country);
+  const shippingStatusLabel = shippingStatus === "deliverable"
+    ? t("product.shipping.deliverable", "Ships to {{country}}", { country: shippingCountry })
+    : shippingStatus === "unavailable"
+      ? t("product.shipping.unavailable", "Not shipping to {{country}}", { country: shippingCountry })
+      : t("product.shipping.unconfirmed", "Shipping destinations not confirmed");
   const sku = selectedVariant?.sku ?? product.sku;
   const optionGroups = Object.entries(product.variants?.reduce<Record<string, string[]>>((groups, variant) => {
     for (const [name, value] of Object.entries(variant.options ?? {})) {
@@ -118,7 +127,11 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
   const waitingStatuses = ["Coming Soon", "Waitlist", "Unavailable"];
   const waitlistEligible = availability === "unavailable" || waitingStatuses.includes(product.availabilityStatus ?? "");
   const statusLabel = storefrontFeatures.productReservations
-    ? t("product.status.preorder", "Pre-order")
+    ? shippingStatus === "deliverable"
+      ? product.reservationsOpen
+        ? t("product.status.reservation_open", "Reservation open")
+        : t("product.status.reservation_closed", "Reservations closed")
+      : t("product.status.interest_open", "Interest open")
     : product.availabilityStatus === "Coming Soon"
     ? t("product.status.coming_soon", "Coming soon")
     : product.availabilityStatus === "Waitlist"
@@ -136,6 +149,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
         {shareMessage && <p className="product-share-message" role="status">{shareMessage}</p>}
         <p className="product-detail-price">{formatPrice(price, currency)}{compareAtAmount && <del>{formatPrice(compareAtAmount, currency)}</del>}</p>
         <p className="product-short-description">{productDescription}</p>
+        <p className={`product-destination-status is-${shippingStatus}`}>{shippingStatusLabel}</p>
         {optionGroups.length > 0 ? <div className="product-option-fields">{optionGroups.map(([name, values]) => <fieldset className={`product-option-group${/color|colour/i.test(name) ? " is-color-option" : /size/i.test(name) ? " is-size-option" : ""}`} key={name}><legend>{/color|colour/i.test(name) ? t("product.options.color", "Color") : /size/i.test(name) ? t("product.options.size", "Size") : name}<span>{selectedVariant?.options?.[name] ?? values[0]}</span></legend><div className="product-option-values">{values.map((value) => {
           const isSelected = selectedVariant?.options?.[name] === value;
           const hasVariant = productHasVariantOption(name, value);
@@ -147,7 +161,15 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
   {product.dispatchTime && !storefrontFeatures.productReservations && <p className="product-dispatch">↗ {product.dispatchTime}</p>}
   {storefrontFeatures.commerce && <div className="product-quantity"><span>{t("product.quantity", "Quantity")}</span><div><button type="button" aria-label={t("product.quantity_decrease", "Decrease quantity")} disabled={quantity <= 1} onClick={() => setQuantity((amount) => Math.max(1, amount - 1))}>−</button><span>{quantity}</span><button type="button" aria-label={t("product.quantity_increase", "Increase quantity")} disabled={quantity >= 99} onClick={() => setQuantity((amount) => Math.min(99, amount + 1))}>＋</button></div></div>}
   {storefrontFeatures.productReservations
-    ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-reservation">{t("product.action.reserve_spot", "Reserve a spot")} <span aria-hidden="true">→</span></a>
+    ? shippingStatus === "deliverable"
+      ? product.reservationsOpen
+        ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-reservation">{t("product.action.reserve_spot", "Reserve a spot")} <span aria-hidden="true">→</span></a>
+        : <p className="product-shipping-note">{t("product.reservation.closed", "Reservations are closed for this product.")}</p>
+      : <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest">{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a>
+    : shippingStatus !== "deliverable"
+      ? product.reservationsOpen
+        ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest">{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a>
+        : <p className="product-shipping-note">{t("product.shipping.checkout_blocked", "Checkout is unavailable until shipping is confirmed for your country.")}</p>
     : waitlistEligible
       ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-waitlist" onClick={scrollToWaitlist}>{t("product.action.join_waitlist", "Join waitlist")} <span aria-hidden="true">→</span></a>
       : storefrontFeatures.commerce && <div className="product-purchase-actions"><button className="shop-button product-add-button" type="button" onClick={addToCart} disabled={previewOnly}>{t("product.action.add_to_cart", "Add to cart")} <span>· {formatPrice(price, currency)}</span></button><button className="product-buy-now-button" type="button" onClick={buyNow} disabled={previewOnly}>{t("product.action.buy_now", "Buy now")} <span aria-hidden="true">→</span></button></div>}
@@ -156,7 +178,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
     : (waitlistEligible || storefrontFeatures.commerce) && <p className="product-shipping-note">{waitlistEligible ? t("product.waitlist_note", "Join the waitlist and we’ll email you when this plush is available.") : t("product.shipping_note", "Shipping and taxes calculated at checkout.")}</p>}
         <div className="product-trust"><span>♡ {t("product.trust.curated", "Thoughtfully selected")}</span><span>✦ {t("product.trust.ready", "Ready to be loved")}</span></div>
       </div>
-      {storefrontFeatures.commerce && <div className="mobile-sticky-purchase"><Link href="/" className="product-home-shortcut" aria-label={t("static.product.home", "Home")}><span aria-hidden="true">⌂</span><small>{t("static.product.home", "Home")}</small></Link>{waitlistEligible ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-waitlist" onClick={scrollToWaitlist}>{t("product.action.join_waitlist", "Join waitlist")} <span aria-hidden="true">→</span></a> : <button className="shop-button product-add-button" type="button" onClick={addToCart} disabled={previewOnly}>{t("product.action.add_to_cart", "Add to cart")} <span>· {formatPrice(price, currency)}</span></button>}</div>}
+      {storefrontFeatures.commerce && <div className="mobile-sticky-purchase"><Link href="/" className="product-home-shortcut" aria-label={t("static.product.home", "Home")}><span aria-hidden="true">⌂</span><small>{t("static.product.home", "Home")}</small></Link>{shippingStatus !== "deliverable" ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest">{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a> : waitlistEligible ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-waitlist" onClick={scrollToWaitlist}>{t("product.action.join_waitlist", "Join waitlist")} <span aria-hidden="true">→</span></a> : <button className="shop-button product-add-button" type="button" onClick={addToCart} disabled={previewOnly}>{t("product.action.add_to_cart", "Add to cart")} <span>· {formatPrice(price, currency)}</span></button>}</div>}
       <div className="product-details-accordion">
         <details open><summary>{t("product.details.title", "Product details")}</summary><div><p>{productDescription}</p><dl><div><dt>{t("product.details.sku", "SKU")}</dt><dd>{sku}</dd></div><div><dt>{t("product.details.brand", "Brand")}</dt><dd>{product.supplierName}</dd></div><div><dt>{t("product.details.collection", "Collection")}</dt><dd>{t(`product.categories.${product.categoryName.toLowerCase().replaceAll(" ", "_")}`, product.categoryName)}</dd></div>{product.productType && <div><dt>{t("product.details.type", "Type")}</dt><dd>{product.productType}</dd></div>}{product.sizeTier && <div><dt>{t("product.details.size_tier", "Size tier")}</dt><dd>{product.sizeTier}</dd></div>}{product.size && <div><dt>{t("product.options.size", "Size")}</dt><dd>{product.size}</dd></div>}{product.dimensions && <div><dt>{t("product.details.dimensions", "Dimensions")}</dt><dd>{product.dimensions}</dd></div>}<div><dt>{t("product.details.availability", "Availability")}</dt><dd>{statusLabel}</dd></div>{product.dispatchTime && !storefrontFeatures.productReservations && <div><dt>{t("product.details.dispatch", "Dispatch estimate")}</dt><dd>{product.dispatchTime}</dd></div>}</dl></div></details>
         <details><summary>{t("product.details.care_title", "Materials & care")}</summary><p>{t("product.details.care_body", "Specific material and care details haven’t been provided for this plush yet. Please follow the care label included with your item, or contact Ponyo before ordering if you need more information.")}</p></details>

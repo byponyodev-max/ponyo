@@ -40,14 +40,17 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()]);
-  const savedLanguage = cookieStore.get("ponyo-language")?.value;
+  const isAdminPortal = requestHeaders.get("x-ponyo-admin-portal") === "1";
+  const savedLanguage = cookieStore.get(isAdminPortal ? "ponyo-admin-language" : "ponyo-language")?.value;
   const initialCountry = resolveDeliveryCountry(cookieStore.get("ponyo-country")?.value, [
     requestHeaders.get("cf-ipcountry"),
     requestHeaders.get("x-vercel-ip-country"),
   ]);
   const countryLocalization = getDeliveryLocalization(initialCountry);
   const savedCurrency = cookieStore.get("ponyo-currency")?.value;
-  const initialLanguage = languages.some((language) => language.code === savedLanguage) ? savedLanguage! : countryLocalization.language;
+  const initialLanguage = languages.some((language) => language.code === savedLanguage)
+    ? savedLanguage!
+    : isAdminPortal ? "en" : countryLocalization.language;
   const initialCurrency = currencies.some((currency) => currency.code === savedCurrency) ? savedCurrency! : countryLocalization.currency;
   const initialDeliveryNoticeDismissed = cookieStore.get("ponyo-delivery-notice-dismissed")?.value === "1";
   const savedCookieConsent = cookieStore.get("ponyo-cookie-consent")?.value;
@@ -58,7 +61,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang={initialLanguage} className="h-full antialiased">
       <body className={`min-h-full ${bodyFont.variable} ${headingFont.variable}`}>
         <NextIntlClientProvider>
-          <LocalizationProvider initialLanguage={initialLanguage} initialCurrency={initialCurrency} initialCountry={initialCountry} initialDeliveryNoticeDismissed={initialDeliveryNoticeDismissed}>
+          <LocalizationProvider adminPortal={isAdminPortal} initialLanguage={initialLanguage} initialCurrency={initialCurrency} initialCountry={initialCountry} initialDeliveryNoticeDismissed={initialDeliveryNoticeDismissed}>
             <CustomerSessionProvider>
               <CookieConsentBanner initialConsent={initialCookieConsent} initialAnalyticsConsent={initialAnalyticsConsent} initialMarketingConsent={initialMarketingConsent} />
               {children}

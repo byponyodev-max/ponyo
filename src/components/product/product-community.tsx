@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useId, useRef } from "react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocalization } from "@/components/layout/localization-provider";
-import { regionName } from "@/lib/localization-options";
+import { regionName, supportedShippingCountries } from "@/lib/localization-options";
+import { getShippingStatus } from "@/lib/product-shipping";
 import { ponyoApi, PONYO_API_BASE_URL, type CustomerProfile, type ProductReview, type ProductReviewSummary } from "@/services/ponyo-api.client";
 import { optimizeJpegPhoto } from "@/lib/optimize-jpeg-photo";
 
@@ -216,21 +217,40 @@ export function ProductWaitlistForm({ productId, productName }: { productId: str
   </div>;
 }
 
-export function ProductReservationPanel({
+export function ProductActionPanel({
   productId,
   productName,
   reservationsOpen,
+  shippingCountries,
 }: {
   productId: string;
   productName: string;
   reservationsOpen: boolean;
+  shippingCountries?: string[] | null;
 }) {
-  const { deliveryCountries, language, t } = useLocalization();
+  const { country } = useLocalization();
+  const shippingStatus = getShippingStatus(shippingCountries, country);
+  return shippingStatus === "deliverable"
+    ? <ProductReservationPanel productId={productId} productName={productName} reservationsOpen={reservationsOpen} country={country} />
+    : <ProductInterestPanel productId={productId} productName={productName} defaultCountry={country} shippingCountries={shippingCountries} />;
+}
+
+function ProductReservationPanel({
+  productId,
+  productName,
+  reservationsOpen,
+  country,
+}: {
+  productId: string;
+  productName: string;
+  reservationsOpen: boolean;
+  country: string;
+}) {
+  const { language, t } = useLocalization();
   const [reservationCount, setReservationCount] = useState<number | null>(null);
   const [target, setTarget] = useState<number | null>(null);
   const [open, setOpen] = useState(reservationsOpen);
   const [email, setEmail] = useState("");
-  const [country, setCountry] = useState("");
   const [loading, setLoading] = useState(Boolean(PONYO_API_BASE_URL));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -264,7 +284,7 @@ export function ProductReservationPanel({
       });
       setReservationCount(result.reservationCount);
       setTarget(result.target);
-      setMessage(t("product.reservation.success", "Your interest is reserved. This is not a purchase, and no payment was taken."));
+      setMessage(t("product.reservation.success", "Thanks — your reservation is recorded. This is not a purchase, and no payment was taken."));
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t("product.reservation.error", "Your reservation could not be saved."));
     } finally {
@@ -279,33 +299,100 @@ export function ProductReservationPanel({
   const stage = targetReached
     ? t("product.reservation.status.target_reached", "Reservation target reached")
     : target !== null && reservationCount !== null
-      ? t("product.reservation.status.target_not_reached", "Target not reached · collecting reservations")
-      : t("product.reservation.status.collecting", "Collecting reservations");
+      ? t("product.reservation.status.target_not_reached", "Reservation target not reached · accepting reservations")
+      : t("product.reservation.status.collecting", "Reservations open");
 
   return <section className="product-reservation" id="product-reservation" aria-labelledby="product-reservation-title">
     <div className="product-reservation-heading">
       <span className="product-reservation-seal" aria-hidden="true">✦</span>
-      <div><p className="eyebrow">{t("product.reservation.eyebrow", "A NOTE OF INTEREST · NO PAYMENT")}</p><h2 id="product-reservation-title">{t("product.reservation.title", "Reserve your interest")}</h2></div>
+      <div><p className="eyebrow">{t("product.reservation.eyebrow", "RESERVE A SPOT · NO PAYMENT")}</p><h2 id="product-reservation-title">{t("product.reservation.title", "Reserve a spot")}</h2></div>
     </div>
-    {loading ? <p className="product-reservation-status">{t("product.reservation.loading", "Loading the live reservation count…")}</p>
+    {loading ? <p className="product-reservation-status">{t("product.reservation.loading", "Loading current reservations…")}</p>
       : reservationCount !== null && <div className="product-reservation-counter" aria-live="polite">
         <strong>{reservationCount}{target ? <span> / {target}</span> : ""}</strong>
         <span>{reservationCount === 1
-          ? t("product.reservation.people_one", "{{count}} person has reserved interest", { count: reservationCount })
-          : t("product.reservation.people_other", "{{count}} people have reserved interest", { count: reservationCount })}</span>
+          ? t("product.reservation.people_one", "{{count}} person has reserved a spot", { count: reservationCount })
+          : t("product.reservation.people_other", "{{count}} people have reserved a spot", { count: reservationCount })}</span>
         <span className={`product-reservation-stage${targetReached ? " is-reached" : ""}`}>{stage}</span>
-        {progress !== null && <><div className="product-reservation-progress" role="progressbar" aria-label={t("product.reservation.progress_label", "Reservation target reached")} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div><small>{t("product.reservation.progress", "{{progress}}% of the reservation target reached", { progress })}</small></>}
-        {target === null && <small>{t("product.reservation.target_not_set", "No reservation target has been set for this product yet.")}</small>}
+        {progress !== null && <><div className="product-reservation-progress" role="progressbar" aria-label={t("product.reservation.progress_label", "Reservation target progress")} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div><small>{t("product.reservation.progress", "{{progress}}% of the reservation target reached", { progress })}</small></>}
+        {target === null && <small>{t("product.reservation.target_not_set", "No reservation target is set for this product yet.")}</small>}
       </div>}
-    {!open ? <p className="product-reservation-status">{t("product.reservation.closed", "Reservations are not open for this piece yet.")}</p>
+    {!open ? <p className="product-reservation-status">{t("product.reservation.closed", "Reservations are closed for this product.")}</p>
       : !PONYO_API_BASE_URL ? <p className="product-reservation-status" role="status">{t("product.reservation.service_unavailable", "The reservation service is not configured right now.")}</p>
       : <form onSubmit={reserve}>
         <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} /></label>
-        <label>{t("product.reservation.country", "Country")}<select autoComplete="country-name" value={country} onChange={(event) => setCountry(event.target.value)} required><option value="">{t("product.reservation.select_country", "Select your country")}</option>{deliveryCountries.map((item) => <option key={item.code} value={item.code}>{regionName(item.code, language, item.label)}</option>)}</select></label>
+        <p className="product-reservation-country">{t("product.reservation.destination", "Reservation destination")}: <strong>{regionName(country, language, country)}</strong></p>
         {error && <p className="api-form-error" role="alert">{error}</p>}
         {message && <p className="product-form-success" role="status">{message}</p>}
-        <button className="product-review-submit" type="submit" disabled={saving}>{saving ? t("product.reservation.saving", "Saving your interest…") : t("product.reservation.submit", "Reserve my interest")}<span aria-hidden="true">→</span></button>
+        <button className="product-review-submit" type="submit" disabled={saving}>{saving ? t("product.reservation.saving", "Saving your reservation…") : t("product.reservation.submit", "Reserve a spot")}<span aria-hidden="true">→</span></button>
       </form>}
-    <p className="product-reservation-disclaimer">{t("product.reservation.disclaimer", "{{product}} reservations only record interest. They are non-binding, do not create an order, and require no payment.", { product: productName })}</p>
+    <p className="product-reservation-disclaimer">{t("product.reservation.disclaimer", "{{product}} reservations are non-binding, do not create an order, and require no payment.", { product: productName })}</p>
+  </section>;
+}
+
+function ProductInterestPanel({
+  productId,
+  productName,
+  defaultCountry,
+  shippingCountries,
+}: {
+  productId: string;
+  productName: string;
+  defaultCountry: string;
+  shippingCountries?: string[] | null;
+}) {
+  const { language, t } = useLocalization();
+  const [email, setEmail] = useState("");
+  const [country, setCountry] = useState(
+    supportedShippingCountries.some((item) => item.code === defaultCountry) ? defaultCountry : "OTHER",
+  );
+  const [otherCountry, setOtherCountry] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function registerInterest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setMessage("");
+    const destination = country === "OTHER" ? otherCountry.trim() : country;
+    try {
+      await ponyoApi.submitProductInterest(productId, { email: email.trim(), country: destination });
+      setMessage(t("product.interest.success", "Thanks — we recorded your interest in shipping {{product}} to {{country}}.", {
+        product: productName,
+        country: country === "OTHER" ? destination : regionName(country, language, country),
+      }));
+      setEmail("");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : t("product.interest.error", "Your interest could not be saved."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <section className="product-reservation product-interest" id="product-interest" aria-labelledby="product-interest-title">
+    <div className="product-reservation-heading">
+      <span className="product-reservation-seal" aria-hidden="true">♡</span>
+      <div>
+        <p className="eyebrow">{t("product.interest.eyebrow", "NOT SHIPPING HERE YET?")}</p>
+        <h2 id="product-interest-title">{t("product.interest.title", "Register interest")}</h2>
+      </div>
+    </div>
+    <p>{t("product.interest.body", "Tell us where you would like this product shipped. This is separate from reserving an available item.")}</p>
+    {!PONYO_API_BASE_URL
+      ? <p className="product-reservation-status" role="status">{t("product.interest.service_unavailable", "The interest form is not available right now.")}</p>
+      : <form onSubmit={registerInterest}>
+        <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} /></label>
+        <label>{t("product.reservation.country", "Country or region")}<select autoComplete="country-name" value={country} onChange={(event) => setCountry(event.target.value)} required>
+          {supportedShippingCountries.filter((item) => !shippingCountries?.includes(item.code)).map((item) => <option key={item.code} value={item.code}>{regionName(item.code, language, item.label)}</option>)}
+          <option value="OTHER">{t("product.reservation.other_country", "Other country or region")}</option>
+        </select></label>
+        {country === "OTHER" && <label>{t("product.reservation.other_country_name", "Country or region")}<input autoComplete="country-name" value={otherCountry} onChange={(event) => setOtherCountry(event.target.value)} required maxLength={100} /></label>}
+        {error && <p className="api-form-error" role="alert">{error}</p>}
+        {message && <p className="product-form-success" role="status">{message}</p>}
+        <button className="product-review-submit" type="submit" disabled={saving}>{saving ? t("product.interest.saving", "Saving your interest…") : t("product.interest.submit", "Register interest")}<span aria-hidden="true">→</span></button>
+      </form>}
+    <p className="product-reservation-disclaimer">{t("product.interest.disclaimer", "Interest is recorded separately from reservations. It does not create an order and no payment is taken.")}</p>
   </section>;
 }

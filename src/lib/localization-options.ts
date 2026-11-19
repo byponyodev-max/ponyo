@@ -23,6 +23,14 @@ export const deliveryCountries: DeliveryCountryOption[] = [
 	{ code: "KR", label: "South Korea" },
 ];
 
+export const supportedShippingCountries: DeliveryCountryOption[] = [
+	...deliveryCountries,
+	{ code: "US", label: "United States" },
+	{ code: "GB", label: "United Kingdom" },
+	{ code: "AU", label: "Australia" },
+	{ code: "CA", label: "Canada" },
+];
+
 const deliveryLocalization: Record<DeliveryCountryCode, { language: string; currency: string }> = {
 	JP: { language: "ja", currency: "JPY" },
 	KR: { language: "ko", currency: "KRW" },

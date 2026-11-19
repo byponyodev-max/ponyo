@@ -30,6 +30,33 @@ async def flow(test_client, mocked_services, monkeypatch):
     return client, factory, customer_id, product_id, variant_id
 
 
+async def test_checkout_requires_confirmed_product_shipping_destination(flow):
+    client, factory, _, product_id, variant_id = flow
+    async with factory() as db:
+        product = await db.get(Product, product_id)
+        product.shipping_countries = None
+        await db.commit()
+
+    payload = checkout_payload(variant_id)
+    unconfirmed = await post(client, "/v1/checkout/quote", payload)
+    assert unconfirmed.status_code == 409
+    assert "not confirmed" in unconfirmed.json()["error"]["message"]
+
+    async with factory() as db:
+        product = await db.get(Product, product_id)
+        product.shipping_countries = ["KR"]
+        await db.commit()
+
+    unavailable = await post(client, "/v1/checkout/quote", payload)
+    assert unavailable.status_code == 409
+    assert "cannot ship" in unavailable.json()["error"]["message"]
+
+    payload["shippingAddress"]["countryCode"] = "KR"
+    payload["shippingAddress"]["postalCode"] = "04524"
+    deliverable = await post(client, "/v1/checkout/quote", payload)
+    assert deliverable.status_code == 200, deliverable.text
+
+
 async def post(client, route, payload):
     return await client.post(route, json=payload, headers={"X-CSRF-Token": await csrf_token(client)})
 

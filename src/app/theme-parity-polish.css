@@ -17758,6 +17758,24 @@ body:has(.smart-header.is-mobile-pinned) .page-jellyfish-accent {
     line-height: 1.55;
 }
 
+.product-destination-status {
+    width: fit-content;
+    margin: 12px 0 0;
+    padding: 6px 10px;
+    border: 1px solid #e6d9c7;
+    border-radius: 999px;
+    background: #fffaf1;
+    color: #765a42;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.product-destination-status.is-deliverable {
+    border-color: #cfddc7;
+    background: #f5faf1;
+    color: #58715b;
+}
+
 .product-purchase-actions .product-add-button,
 .product-buy-now-button {
     min-width: 0;

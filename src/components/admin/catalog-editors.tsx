@@ -6,8 +6,11 @@ import {
   type AdminBrand,
   type AdminProduct,
 } from "@/services/ponyo-api.client";
+import { regionName, supportedShippingCountries } from "@/lib/localization-options";
 
 export function ProductProofEditor({ product }: { product: AdminProduct }) {
+  const [shippingConfirmed, setShippingConfirmed] = useState(product.shippingCountries != null);
+  const [shippingCountries, setShippingCountries] = useState(product.shippingCountries ?? []);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -26,6 +29,7 @@ export function ProductProofEditor({ product }: { product: AdminProduct }) {
         editionCount: optionalNumber(values.get("editionCount")),
         estimatedDeliveryDate: String(values.get("estimatedDeliveryDate") ?? "") || null,
         onlyAtPonyo: values.get("onlyAtPonyo") === "on",
+        shippingCountries: shippingConfirmed ? shippingCountries : null,
       });
       setMessage("Verified product details saved.");
     } catch (saveError) {
@@ -39,6 +43,11 @@ export function ProductProofEditor({ product }: { product: AdminProduct }) {
     <label>Materials<textarea name="materials" rows={2} defaultValue={product.materials ?? ""} maxLength={3000} placeholder="Only enter maker-confirmed details" /></label>
     <div className="ad-editor-fields"><label>Weight (grams)<input name="weightGrams" type="number" min="0" step="1" defaultValue={product.weightGrams ?? ""} /></label><label>Edition count<input name="editionCount" type="number" min="1" step="1" defaultValue={product.editionCount ?? ""} /></label><label>Estimated delivery date<input name="estimatedDeliveryDate" type="date" defaultValue={product.estimatedDeliveryDate ?? ""} /></label></div>
     <label className="ad-editor-check"><input name="onlyAtPonyo" type="checkbox" defaultChecked={product.onlyAtPonyo} /> Confirmed exclusive to Ponyo</label>
+    <fieldset><legend>Shipping destinations</legend>
+      <label className="ad-editor-check"><input type="checkbox" checked={shippingConfirmed} onChange={(event) => setShippingConfirmed(event.target.checked)} /> Shipping destinations confirmed</label>
+      <div className="ad-editor-fields">{supportedShippingCountries.map((destination) => <label className="ad-editor-check" key={destination.code}><input type="checkbox" checked={shippingCountries.includes(destination.code)} disabled={!shippingConfirmed} onChange={(event) => setShippingCountries((current) => event.target.checked ? [...current, destination.code] : current.filter((code) => code !== destination.code))} /> {regionName(destination.code, "en", destination.label)}</label>)}</div>
+      <small>{shippingConfirmed ? "Select every country confirmed by the maker. No selections means shipping is confirmed unavailable everywhere." : "Unconfirmed destinations block checkout; the product remains visible for interest collection."}</small>
+    </fieldset>
     {error && <p className="ad-inline-error" role="alert">{error}</p>}{message && <p className="ad-inline-success" role="status">{message}</p>}
     <button className="ad-row-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save verified details"}</button>
   </form></details>;
@@ -71,7 +80,7 @@ export function ReservationSettingsEditor({ product }: { product: AdminProduct }
 
   return <form className="ad-reservation-editor" onSubmit={save}>
     <label className="ad-editor-check"><input type="checkbox" checked={open} onChange={(event) => setOpen(event.target.checked)} /> Reservations open</label>
-    <label>Minimum reservation target<input type="number" min="1" step="1" value={target} onChange={(event) => setTarget(event.target.value)} placeholder="No minimum set" /></label>
+    <label>Reservation target<input type="number" min="1" step="1" value={target} onChange={(event) => setTarget(event.target.value)} placeholder="No target set" /></label>
     <button className="ad-row-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button>
     {error && <p className="ad-inline-error" role="alert">{error}</p>}{message && <p className="ad-inline-success" role="status">{message}</p>}
   </form>;

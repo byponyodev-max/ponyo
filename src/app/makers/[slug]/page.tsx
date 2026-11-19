@@ -6,7 +6,8 @@ import { cookies } from "next/headers";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { LocalizedText } from "@/components/layout/localization-provider";
 import { ProductGrid } from "@/components/product/product-grid";
-import { ApiRequestError, ApiNotConfiguredError, ponyoApi } from "@/services/ponyo-api.client";
+import { getLocalizedProducts } from "@/services/localized-products.server";
+import { PONYO_API_BASE_URL, ApiRequestError, ApiNotConfiguredError, ponyoApi } from "@/services/ponyo-api.client";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -18,13 +19,33 @@ export default async function MakerProfilePage({ params }: { params: Promise<{ s
   const savedLanguage = (await cookies()).get("ponyo-language")?.value;
   const locale = savedLanguage === "ja" || savedLanguage === "ko" ? savedLanguage : "en";
   let profileData;
-  try {
-    profileData = await ponyoApi.getMakerProfile(slug, locale);
-  } catch (error) {
-    if (error instanceof ApiRequestError && error.status === 404) notFound();
-    const isNotConfigured = error instanceof ApiNotConfiguredError;
-    const message = error instanceof Error ? error.message : null;
-    return <SiteFrame className="store-page maker-profile-page"><section className="maker-profile-unavailable store-container" role="status"><p className="eyebrow"><LocalizedText translationKey="maker.profile.unavailable.eyebrow" fallback="PONYO MAKERS" /></p><h1><LocalizedText translationKey="maker.profile.unavailable.title" fallback="Maker profile unavailable" /></h1><p>{isNotConfigured ? <LocalizedText translationKey="maker.profile.unavailable.not_configured" fallback="Maker profiles will appear here when the Ponyo catalog service is connected." /> : message || <LocalizedText translationKey="maker.profile.unavailable.generic" fallback="The maker profile could not be loaded." />}</p><Link href="/for-makers"><LocalizedText translationKey="maker.profile.unavailable.cta" fallback="For makers" /> <span aria-hidden="true">→</span></Link></section></SiteFrame>;
+  if (!PONYO_API_BASE_URL) {
+    const products = await getLocalizedProducts("?limit=100", locale);
+    const makerProducts = products.filter((product) => product.makerSlug === slug);
+    if (!makerProducts.length) notFound();
+    const firstProduct = makerProducts[0];
+    profileData = {
+      maker: {
+        name: firstProduct.makerName ?? firstProduct.supplierName,
+        location: firstProduct.makerLocation ?? "",
+        story: firstProduct.makerStory ?? "",
+        philosophy: firstProduct.makerPhilosophy ?? "",
+        process: firstProduct.makerProcess ?? "",
+        specialties: [...new Set(makerProducts.map((product) => product.productType ?? product.categoryName))],
+        profileImageUrl: null,
+        website: null,
+      },
+      products: makerProducts,
+    };
+  } else {
+    try {
+      profileData = await ponyoApi.getMakerProfile(slug, locale);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 404) notFound();
+      const isNotConfigured = error instanceof ApiNotConfiguredError;
+      const message = error instanceof Error ? error.message : null;
+      return <SiteFrame className="store-page maker-profile-page"><section className="maker-profile-unavailable store-container" role="status"><p className="eyebrow"><LocalizedText translationKey="maker.profile.unavailable.eyebrow" fallback="PONYO MAKERS" /></p><h1><LocalizedText translationKey="maker.profile.unavailable.title" fallback="Maker profile unavailable" /></h1><p>{isNotConfigured ? <LocalizedText translationKey="maker.profile.unavailable.not_configured" fallback="Maker profiles will appear here when the Ponyo catalog service is connected." /> : message || <LocalizedText translationKey="maker.profile.unavailable.generic" fallback="The maker profile could not be loaded." />}</p><Link href="/for-makers"><LocalizedText translationKey="maker.profile.unavailable.cta" fallback="For makers" /> <span aria-hidden="true">→</span></Link></section></SiteFrame>;
+    }
   }
 
   const { maker, products } = profileData;

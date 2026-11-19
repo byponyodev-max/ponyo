@@ -76,6 +76,42 @@
     letter-spacing: .12em;
 }
 
+.ad-login-topbar {
+    width: min(100%, 480px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    position: relative;
+    z-index: 1;
+}
+
+.ad-language-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #806b61;
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.ad-language-control select {
+    min-height: 38px;
+    padding: 7px 30px 7px 10px;
+    border: 1px solid #eadfd7;
+    border-radius: 11px;
+    background: #fff;
+    color: #5a4942;
+    font: inherit;
+    cursor: pointer;
+}
+
+.ad-language-control select:focus-visible {
+    outline: 3px solid rgb(210 157 131 / 25%);
+    outline-offset: 2px;
+}
+
 .ad-wordmark>span,
 .ad-brand>span {
     display: grid;
@@ -478,6 +514,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
+}
+
+.ad-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .ad-topbar h1 {

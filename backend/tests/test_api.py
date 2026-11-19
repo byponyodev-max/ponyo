@@ -102,7 +102,7 @@ async def add_product(session_factory, *, slug="test-bunny", price=1500, stock=4
             id=uuid4(), slug=slug, name=slug.title(), description="Soft toy", currency="JPY",
             price_amount=price, availability="available", category_name="Bunnies", supplier_name="Ponyo",
             image_url="https://example.test/bunny.png", image_alt="Bunny", tags=["bunny"],
-            reservations_open=False, published=True,
+            reservations_open=False, published=True, shipping_countries=["JP", "KR", "US", "GB", "AU", "CA"],
         )
         db.add(product)
         await db.flush()

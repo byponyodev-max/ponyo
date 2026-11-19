@@ -201,6 +201,7 @@ async def seed_products() -> None:
                     estimated_delivery_date=date(2027, 1, 15),
                     only_at_ponyo=True,
                     reservations_open=True,
+                    reservation_target=50,
                     dispatch_time="Ships in 1–3 business days",
                     published=True,
                 )
@@ -227,7 +228,6 @@ async def seed_products() -> None:
                 product.edition_count = 240
                 product.estimated_delivery_date = date(2027, 1, 15)
                 product.only_at_ponyo = True
-                product.reservations_open = True
                 product.dispatch_time = "Ships in 1–3 business days"
                 product.published = True
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id, ProductVariant.title == "Default"))

@@ -130,6 +130,19 @@ class ProductReservation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class ProductInterest(Base):
+    __tablename__ = "product_interests"
+    __table_args__ = (
+        UniqueConstraint("product_id", "email", "country", name="uq_product_interests_product_email_country"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    country: Mapped[str] = mapped_column(String(100), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class MakerApplication(Base):
     __tablename__ = "maker_applications"
 
@@ -170,6 +183,7 @@ class Product(Base):
     compare_at_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     availability: Mapped[str] = mapped_column(String(32), default="available")
     availability_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    shipping_countries: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     category_id: Mapped[UUID | None] = mapped_column(ForeignKey("product_categories.id", ondelete="SET NULL"), nullable=True, index=True)
     brand_id: Mapped[UUID | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"), nullable=True, index=True)
     category_name: Mapped[str] = mapped_column(String(100), default="Plushie")
@@ -188,6 +202,7 @@ class Product(Base):
     only_at_ponyo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     reservations_open: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     reservation_target: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reservation_minimum_reached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     variants: Mapped[list[ProductVariant]] = relationship(back_populates="product", cascade="all, delete-orphan")

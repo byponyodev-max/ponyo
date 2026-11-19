@@ -3,19 +3,25 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
+import { regionName } from "@/lib/localization-options";
+import { getProductShippingStatus } from "@/lib/product-shipping";
 import { storefrontFeatures } from "@/lib/storefront-features";
+import { ProductCardAction } from "@/components/product/product-card-action";
 import type { Product } from "@/types/product";
 
 
 export function ProductCard({ product, badge, compact = false }: { product: Product; badge?: string; compact?: boolean }) {
-  const { formatPrice, t } = useLocalization();
+  const { country, formatPrice, language, t } = useLocalization();
   const productName = t(`product.names.${product.slug}`, product.name);
   const tags = product.tags ?? [];
   const isNew = product.isNew ?? tags.includes("new-arrival");
   const isXl = tags.includes("domina-xl") || /\bxl\b/i.test(`${product.name} ${product.sizeTier ?? ""} ${product.size ?? ""}`);
   const categoryLabel = product.size ?? t(`product.categories.${(product.productType === "Plush" ? product.categoryName : product.productType ?? product.categoryName).toLowerCase().replaceAll(" ", "_")}`, product.productType === "Plush" ? product.categoryName : product.productType ?? product.categoryName);
+  const shippingStatus = getProductShippingStatus(product, country);
   const statusLabel = storefrontFeatures.productReservations
-    ? t("product.status.preorder", "Pre-order")
+    ? shippingStatus === "deliverable"
+      ? t("product.status.reservation_open", "Reservation open")
+      : t("product.status.interest_open", "Interest open")
     : product.availabilityStatus === "Coming Soon"
     ? t("product.status.coming_soon", "Coming soon")
     : product.availabilityStatus === "Waitlist"
@@ -25,6 +31,11 @@ export function ProductCard({ product, badge, compact = false }: { product: Prod
         : product.availabilityStatus === "Available" || product.availability === "available"
           ? t("product.status.available", "Available")
         : "";
+  const shippingLabel = shippingStatus === "deliverable"
+    ? t("product.shipping.deliverable", "Ships to {{country}}", { country: regionName(country, language, country) })
+    : shippingStatus === "unavailable"
+      ? t("product.shipping.unavailable", "Not shipping to {{country}}", { country: regionName(country, language, country) })
+      : t("product.shipping.unconfirmed", "Shipping destinations not confirmed");
 
   const labels = [...new Set([
     ...(badge ? [badge] : []),
@@ -49,6 +60,7 @@ export function ProductCard({ product, badge, compact = false }: { product: Prod
           <span className="shop-product-title">{productName}</span>
           <div className="shop-product-meta"><span>{categoryLabel}</span></div>
           {statusLabel && <p className="shop-product-availability">{statusLabel}</p>}
+          <p className={`shop-product-shipping-status is-${shippingStatus}`}>{shippingLabel}</p>
           <div className="shop-product-bottom">
             <strong className="shop-product-prices">
               <span className="shop-product-current-price">{formatPrice(product.priceAmount, product.currency)}</span>
@@ -58,6 +70,7 @@ export function ProductCard({ product, badge, compact = false }: { product: Prod
           {product.dispatchTime && !storefrontFeatures.productReservations && <p className="shop-product-dispatch">{product.dispatchTime}</p>}
         </div>
       </article>
+      {storefrontFeatures.productReservations && <ProductCardAction product={product} productName={productName} />}
     </div>
   );
 }

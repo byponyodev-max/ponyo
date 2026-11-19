@@ -150,7 +150,7 @@ export default async function Home() {
             { name: "Medium", range: "25–45 cm", rangeKey: "range_medium", image: images.bear, size: "Medium" },
             { name: "Large", range: "45–70 cm", rangeKey: "range_large", image: images.dog, size: "Large" },
             { name: "XL", range: "70 cm +", rangeKey: "range_xl", image: images.xlCat, size: "XL" },
-          ].map((tile) => <Link className={`size-guide-tile size-guide-tile--${tile.name.toLowerCase()}`} href={`/collections/all?filter.p.m.ponyo.size_tier=${tile.size}`} key={tile.name}><span><Image src={tile.image} alt={t("home.size.image_alt", { size: t(`home.size.${tile.name.toLowerCase()}`) })} fill sizes="(max-width: 640px) 30vw, 265px" /></span><strong><LocalizedText translationKey={`home.size.${tile.name.toLowerCase()}`} fallback={tile.name} /></strong><small><LocalizedText translationKey={`home.size.${tile.rangeKey}`} fallback={tile.range} /></small></Link>)}
+          ].map((tile) => <Link className={`size-guide-tile size-guide-tile--${tile.name.toLowerCase()}`} href={`/collections/all?filter.p.m.ponyo.size_tier=${tile.size}`} key={tile.name}><span><Image src={tile.image} alt={t("home.size.image_alt", { size: t(`shop.size.${tile.name.toLowerCase()}`) })} fill sizes="(max-width: 640px) 30vw, 265px" /></span><strong><LocalizedText translationKey={`shop.size.${tile.name.toLowerCase()}`} fallback={tile.name} /></strong><small><LocalizedText translationKey={`home.size.${tile.rangeKey}`} fallback={tile.range} /></small></Link>)}
         </div>
         <Link className="size-guide-full-link" href="/size-guide"><LocalizedText translationKey="product.proof.size_guide" fallback="Explore the full size guide" /> <span aria-hidden="true">→</span></Link>
       </section>

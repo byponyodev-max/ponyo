@@ -69,6 +69,7 @@ export type Product = {
 	onlyAtPonyo?: boolean;
 	reservationsOpen?: boolean;
 	reservationTarget?: number | null;
+	shippingCountries?: string[] | null;
 	isExampleData?: boolean;
 	badge?: string;
 };

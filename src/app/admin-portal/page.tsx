@@ -18,7 +18,7 @@ const navigation: Array<{ id: AdminSection; label: string; labelKey: string; ico
 	{ id: "dashboard", label: "Dashboard", labelKey: "dashboard", icon: "⌂", hint: "Marketplace overview", hintKey: "dashboard_hint" },
 	{ id: "orders", label: "Orders", labelKey: "orders", icon: "▤", hint: "Customer orders", hintKey: "orders_hint" },
 	{ id: "products", label: "Products", labelKey: "products", icon: "♡", hint: "Catalog & approval", hintKey: "products_hint" },
-	{ id: "reservations", label: "Reservations", labelKey: "reservations", icon: "✦", hint: "Interest counts & targets", hintKey: "reservations_hint" },
+	{ id: "reservations", label: "Reservations & interests", labelKey: "reservations_interest", icon: "✦", hint: "Reservation targets and unshipped demand", hintKey: "reservations_hint" },
 	{ id: "maker-applications", label: "Maker applications", labelKey: "maker_applications", icon: "✿", hint: "Review maker submissions", hintKey: "maker_applications_hint" },
 	{ id: "suppliers", label: "Suppliers", labelKey: "suppliers", icon: "✿", hint: "Partners & access", hintKey: "suppliers_hint" },
 	{ id: "brands", label: "Brands", labelKey: "brands", icon: "✧", hint: "Curated labels", hintKey: "brands_hint" },
@@ -43,8 +43,23 @@ function date(value: string) {
 	return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(parsed);
 }
 
+function AdminLanguageSelect({ language, setLanguage, label }: {
+	language: string;
+	setLanguage: (language: string) => Promise<void>;
+	label: string;
+}) {
+	return <label className="ad-language-control">
+		<span>{label}</span>
+		<select aria-label={label} value={language} onChange={(event) => void setLanguage(event.target.value)}>
+			<option value="en">English</option>
+			<option value="ja">日本語</option>
+			<option value="ko">한국어</option>
+		</select>
+	</label>;
+}
+
 export default function AdminPortalPage() {
-	const { formatPrice, language, t } = useLocalization();
+	const { formatPrice, language, setLanguage, t } = useLocalization();
 	const ui = (key: string, fallback: string, values?: Record<string, string | number>) => t(`admin.ui.${key}`, fallback, values);
 	const [admin, setAdmin] = useState<AdminIdentity | null>(null);
 	const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
@@ -53,6 +68,7 @@ export default function AdminPortalPage() {
 	const [suppliers, setSuppliers] = useState<AdminSupplier[]>([]);
 	const [brands, setBrands] = useState<AdminBrand[]>([]);
 	const [reservationProducts, setReservationProducts] = useState<AdminProduct[]>([]);
+	const [interestProducts, setInterestProducts] = useState<AdminProduct[]>([]);
 	const [reservationEntries, setReservationEntries] = useState<AdminReservationPage>({ items: [], total: 0, limit: 50, offset: 0 });
 	const [reservationFilters, setReservationFilters] = useState({ productId: "", country: "", query: "" });
 	const [reservationEntriesLoading, setReservationEntriesLoading] = useState(false);
@@ -108,7 +124,14 @@ export default function AdminPortalPage() {
 				setProducts(await ponyoApi.listAdminProducts(search, publishedFilter === "all" ? undefined : publishedFilter === "published"));
 				break;
 				case "reservations":
-					setReservationProducts(await ponyoApi.listAdminReservations());
+					{
+						const [reservations, interests] = await Promise.all([
+							ponyoApi.listAdminReservations(),
+							ponyoApi.listAdminInterests(),
+						]);
+						setReservationProducts(reservations);
+						setInterestProducts(interests);
+					}
 					await loadReservationEntries(0);
 					break;
 				case "maker-applications":
@@ -160,6 +183,9 @@ export default function AdminPortalPage() {
 
 	const productView = useMemo(() => publishedFilter === "pending" ? products.items.filter((product) => !product.published) : products.items, [products.items, publishedFilter]);
 	const reservationCountryTotals = useMemo(() => aggregateReservationsByCountry(reservationProducts), [reservationProducts]);
+	const interestCountryTotals = useMemo(() => aggregateReservationsByCountry(
+		interestProducts.map((product) => ({ reservationsByCountry: product.interestsByCountry })),
+	), [interestProducts]);
 
 	function navigateSection(target: AdminSection) {
 		setSection(target);
@@ -276,7 +302,7 @@ export default function AdminPortalPage() {
 
 	if (!admin) return <main className="ad-login-page">
 		<div className="ad-login-glow ad-login-glow--one" /><div className="ad-login-glow ad-login-glow--two" />
-		<Link className="ad-wordmark" href="/" aria-label={ui("home", "Ponyo home")}><Image src="/ponyo-jellyfish.svg" alt="" width={42} height={42} /><span>PONYO<small>{ui("operations", "MARKETPLACE OPERATIONS")}</small></span></Link>
+		<div className="ad-login-topbar"><Link className="ad-wordmark" href="/" aria-label={ui("home", "Ponyo home")}><Image src="/ponyo-jellyfish.svg" alt="" width={42} height={42} /><span>PONYO<small>{ui("operations", "MARKETPLACE OPERATIONS")}</small></span></Link><AdminLanguageSelect language={language} setLanguage={setLanguage} label={ui("language", "Language")} /></div>
 		<section className="ad-login-card"><div className="ad-login-art"><Image src="/ponyo-jellyfish.svg" alt="" width={75} height={75} /><span>✦</span><i>✧</i></div><p className="ad-eyebrow">{ui("control_room", "THE PONYO CONTROL ROOM")}</p><h1>{ui("login_title_lead", "Good things,")}<br /><em>{ui("login_title_accent", "under control.")}</em></h1><p className="ad-login-copy">{ui("login_body", "Sign in to manage Ponyo’s curated marketplace, partners and operations.")}</p>
 			{error && <div className="ad-alert ad-alert--error" role="alert">{error}</div>}
 			<form className="ad-login-form" onSubmit={handleLogin}><label>{ui("email", "Admin email")}<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder={ui("email_placeholder", "you@ponyo.com")} /></label><label>{ui("password", "Password")}<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder={ui("password_placeholder", "Your secure password")} /></label><button className="ad-primary-button" type="submit" disabled={busyId === "login"}>{busyId === "login" ? ui("signing_in", "Signing in…") : ui("enter_dashboard", "Enter admin dashboard")}<span>↗</span></button></form>
@@ -301,7 +327,7 @@ export default function AdminPortalPage() {
 			<div className="ad-sidebar-note"><span>✦</span><strong>{ui("sidebar_tagline", "Thoughtfully found. Ready to be loved.")}</strong><small>{ui("sidebar_note", "The little details make the whole marketplace.")}</small></div>
 			<div className="ad-account"><span className="ad-avatar">{admin.firstName.slice(0, 1).toUpperCase() || "A"}</span><div><strong>{admin.firstName} {admin.lastName}</strong><small>{admin.email}</small></div><button type="button" onClick={() => void logout()} disabled={busyId === "logout"} aria-label={ui("sign_out", "Sign out")}>↗</button></div>
 		</aside>
-		<section className="ad-main"><header className="ad-topbar"><div><span className="ad-eyebrow">{ui("management", "PONYO MARKETPLACE MANAGEMENT")}</span><h1>{section === "dashboard" ? ui("good_morning", "Good morning, {{name}}", { name: admin.firstName || ui("admin_fallback", "Admin") }) : ui(navigation.find((item) => item.id === section)?.labelKey ?? "dashboard", navigation.find((item) => item.id === section)?.label ?? "Dashboard")}<span> ✦</span></h1><p>{ui(navigation.find((item) => item.id === section)?.hintKey ?? "dashboard_hint", navigation.find((item) => item.id === section)?.hint ?? "Marketplace overview")} · {ui("dashboard_subtitle", "One calm view of the moving parts.")}</p></div><button className="ad-refresh" type="button" onClick={() => void refreshAll()} disabled={refreshing}>{refreshing ? ui("refreshing", "Refreshing…") : `↻ ${ui("refresh", "Refresh")}`}</button></header>
+		<section className="ad-main"><header className="ad-topbar"><div><span className="ad-eyebrow">{ui("management", "PONYO MARKETPLACE MANAGEMENT")}</span><h1>{section === "dashboard" ? ui("good_morning", "Good morning, {{name}}", { name: admin.firstName || ui("admin_fallback", "Admin") }) : ui(navigation.find((item) => item.id === section)?.labelKey ?? "dashboard", navigation.find((item) => item.id === section)?.label ?? "Dashboard")}<span> ✦</span></h1><p>{ui(navigation.find((item) => item.id === section)?.hintKey ?? "dashboard_hint", navigation.find((item) => item.id === section)?.hint ?? "Marketplace overview")} · {ui("dashboard_subtitle", "One calm view of the moving parts.")}</p></div><div className="ad-topbar-actions"><AdminLanguageSelect language={language} setLanguage={setLanguage} label={ui("language", "Language")} /><button className="ad-refresh" type="button" onClick={() => void refreshAll()} disabled={refreshing}>{refreshing ? ui("refreshing", "Refreshing…") : `↻ ${ui("refresh", "Refresh")}`}</button></div></header>
 			{notice && <div className="ad-alert ad-alert--success" role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label={ui("dismiss", "Dismiss")}>×</button></div>}{error && <div className="ad-alert ad-alert--error" role="alert">{error}<button type="button" onClick={() => setError("")} aria-label={ui("dismiss", "Dismiss")}>×</button></div>}
 			{section === "dashboard" && <>
 				<div className="ad-metrics">{cards.map(([label, value, note, tone]) => <article className={`ad-metric ad-metric--${tone}`} key={label}><small>{label}</small><strong>{value}</strong><span>{note}</span></article>)}</div>
@@ -316,10 +342,10 @@ export default function AdminPortalPage() {
 				<>
 					<section className="ad-panel">
 						<div className="ad-panel-heading">
-							<div><span className="ad-eyebrow">NO-PAYMENT INTEREST</span><h2>Reservation counter</h2><p>Counts come from submitted reservations; no checkout or payment is involved.</p></div>
+							<div><span className="ad-eyebrow">RESERVE A SPOT · NO PAYMENT</span><h2>Reservations</h2><p>Only products that can ship to the selected destination accept reservations.</p></div>
 							<span className="ad-count-pill">{reservationProducts.reduce((total, product) => total + (product.reservationCount ?? 0), 0)} reservations</span>
 						</div>
-						<div className="ad-reservation-country-summary" aria-label="Reservation totals by country across all products">
+						<div className="ad-reservation-country-summary" aria-label="Reservations by country across all products">
 							<strong>Reservations by country</strong>
 							{reservationCountryTotals.length
 								? <div className="ad-reservation-country-totals">{reservationCountryTotals.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}<strong>{entry.count}</strong></span>)}</div>
@@ -331,16 +357,40 @@ export default function AdminPortalPage() {
 									<td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td>
 									<td><strong>{product.reservationCount ?? 0}</strong>{product.reservationTarget ? ` / ${product.reservationTarget}` : " · no target"}</td>
 									<td className="ad-reservation-country-list">{product.reservationsByCountry?.length ? product.reservationsByCountry.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}: <strong>{entry.count}</strong></span>) : <small>No reservations yet</small>}</td>
-									<td><span className={`ad-status ${product.reservationsOpen ? "ad-status--published" : "ad-status--pending"}`}>{product.reservationsOpen ? "Open" : "Closed"}</span></td>
+									<td>
+										<span className={`ad-status ${product.reservationsOpen ? "ad-status--published" : "ad-status--pending"}`}>{product.reservationsOpen ? "Open" : "Closed"}</span>
+										{product.reservationMinimumReachedAt && <small>{t("admin.reservations.minimum_reached", "Minimum reached — review production")}</small>}
+									</td>
 									<td><ReservationSettingsEditor product={product} /></td>
 								</tr>)}</tbody>
 							</table>
 							{!reservationProducts.length && <div className="ad-empty">No products are available for reservation setup.</div>}
 						</div>
 					</section>
+					<section className="ad-panel">
+						<div className="ad-panel-heading">
+							<div><span className="ad-eyebrow">UNSHIPPED DEMAND</span><h2>Interests (separate from reservations)</h2><p>These are requests for destinations a product cannot currently serve or has not confirmed.</p></div>
+							<span className="ad-count-pill">{interestProducts.reduce((total, product) => total + (product.interestCount ?? 0), 0)} interests</span>
+						</div>
+						<div className="ad-reservation-country-summary" aria-label="Interests by country across all products">
+							<strong>Interests by country</strong>
+							{interestCountryTotals.length
+								? <div className="ad-reservation-country-totals">{interestCountryTotals.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}<strong>{entry.count}</strong></span>)}</div>
+								: <p>No interest registrations yet.</p>}
+						</div>
+						<div className="ad-table-wrap">
+							<table className="ad-table"><thead><tr><th>PRODUCT</th><th>INTEREST</th><th>BY COUNTRY</th></tr></thead>
+								<tbody>{interestProducts.map((product) => <tr key={product.id}>
+									<td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td>
+									<td><strong>{product.interestCount ?? 0}</strong></td>
+									<td className="ad-reservation-country-list">{product.interestsByCountry?.length ? product.interestsByCountry.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}: <strong>{entry.count}</strong></span>) : <small>No interests yet</small>}</td>
+								</tr>)}</tbody>
+							</table>
+						</div>
+					</section>
 					<section className="ad-panel ad-reservation-entries-panel">
 						<div className="ad-panel-heading">
-							<div><span className="ad-eyebrow">ADMIN-ONLY DETAILS</span><h2>{t("admin.reservations.entries_title", "Individual reservations")}</h2><p>{t("admin.reservations.entries_note", "Emails are visible only to signed-in admins and are included in filtered exports.")}</p></div>
+							<div><span className="ad-eyebrow">ADMIN-ONLY DETAILS · RESERVATIONS</span><h2>{t("admin.reservations.entries_title", "Individual reservations")}</h2><p>{t("admin.reservations.entries_note", "Reservation emails are visible only to signed-in admins and are included in filtered exports.")}</p></div>
 							<span className="ad-count-pill">{reservationEntries.total} {t("admin.reservations.entries_count", "records")}</span>
 						</div>
 						<form className="ad-toolbar ad-reservation-entry-filters" onSubmit={(event) => { event.preventDefault(); void loadReservationEntries(0); }}>

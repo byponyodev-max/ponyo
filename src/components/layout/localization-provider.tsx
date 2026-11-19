@@ -53,7 +53,7 @@ async function requestRates(symbols: string[]): Promise<RatePayload> {
   return payload.data;
 }
 
-export function LocalizationProvider({ children, initialLanguage = "ja", initialCurrency = "JPY", initialCountry = "JP", initialDeliveryNoticeDismissed = false }: { children: ReactNode; initialLanguage?: string; initialCurrency?: string; initialCountry?: string; initialDeliveryNoticeDismissed?: boolean }) {
+export function LocalizationProvider({ children, adminPortal = false, initialLanguage = "ja", initialCurrency = "JPY", initialCountry = "JP", initialDeliveryNoticeDismissed = false }: { children: ReactNode; adminPortal?: boolean; initialLanguage?: string; initialCurrency?: string; initialCountry?: string; initialDeliveryNoticeDismissed?: boolean }) {
   const router = useRouter();
   const intlTranslate = useTranslations();
   const [language, setLanguageState] = useState(languages.some((item) => item.code === initialLanguage) ? initialLanguage : "en");
@@ -97,7 +97,7 @@ export function LocalizationProvider({ children, initialLanguage = "ja", initial
     void refreshRates();
   }, [refreshRates]);
 
-  const savePreference = useCallback(async (next: { language?: string; currency?: string; country?: string; deliveryNoticeDismissed?: boolean }) => {
+  const savePreference = useCallback(async (next: { language?: string; adminLanguage?: string; currency?: string; country?: string; deliveryNoticeDismissed?: boolean }) => {
     try {
       const response = await fetch("/api/preferences", {
         method: "POST",
@@ -111,9 +111,9 @@ export function LocalizationProvider({ children, initialLanguage = "ja", initial
   const setLanguage = useCallback(async (next: string) => {
     if (!languages.some((item) => item.code === next)) return;
     setLanguageState(next);
-    await savePreference({ language: next });
+    await savePreference(adminPortal ? { adminLanguage: next } : { language: next });
     router.refresh();
-  }, [router, savePreference]);
+  }, [adminPortal, router, savePreference]);
 
   const setCurrency = useCallback(async (next: string) => {
     if (!currencies.some((item) => item.code === next)) return;

@@ -108,7 +108,7 @@ async def add_variant(factory, *, stock=1):
             slug=uuid4().hex, name="Concurrency toy", description="Test fixture",
             currency="JPY", price_amount=1500, availability="available",
             category_name="Toys", supplier_name="Ponyo", image_url="/images/test.png",
-            published=True,
+            published=True, shipping_countries=["JP", "KR", "US", "GB", "AU", "CA"],
         )
         db.add(product)
         await db.flush()

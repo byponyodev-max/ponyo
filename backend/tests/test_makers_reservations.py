@@ -1,10 +1,16 @@
 import pytest
 from sqlalchemy import func, select
 
-from app.models import Brand, Customer, MakerApplication, OutboxEvent, Product, ProductReservation
+from app.models import Brand, Customer, MakerApplication, OutboxEvent, Product, ProductInterest, ProductReservation
 from app.routers.admin import safe_csv_cell
 from app.security import hash_password
-from test_api import add_product, csrf_token, seed_customer_session, test_client
+from test_api import (
+    add_product,
+    csrf_token,
+    safe_auth_email_and_cookies as safe_auth_email_and_cookies,
+    seed_customer_session,
+    test_client,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -24,7 +30,7 @@ async def test_product_reservations_are_idempotent_non_binding_and_counted(test_
         await db.commit()
 
     csrf = await csrf_token(client)
-    payload = {"email": "Plush.Friend@example.com", "country": "Japan"}
+    payload = {"email": "Plush.Friend@example.com", "country": "JP"}
     first = await client.post(f"/v1/products/{product_id}/reservations", headers={"X-CSRF-Token": csrf}, json=payload)
     duplicate = await client.post(f"/v1/products/{product_id}/reservations", headers={"X-CSRF-Token": csrf}, json=payload)
     assert first.status_code == duplicate.status_code == 200
@@ -39,13 +45,138 @@ async def test_product_reservations_are_idempotent_non_binding_and_counted(test_
         assert await db.scalar(select(func.count()).select_from(MakerApplication)) == 0
 
 
+async def test_reservations_keep_target_unset_when_product_has_no_custom_target(test_client):
+    client, factory = test_client
+    product_id, _ = await add_product(factory, slug="default-target-reservation-plush")
+    async with factory() as db:
+        product = await db.get(Product, product_id)
+        product.reservations_open = True
+        await db.commit()
+
+    counter = await client.get(f"/v1/products/{product_id}/reservations")
+    assert counter.status_code == 200
+    assert counter.json()["data"] == {"reservationCount": 0, "target": None, "open": True}
+
+    response = await client.post(
+        f"/v1/products/{product_id}/reservations",
+        headers={"X-CSRF-Token": await csrf_token(client)},
+        json={"email": "plush-friend@example.com", "country": "JP"},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["reservationCount"] == 1
+    assert response.json()["data"]["target"] is None
+
+
+async def test_interest_registration_accepts_free_text_unserved_country(test_client):
+    client, factory = test_client
+    product_id, _ = await add_product(factory, slug="unserved-country-interest")
+
+    response = await client.post(
+        f"/v1/products/{product_id}/interests",
+        headers={"X-CSRF-Token": await csrf_token(client)},
+        json={"email": "friend@example.com", "country": "New Zealand"},
+    )
+    assert response.status_code == 200, response.text
+    async with factory() as db:
+        entry = await db.scalar(
+            select(ProductInterest).where(ProductInterest.product_id == product_id)
+        )
+        assert entry.country == "New Zealand"
+        assert await db.scalar(select(func.count()).select_from(ProductReservation)) == 0
+
+
+async def test_reservation_and_unserved_interest_are_separate_country_gated_records(test_client):
+    client, factory = test_client
+    product_id, _ = await add_product(factory, slug="split-reservation-interest")
+    async with factory() as db:
+        product = await db.get(Product, product_id)
+        product.shipping_countries = ["JP"]
+        product.reservations_open = True
+        await db.commit()
+    csrf = await csrf_token(client)
+
+    reserved = await client.post(
+        f"/v1/products/{product_id}/reservations",
+        headers={"X-CSRF-Token": csrf},
+        json={"email": "friend@example.com", "country": "JP"},
+    )
+    assert reserved.status_code == 200
+    wrong_reservation = await client.post(
+        f"/v1/products/{product_id}/reservations",
+        headers={"X-CSRF-Token": csrf},
+        json={"email": "other@example.com", "country": "KR"},
+    )
+    assert wrong_reservation.status_code == 409
+    wrong_interest = await client.post(
+        f"/v1/products/{product_id}/interests",
+        headers={"X-CSRF-Token": csrf},
+        json={"email": "friend@example.com", "country": "Japan"},
+    )
+    assert wrong_interest.status_code == 409
+    interested = await client.post(
+        f"/v1/products/{product_id}/interests",
+        headers={"X-CSRF-Token": csrf},
+        json={"email": "friend@example.com", "country": "KR"},
+    )
+    assert interested.status_code == 200
+
+    async with factory() as db:
+        assert await db.scalar(select(func.count()).select_from(ProductReservation)) == 1
+        assert await db.scalar(select(func.count()).select_from(ProductInterest)) == 1
+
+
+async def test_reaching_reservation_minimum_notifies_admin_once(test_client):
+    client, factory = test_client
+    product_id, _ = await add_product(factory, slug="minimum-reached-plush")
+    async with factory() as db:
+        product = await db.get(Product, product_id)
+        product.reservations_open = True
+        product.reservation_target = 2
+        await db.commit()
+
+    csrf = await csrf_token(client)
+    for email in ("first@example.com", "second@example.com", "second@example.com"):
+        response = await client.post(
+            f"/v1/products/{product_id}/reservations",
+            headers={"X-CSRF-Token": csrf},
+            json={"email": email, "country": "JP"},
+        )
+        assert response.status_code == 200
+
+    async with factory() as db:
+        product = await db.get(Product, product_id)
+        event = await db.scalar(select(OutboxEvent).where(
+            OutboxEvent.event_type == "product.reservation_minimum_reached",
+        ))
+        assert product.reservation_minimum_reached_at is not None
+        assert event.payload == {
+            "productId": str(product_id),
+            "productName": "Minimum-Reached-Plush",
+            "reservationCount": 2,
+            "target": 2,
+        }
+        assert await db.scalar(select(func.count()).select_from(OutboxEvent).where(
+            OutboxEvent.event_type == "product.reservation_minimum_reached",
+        )) == 1
+
+    admin_id = await seed_customer_session(client, factory, email="minimum-admin@example.com")
+    async with factory() as db:
+        admin = await db.get(Customer, admin_id)
+        admin.role = "admin"
+        await db.commit()
+    overview = await client.get("/v1/admin/reservations")
+    row = next(item for item in overview.json()["data"] if item["id"] == str(product_id))
+    assert row["reservationMinimumReachedAt"] is not None
+    assert row["reservationCount"] == 2
+
+
 async def test_closed_reservations_reject_submission_without_storing_email(test_client):
     client, factory = test_client
     product_id, _ = await add_product(factory, slug="closed-reservation-plush")
     response = await client.post(
         f"/v1/products/{product_id}/reservations",
         headers={"X-CSRF-Token": await csrf_token(client)},
-        json={"email": "plush-friend@example.com", "country": "Japan"},
+        json={"email": "plush-friend@example.com", "country": "JP"},
     )
     assert response.status_code == 409
     async with factory() as db:
@@ -195,11 +326,20 @@ async def test_admin_can_configure_product_proof_and_reservation_counter(test_cl
             "editionCount": 24,
             "estimatedDeliveryDate": "2027-01-15",
             "onlyAtPonyo": True,
+            "shippingCountries": ["JP", "KR", "US"],
         },
     )
     assert proof.status_code == 200
     assert proof.json()["data"]["editionCount"] == 24
     assert proof.json()["data"]["onlyAtPonyo"] is True
+    assert proof.json()["data"]["shippingCountries"] == ["JP", "US"]
+
+    invalid_shipping = await client.patch(
+        f"/v1/admin/products/{product_id}/proof",
+        headers={"X-CSRF-Token": csrf},
+        json={"shippingCountries": ["XX"]},
+    )
+    assert invalid_shipping.status_code == 422
 
     settings = await client.patch(
         f"/v1/admin/products/{product_id}/reservations",
@@ -228,6 +368,17 @@ async def test_admin_can_configure_product_proof_and_reservation_counter(test_cl
         {"country": "JP", "count": 2},
         {"country": "KR", "count": 1},
     ]
+
+    interest = await client.post(
+        f"/v1/products/{product_id}/interests",
+        headers={"X-CSRF-Token": csrf},
+        json={"email": "interest@example.com", "country": "AU"},
+    )
+    assert interest.status_code == 200
+    interest_overview = await client.get("/v1/admin/interests")
+    interest_row = next(item for item in interest_overview.json()["data"] if item["id"] == str(product_id))
+    assert interest_row["interestCount"] == 1
+    assert interest_row["interestsByCountry"] == [{"country": "AU", "count": 1}]
 
     entries = await client.get(
         "/v1/admin/reservations/entries",

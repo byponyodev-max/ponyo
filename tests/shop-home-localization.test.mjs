@@ -60,6 +60,8 @@ test("shop and homepage copy has reviewed English, Japanese, and Korean entries"
 	}
 	assert.notEqual(translations.ja["shop.metadata.title"], translations.en["shop.metadata.title"]);
 	assert.notEqual(translations.ko["shop.metadata.title"], translations.en["shop.metadata.title"]);
+	assert.ok(translations.ja["home.header.domina"]);
+	assert.ok(translations.ko["home.header.domina"]);
 	assert.match(translations.ja["shop.heading.search"], /\{query\}/);
 	assert.match(translations.ko["shop.filter.remove"], /\{label\}/);
 	assert.match(translations.ja["home.size.image_alt"], /\{size\}/);
@@ -83,12 +85,16 @@ test("shop metadata, labels, filters, counts, and empty states are wired to tran
 
 test("homepage shelf, category rail, marquee, and descriptive image alt text use localized keys", () => {
 	const homePage = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+	const siteHeader = readFileSync(new URL("../src/components/layout/site-header.tsx", import.meta.url), "utf8");
 	const homeCarousel = readFileSync(new URL("../src/components/home/home-carousel.tsx", import.meta.url), "utf8");
 	const shelf = readFileSync(new URL("../src/components/product/product-shelf.tsx", import.meta.url), "utf8");
 	for (const key of ["home.category_rail.aria_label", "home.size.marquee_label", "home.size.marquee_big_hugs", "home.image_alt.lifestyle", "home.image_alt.domina", "home.size.image_alt"]) {
 		assert.ok(homePage.includes(key), `homepage does not use ${key}`);
 	}
+	assert.match(homePage, /t\("home\.size\.image_alt", \{ size: t\(`shop\.size\.\$\{tile\.name\.toLowerCase\(\)\}`\) \}\)/);
+	assert.doesNotMatch(homePage, /home\.size\.\$\{tile\.name\.toLowerCase\(\)\}/);
 	assert.match(homeCarousel, /t\(slide\.imageAltKey, slide\.imageAlt\)/);
 	assert.match(homeCarousel, /home\.slides\.choose_collection/);
+	assert.match(siteHeader, /className="domina-link"><span>\{t\("home\.header\.domina", "DOMINA by Ponyo"\)\}/);
 	assert.match(shelf, /home\.most_loved\.eyebrow/);
 });

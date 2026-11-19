@@ -198,8 +198,12 @@ export type AdminProduct = {
 	onlyAtPonyo: boolean;
 	reservationsOpen: boolean;
 	reservationTarget: number | null;
+	shippingCountries?: string[] | null;
+	reservationMinimumReachedAt?: string | null;
 	reservationCount?: number;
 	reservationsByCountry?: Array<{ country: string; count: number }>;
+	interestCount?: number;
+	interestsByCountry?: Array<{ country: string; count: number }>;
 };
 
 export type AdminReservationEntry = {
@@ -710,6 +714,11 @@ export const ponyoApi = {
 			`/products/${encodeURIComponent(productId)}/reservations`,
 			{ method: "POST", body: JSON.stringify(input) },
 		),
+	submitProductInterest: (productId: string, input: { email: string; country: string }) =>
+		apiRequest<{ accepted: boolean; interestCount: number; country: string }>(
+			`/products/${encodeURIComponent(productId)}/interests`,
+			{ method: "POST", body: JSON.stringify(input) },
+		),
 	getProductReviews: (productId: string) =>
 		apiRequest<ProductReviewSummary>(
 			`/products/${encodeURIComponent(productId)}/reviews`,
@@ -923,6 +932,8 @@ export const ponyoApi = {
 	},
 	listAdminReservations: () =>
 		apiRequest<AdminProduct[]>("/admin/reservations"),
+	listAdminInterests: () =>
+		apiRequest<AdminProduct[]>("/admin/interests"),
 	listAdminReservationEntries: (filters: {
 		productId?: string;
 		country?: string;
@@ -966,6 +977,7 @@ export const ponyoApi = {
 			editionCount: number | null;
 			estimatedDeliveryDate: string | null;
 			onlyAtPonyo: boolean;
+			shippingCountries: string[] | null;
 		},
 	) =>
 		apiRequest<AdminProduct>(

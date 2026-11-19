@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from app.shipping import SUPPORTED_SHIPPING_COUNTRIES
+
 
 class VariantOut(BaseModel):
     id: str
@@ -50,6 +52,7 @@ class ProductOut(BaseModel):
     onlyAtPonyo: bool = False
     reservationsOpen: bool = False
     reservationTarget: int | None = None
+    shippingCountries: list[str] | None = None
     images: list[dict[str, str]] = Field(default_factory=list)
     galleryImages: list[dict[str, str]] = Field(default_factory=list)
     categoryName: str = Field(validation_alias="category_name")
@@ -167,6 +170,13 @@ class ProductReviewCreate(BaseModel):
 
 
 class ProductReservationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    email: EmailStr
+    country: str = Field(min_length=2, max_length=100)
+
+
+class ProductInterestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     email: EmailStr
@@ -429,6 +439,19 @@ class AdminProductProofRequest(BaseModel):
     editionCount: int | None = Field(default=None, gt=0, strict=True)
     estimatedDeliveryDate: date | None = None
     onlyAtPonyo: bool | None = None
+    shippingCountries: list[str] | None = Field(default=None, max_length=len(SUPPORTED_SHIPPING_COUNTRIES))
+
+    @field_validator("shippingCountries")
+    @classmethod
+    def validate_shipping_countries(cls, countries: list[str] | None) -> list[str] | None:
+        if countries is None:
+            return None
+        normalized = [country.strip().upper() for country in countries]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("Shipping destinations must not contain duplicates.")
+        if any(country not in SUPPORTED_SHIPPING_COUNTRIES for country in normalized):
+            raise ValueError("Choose only countries supported by checkout.")
+        return normalized
 
 
 class AdminBrandProfileRequest(BaseModel):

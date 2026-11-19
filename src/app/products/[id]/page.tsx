@@ -1,12 +1,11 @@
  import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { LocalizedText } from "@/components/layout/localization-provider";
 import { ProductPurchasePanel } from "@/components/product/product-purchase-panel";
-import { ProductReservationPanel, ProductReviews } from "@/components/product/product-community";
+import { ProductActionPanel, ProductReviews } from "@/components/product/product-community";
 import { ProductGrid } from "@/components/product/product-grid";
 import { ProductGallery } from "@/components/product/product-gallery";
 import { withProductVariantDemo } from "@/lib/product-variant-demo";
@@ -16,8 +15,12 @@ import { storefrontFeatures } from "@/lib/storefront-features";
 
 const getProductPageData = cache(async (identifier: string) => {
   const products = await getLocalizedProducts("?limit=100");
+  const legacySampleSlug = identifier.startsWith("sample-")
+    ? identifier.slice("sample-".length)
+    : null;
   const product = products.find((item) => item.id === identifier)
     ?? products.find((item) => item.slug === identifier)
+    ?? (legacySampleSlug ? products.find((item) => item.slug === legacySampleSlug) : undefined)
     ?? await getLocalizedProductById(identifier);
   return { product, products };
 });
@@ -71,10 +74,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <div className="product-gallery-column">
           <div className="product-gallery-hero">
             <ProductGallery title={product.name} images={productImages} />
-            {product.onlyAtPonyo && <span className="product-gallery-approval-badge">
-              <Image src="/ponyo-jellyfish.svg" width={22} height={22} alt="" aria-hidden="true" />
-              <LocalizedText translationKey="product.proof.only_at_ponyo" fallback="Only at Ponyo" />
-            </span>}
+            <span className="product-gallery-approval-badge">
+              <span className="product-gallery-approval-star" aria-hidden="true">★</span>
+              <span className="product-gallery-approval-copy">
+                <LocalizedText translationKey="product.proof.only_at_ponyo" fallback="Only at Ponyo" />
+                <small><LocalizedText translationKey="product.proof.exclusive" fallback="Exclusive" /></small>
+              </span>
+            </span>
           </div>
           <section className="product-proof product-proof-in-gallery" aria-labelledby="product-proof-title">
             <div className="product-proof-heading">
@@ -103,7 +109,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <span className="product-brand-story-link"><LocalizedText translationKey="product.proof.visit_maker" fallback="Meet the maker" /> <span aria-hidden="true">→</span></span>
           </Link>}
         </div>
-        <div className="product-detail-copy"><ProductPurchasePanel product={displayProduct} />{storefrontFeatures.commerce && <p className="product-payment-caption"><LocalizedText as="span" translationKey="pages.product.payment_caption" fallback="Secure checkout powered by Ponyo." /></p>}{(storefrontFeatures.productReservations || hasWaitlist || product.reservationsOpen) && <ProductReservationPanel productId={product.id} productName={product.name} reservationsOpen={storefrontFeatures.productReservations || (!isExample && product.reservationsOpen === true)} />}</div>
+        <div className="product-detail-copy"><ProductPurchasePanel product={displayProduct} />{storefrontFeatures.commerce && <p className="product-payment-caption"><LocalizedText as="span" translationKey="pages.product.payment_caption" fallback="Secure checkout powered by Ponyo." /></p>}{(storefrontFeatures.productReservations || hasWaitlist || product.reservationsOpen) && <ProductActionPanel productId={product.id} productName={product.name} shippingCountries={product.shippingCountries} reservationsOpen={product.reservationsOpen === true} />}</div>
       </section>
       {storefrontFeatures.productReviews && <ProductReviews productId={product.id} />}
       {related.length > 0 && <section className="related-products store-container"><div className="section-head"><div><p className="eyebrow"><LocalizedText as="span" translationKey="pages.product.related_eyebrow" fallback="A FEW MORE TO LOVE" /></p><h2><LocalizedText as="span" translationKey="pages.product.related_title" fallback="You may also like" /></h2></div><Link className="text-link" href={`/shop?category=${product.categoryName.toLowerCase().replaceAll(" ", "-")}`}><LocalizedText as="span" translationKey="pages.product.see_all" fallback="See all →" /></Link></div><ProductGrid products={related} /></section>}

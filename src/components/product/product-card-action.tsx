@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCustomerSession } from "@/components/layout/customer-session-provider";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { ponyoApi } from "@/services/ponyo-api.client";
+import { getProductShippingStatus } from "@/lib/product-shipping";
 import type { CartItem } from "@/lib/cart";
 import type { Product } from "@/types/product";
 import { storefrontFeatures } from "@/lib/storefront-features";
@@ -27,7 +28,7 @@ function ProductActionIcon({ type }: { type: "bag" | "email" | "arrow" }) {
 
 export function ProductCardAction({ product, productName }: ProductCardActionProps) {
   const { customer, isLoading } = useCustomerSession();
-  const { t } = useLocalization();
+  const { country, t } = useLocalization();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
@@ -49,10 +50,14 @@ export function ProductCardAction({ product, productName }: ProductCardActionPro
   }, [dialogOpen]);
 
   if (storefrontFeatures.productReservations) {
+    const shippingStatus = getProductShippingStatus(product, country);
+    if (shippingStatus === "deliverable" && !product.reservationsOpen) return null;
+    const canShipToCountry = shippingStatus === "deliverable";
+    const target = canShipToCountry ? "product-reservation" : "product-interest";
     return (
       <div className="product-card-action-wrap">
-        <Link className="product-card-action is-reservation" href={`/products/${encodeURIComponent(product.id)}#product-reservation`}>
-          <span className="product-card-action-label">{t("product.action.reserve_spot", "Reserve a spot")}</span>
+        <Link className="product-card-action is-reservation" href={`/products/${encodeURIComponent(product.id)}#${target}`}>
+          <span className="product-card-action-label">{canShipToCountry ? t("product.action.reserve_spot", "Reserve a spot") : t("product.action.register_interest", "Register interest")}</span>
           <span className="product-card-action-icon"><ProductActionIcon type="arrow" /></span>
         </Link>
       </div>

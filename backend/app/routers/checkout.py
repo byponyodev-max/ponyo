@@ -18,6 +18,7 @@ from app.checkout_pricing import allocate_discount, coupon_discount, totals
 from app.catalog_stock import available_quantities
 from app.db import get_db
 from app.models import Coupon, Customer, Order, OrderItem, OrderStatusHistory, PaymentTransaction, ProductVariant
+from app.shipping import SUPPORTED_SHIPPING_COUNTRIES
 from app.payments import record_transaction, reference_id
 from app.inventory import reserve_supplier_stock
 from app.media import storefront_image_url
@@ -28,7 +29,7 @@ from app.security import get_current_customer, require_csrf
 router = APIRouter(prefix="/checkout", tags=["checkout"])
 
 SHIPPING_PRICES = {"standard": 0, "express": 1200}
-SUPPORTED_COUNTRIES = {"JP", "KR", "US", "GB", "AU", "CA"}
+SUPPORTED_COUNTRIES = set(SUPPORTED_SHIPPING_COUNTRIES)
 
 
 async def checkout_values(payload: CheckoutSessionRequest, customer: Customer, db: AsyncSession, *, lock: bool):
@@ -65,6 +66,11 @@ async def checkout_values(payload: CheckoutSessionRequest, customer: Customer, d
         variant = variants[requested.variantId]
         if not variant.product.published or (available.get(variant.id, 0) if available is not None else variant.stock_quantity) < requested.quantity:
             raise HTTPException(409, "One or more items are no longer available in that quantity.")
+        destinations = variant.product.shipping_countries
+        if destinations is None:
+            raise HTTPException(409, "Shipping destinations are not confirmed for one or more products. Register your interest instead.")
+        if payload.shippingAddress.countryCode not in destinations:
+            raise HTTPException(409, "One or more products cannot ship to the selected country. Register your interest instead.")
         if (requested.expectedPriceAmount is not None and requested.expectedPriceAmount != variant.price_amount) or (
             requested.expectedCurrency is not None and requested.expectedCurrency.upper() != variant.currency.upper()
         ):

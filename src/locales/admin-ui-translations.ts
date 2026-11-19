@@ -37,6 +37,7 @@ const rows: ReadonlyArray<readonly [string, string, string, string]> = [
 	["admin.ui.sidebar_tagline", "Thoughtfully found. Ready to be loved.", "心を込めて選び、愛される準備を。", "정성껏 골라 사랑받을 준비를 마쳤어요."],
 	["admin.ui.sidebar_note", "The little details make the whole marketplace.", "小さな心配りが、マーケットプレイスをつくります。", "작은 세심함이 마켓플레이스 전체를 완성합니다."],
 	["admin.ui.sign_out", "Sign out", "サインアウト", "로그아웃"],
+	["admin.ui.language", "Language", "言語", "언어"],
 	["admin.ui.management", "PONYO MARKETPLACE MANAGEMENT", "PONYOマーケットプレイス管理", "PONYO 마켓플레이스 관리"],
 	["admin.ui.good_morning", "Good morning, {{name}}", "おはようございます、{{name}}さん", "{{name}}님, 좋은 아침이에요"],
 	["admin.ui.admin_fallback", "Admin", "管理者", "관리자"],

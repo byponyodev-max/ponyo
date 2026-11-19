@@ -9,6 +9,11 @@ const css = read("../src/app/admin-portal.css");
 const api = read("../src/services/ponyo-api.client.ts");
 const proxy = read("../src/proxy.ts");
 const backend = read("../backend/app/routers/admin.py");
+const rootLayout = read("../src/app/layout.tsx");
+const localeRequest = read("../src/i18n/request.ts");
+const localizationProvider = read("../src/components/layout/localization-provider.tsx");
+const preferencesRoute = read("../src/app/api/preferences/route.ts");
+const adminTranslations = read("../src/locales/admin-ui-translations.ts");
 
 test("admin portal exposes separate login, role-gated operations and its Ponyo subdomain", () => {
     assert.ok(api.includes("/admin-auth/login"));
@@ -66,4 +71,19 @@ test("dashboard UI uses Ponyo palette and responsive compact navigation", () => 
     assert.match(css, /\.ad-nav-copy strong\s*\{[^}]*font-size:\s*13px;/s);
     assert.ok(css.includes("/* High-readability scale: prioritize legibility over compact density. */"));
     assert.match(readability, /\.ad-table td,[\s\S]{0,500}font-size:\s*16px;/);
+});
+
+test("admin language can be changed in both login and dashboard and defaults to English", () => {
+    assert.equal((page.match(/<AdminLanguageSelect /g) || []).length, 2);
+    assert.ok(page.includes('value="en">English'));
+    assert.ok(page.includes('value="ja">日本語'));
+    assert.ok(page.includes('value="ko">한국어'));
+    assert.ok(proxy.includes('"x-ponyo-admin-portal"'));
+    assert.ok(rootLayout.includes('isAdminPortal ? "ponyo-admin-language" : "ponyo-language"'));
+    assert.ok(rootLayout.includes('isAdminPortal ? "en" : countryLocalization.language'));
+    assert.ok(localeRequest.includes('isAdminPortal ? "ponyo-admin-language" : "ponyo-language"'));
+    assert.ok(localeRequest.includes('(isAdminPortal ? "en" : getDeliveryLocalization(country).language)'));
+    assert.ok(localizationProvider.includes('adminPortal ? { adminLanguage: next } : { language: next }'));
+    assert.ok(preferencesRoute.includes('cookieStore.set("ponyo-admin-language", adminLanguage, options)'));
+    assert.ok(adminTranslations.includes('"admin.ui.language", "Language", "言語", "언어"'));
 });

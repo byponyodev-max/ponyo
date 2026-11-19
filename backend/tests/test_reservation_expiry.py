@@ -137,7 +137,8 @@ async def test_checkout_persists_actual_provider_deadline(monkeypatch):
     monkeypatch.setattr("app.routers.checkout.reserve_supplier_stock", AsyncMock(return_value=None))
     variant_id = uuid4()
     product = SimpleNamespace(id=uuid4(), slug="expiry", sku="PNY-EXPIRY", category_name="Bears",
-                              published=True, name="Expiry", image_url="/test.jpg", image_alt="", supplier_name="Ponyo")
+                              published=True, name="Expiry", image_url="/test.jpg", image_alt="", supplier_name="Ponyo",
+                              shipping_countries=["JP"])
     variant = SimpleNamespace(id=variant_id, sku="PNV-EXPIRY", title="Default", options={},
                               currency="JPY", price_amount=1500, stock_quantity=10, product=product)
     db = SimpleNamespace(scalar=AsyncMock(return_value=None), scalars=AsyncMock(return_value=[variant]), execute=AsyncMock(return_value=SimpleNamespace(rowcount=1)), add=Mock(), commit=AsyncMock(), rollback=AsyncMock())

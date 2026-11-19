@@ -356,6 +356,18 @@
     overflow-wrap: anywhere;
 }
 
+.shop-product-shipping-status {
+    margin: 5px 0 0;
+    color: #80695c;
+    font-size: 10px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.shop-product-shipping-status.is-deliverable {
+    color: #58715b;
+}
+
 
 /* Ponyo-styled catalog controls shared by every collection and search result page. */
 

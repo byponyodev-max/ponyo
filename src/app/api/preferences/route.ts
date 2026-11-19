@@ -9,6 +9,7 @@ import {
 export async function POST(request: Request) {
 	let body: {
 		language?: unknown;
+		adminLanguage?: unknown;
 		currency?: unknown;
 		country?: unknown;
 		deliveryNoticeDismissed?: unknown;
@@ -26,6 +27,11 @@ export async function POST(request: Request) {
 		typeof body.language === "string" &&
 		languages.some((option) => option.code === body.language)
 			? body.language
+			: null;
+	const adminLanguage =
+		typeof body.adminLanguage === "string" &&
+		languages.some((option) => option.code === body.adminLanguage)
+			? body.adminLanguage
 			: null;
 	const currency =
 		typeof body.currency === "string" &&
@@ -48,6 +54,7 @@ export async function POST(request: Request) {
 	const optionalMarketing = body.optionalMarketing === true;
 	if (
 		!language &&
+		!adminLanguage &&
 		!currency &&
 		!country &&
 		!deliveryNoticeDismissed &&
@@ -66,6 +73,7 @@ export async function POST(request: Request) {
 		secure: process.env.NODE_ENV === "production",
 	};
 	if (language) cookieStore.set("ponyo-language", language, options);
+	if (adminLanguage) cookieStore.set("ponyo-admin-language", adminLanguage, options);
 	if (currency) cookieStore.set("ponyo-currency", currency, options);
 	if (country) cookieStore.set("ponyo-country", country, options);
 	if (deliveryNoticeDismissed)
@@ -87,7 +95,7 @@ export async function POST(request: Request) {
 
 	return NextResponse.json({
 		data: {
-			language: language ?? cookieStore.get("ponyo-language")?.value ?? "en",
+			language: adminLanguage ?? language ?? cookieStore.get("ponyo-language")?.value ?? "en",
 			currency: currency ?? cookieStore.get("ponyo-currency")?.value ?? "JPY",
 			country: country ?? cookieStore.get("ponyo-country")?.value ?? "JP",
 			deliveryNoticeDismissed:

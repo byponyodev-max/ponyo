@@ -16,8 +16,10 @@ from app.models import (
     MakerApplication,
     Order,
     OrderItem,
+    OutboxEvent,
     Product,
     ProductCategory,
+    ProductInterest,
     ProductReservation,
     ProductVariant,
     Shipment,
@@ -26,6 +28,7 @@ from app.models import (
     SupplierOffer,
     SupplierPurchaseOrder,
     SupplierPurchaseOrderItem,
+    utc_now,
 )
 from app.rate_limit import enforce_rate_limit
 from app.schemas import (
@@ -109,6 +112,7 @@ def product_summary(product: Product) -> dict:
         "onlyAtPonyo": product.only_at_ponyo,
         "reservationsOpen": product.reservations_open,
         "reservationTarget": product.reservation_target,
+        "shippingCountries": product.shipping_countries,
     }
 
 
@@ -300,6 +304,37 @@ async def list_product_reservations(_admin: Customer = Depends(require_roles("ad
             **product_summary(product),
             "reservationCount": counts.get(product.id, 0),
             "reservationsByCountry": country_counts.get(product.id, []),
+            "reservationMinimumReachedAt": (
+                product.reservation_minimum_reached_at.isoformat()
+                if product.reservation_minimum_reached_at else None
+            ),
+        }
+        for product in products
+    ]}
+
+
+@router.get("/interests", response_model=dict)
+async def list_product_interests(_admin: Customer = Depends(require_roles("admin")), db: AsyncSession = Depends(get_db)):
+    products = (await db.scalars(
+        select(Product).order_by(Product.name, Product.id)
+        .options(selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images))
+    )).all()
+    counts = dict((await db.execute(
+        select(ProductInterest.product_id, func.count(ProductInterest.id))
+        .group_by(ProductInterest.product_id)
+    )).all())
+    country_counts: dict[UUID, list[dict[str, str | int]]] = {}
+    for product_id, country, count in (await db.execute(
+        select(ProductInterest.product_id, ProductInterest.country, func.count(ProductInterest.id))
+        .group_by(ProductInterest.product_id, ProductInterest.country)
+        .order_by(ProductInterest.country)
+    )).all():
+        country_counts.setdefault(product_id, []).append({"country": country, "count": count})
+    return {"data": [
+        {
+            **product_summary(product),
+            "interestCount": counts.get(product.id, 0),
+            "interestsByCountry": country_counts.get(product.id, []),
         }
         for product in products
     ]}
@@ -408,13 +443,30 @@ async def set_product_reservation_settings(
     product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update())
     if product is None:
         raise HTTPException(404, "Product not found.")
+    reservation_count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+        ProductReservation.product_id == product.id,
+    )) or 0
     product.reservations_open = payload.reservationsOpen
     product.reservation_target = payload.reservationTarget
+    if payload.reservationTarget is None or reservation_count < payload.reservationTarget:
+        product.reservation_minimum_reached_at = None
+    elif product.reservation_minimum_reached_at is None:
+        product.reservation_minimum_reached_at = utc_now()
+        db.add(OutboxEvent(event_type="product.reservation_minimum_reached", payload={
+            "productId": str(product.id),
+            "productName": product.name,
+            "reservationCount": reservation_count,
+            "target": payload.reservationTarget,
+        }))
     await db.commit()
     return {"data": {
         "id": str(product.id),
         "reservationsOpen": product.reservations_open,
         "reservationTarget": product.reservation_target,
+        "reservationMinimumReachedAt": (
+            product.reservation_minimum_reached_at.isoformat()
+            if product.reservation_minimum_reached_at else None
+        ),
     }}
 
 
@@ -440,6 +492,7 @@ async def update_product_proof(
         "editionCount": "edition_count",
         "estimatedDeliveryDate": "estimated_delivery_date",
         "onlyAtPonyo": "only_at_ponyo",
+        "shippingCountries": "shipping_countries",
     }
     for field, value in changes.items():
         setattr(product, field_map[field], value)

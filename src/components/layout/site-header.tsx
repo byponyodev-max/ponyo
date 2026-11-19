@@ -269,7 +269,7 @@ export function SiteHeader() {
             {mainLinks.map((item) => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined}>{t(item.key, item.title)}</Link>)}
             <DesktopCollectiblesMenu />
           </nav>
-          <Link href="/pages/domina-xl" className="domina-link"><span>DOMINA by Ponyo</span><span className="domina-promo-copy">· {t("home.header.giant_plush_range", "Giant plush from 70 to 120 cm")}</span><span className="domina-arrow" aria-hidden="true">›</span></Link>
+          <Link href="/pages/domina-xl" className="domina-link"><span>{t("home.header.domina", "DOMINA by Ponyo")}</span><span className="domina-promo-copy">· {t("home.header.giant_plush_range", "Giant plush from 70 to 120 cm")}</span><span className="domina-arrow" aria-hidden="true">›</span></Link>
         </div>
         </div>
         <div className="store-ticker" role="region" aria-label={t("home.announce_label", "Announcements")}><div className="ticker-track">{[0, 1].map((pass) => <div key={pass} className="ticker-set" aria-hidden={pass === 1}>{ticker.map((item) => <span className="ticker-item" key={`${pass}-${item.text}`}><Link href={item.href} tabIndex={pass ? -1 : undefined}>{t(item.key, item.text)}</Link><span aria-hidden="true">✦</span></span>)}</div>)}</div></div>

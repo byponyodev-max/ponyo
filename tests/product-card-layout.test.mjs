@@ -69,8 +69,9 @@ test("the detail page passes six-item selection to its recommendations grid usin
 	);
 });
 
-test("the detail page shows six maker-supplied facts and a conditional exclusivity badge", () => {
+test("the detail page shows six maker-supplied facts and an exclusivity badge for every product", () => {
 	const page = read("../src/app/products/[id]/page.tsx");
+	const makerPage = read("../src/app/makers/[slug]/page.tsx");
 	assert.match(page, /const proofFacts = \[/);
 	for (const proof of [
 		"maker",
@@ -82,12 +83,15 @@ test("the detail page shows six maker-supplied facts and a conditional exclusivi
 	]) {
 		assert.match(page, new RegExp(`key: "${proof}"`));
 	}
-	assert.match(page, /product\.onlyAtPonyo && <span className="product-gallery-approval-badge"/);
-	assert.match(page, /src="\/ponyo-jellyfish\.svg" width=\{22\} height=\{22\}/);
+	assert.match(page, /<span className="product-gallery-approval-badge">/);
+	assert.match(page, /className="product-gallery-approval-star" aria-hidden="true">★/);
+	assert.doesNotMatch(page, /product\.onlyAtPonyo &&/);
 	assert.match(
 		page,
 		/\{product\.makerSlug && <Link className="product-brand-story"/,
 	);
+	assert.match(makerPage, /getLocalizedProducts\("\?limit=100", locale\)/);
+	assert.match(makerPage, /product\.makerSlug === slug/);
 });
 
 load("../src/components/product/product-card.tsx", {
@@ -100,12 +104,38 @@ load("../src/components/product/product-card.tsx", {
 	"@/lib/storefront-features": {
 		storefrontFeatures: { productReservations: false, commerce: false },
 	},
+	"@/lib/localization-options": {
+		regionName: (code) => code,
+	},
+	"@/lib/product-shipping": {
+		getProductShippingStatus: (item, country) => {
+			if (item.shippingCountries == null) return "unconfirmed";
+			return item.shippingCountries.includes(country) ? "deliverable" : "unavailable";
+		},
+	},
 	"@/components/layout/localization-provider": {
 		useLocalization: () => ({
+			country: "JP",
+			language: "en",
 			formatPrice: (amount) => `IDR\u00a0${amount.toLocaleString("de-DE")}`,
 			t: (_, fallback) => fallback,
 		}),
 	},
+});
+
+const { getProductShippingStatus, sortProductsByDelivery } = load("../src/lib/product-shipping.ts");
+
+test("delivery sorting keeps the full catalog and prioritizes deliverable products stably", () => {
+	const products = [
+		{ id: "unknown", shippingCountries: null },
+		{ id: "not-jp", shippingCountries: ["KR"] },
+		{ id: "jp", shippingCountries: ["JP"] },
+	];
+	const sorted = sortProductsByDelivery(products, "JP");
+	assert.deepEqual(Array.from(sorted, ({ id }) => id), ["jp", "unknown", "not-jp"]);
+	assert.equal(sorted.length, products.length);
+	assert.equal(getProductShippingStatus(products[0], "JP"), "unconfirmed");
+	assert.equal(getProductShippingStatus(products[1], "JP"), "unavailable");
 });
 
 test("product cards show the current price without sale-price claims", () => {
@@ -171,12 +201,16 @@ test("product shelves keep unmapped copy without queuing an empty translation ke
 	]);
 });
 
-test("product cards are information-only while commerce is paused", () => {
+test("product cards show reservation or interest actions while commerce is paused", () => {
 	const cardSource = read("../src/components/product/product-card.tsx");
-	assert.doesNotMatch(
-		cardSource,
-		/ProductCardAction|wishlist-toggle|add_to_cart|Notify me|<del>/,
-	);
+	const cardActionSource = read("../src/components/product/product-card-action.tsx");
+	assert.match(cardSource, /storefrontFeatures\.productReservations && <ProductCardAction/);
+	assert.match(cardActionSource, /getProductShippingStatus\(product, country\)/);
+	assert.match(cardActionSource, /href=\{`\/products\/\$\{encodeURIComponent\(product\.id\)\}#\$\{target\}`\}/);
+	assert.match(cardActionSource, /canShipToCountry \? t\("product\.action\.reserve_spot"/);
+	assert.match(cardActionSource, /: t\("product\.action\.register_interest"/);
+	assert.match(cardActionSource, /shippingStatus === "deliverable" && !product\.reservationsOpen/);
+	assert.doesNotMatch(cardSource, /add_to_cart|Notify me|<del>/);
 	assert.match(cardSource, /href=\{`\/products\/\$\{product\.id\}`\}/);
 });
 
@@ -381,7 +415,7 @@ test("desktop size guide scales square portraits rather than clipping shallow he
 	);
 	const page = read("../src/app/page.tsx");
 	assert.ok(
-		page.includes("translationKey={`home.size.${tile.name.toLowerCase()}`}"),
+		page.includes("translationKey={`shop.size.${tile.name.toLowerCase()}`}"),
 	);
 	assert.ok(page.includes("translationKey={`home.size.${tile.rangeKey}`}"));
 });

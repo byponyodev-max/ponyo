@@ -9,13 +9,14 @@ from sqlalchemy.orm import selectinload
 
 from app.db import get_db
 from app.media import storefront_image_url
-from app.models import Brand, Customer, Order, OrderItem, OutboxEvent, Product, ProductCategory, ProductReservation, ProductReview, ProductTranslation, ProductVariant, ProductWaitlistEntry
+from app.models import Brand, Customer, Order, OrderItem, OutboxEvent, Product, ProductCategory, ProductInterest, ProductReservation, ProductReview, ProductTranslation, ProductVariant, ProductWaitlistEntry, utc_now
 from app.catalog_stock import available_quantities, sellable_variant
-from app.schemas import ProductOut, ProductReservationRequest, ProductReviewCreate, ProductWaitlistRequest, VariantOut
+from app.schemas import ProductInterestRequest, ProductOut, ProductReservationRequest, ProductReviewCreate, ProductWaitlistRequest, VariantOut
 from app.security import get_current_customer, get_optional_customer, require_csrf
 from app.rate_limit import enforce_rate_limit
 from app.translations import TRANSLATION_LOCALES, TranslationUnavailableError, get_product_translation
 from app.translations import _get_nested
+from app.shipping import shipping_country_code
 
 router = APIRouter(prefix="/products", tags=["catalog"])
 
@@ -90,6 +91,7 @@ def product_response(product: Product, translation: ProductTranslation | None = 
         onlyAtPonyo=product.only_at_ponyo,
         reservationsOpen=product.reservations_open,
         reservationTarget=product.reservation_target,
+        shippingCountries=product.shipping_countries,
         images=[{"url": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],
         galleryImages=[{"src": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],
         productType=localized(("productType",), product.product_type),
@@ -375,37 +377,125 @@ async def create_product_reservation(
 ):
     require_csrf(request)
     await enforce_rate_limit(request, "product-reservation", 10, 3600)
-    product = await product_by_id(product_id, db)
+    product = await db.scalar(
+        select(Product)
+        .where(Product.id == product_id, Product.published.is_(True))
+        .with_for_update()
+    )
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
     if not product.reservations_open:
         raise HTTPException(status_code=409, detail="Reservations are not open for this product.")
+    country_code = shipping_country_code(payload.country)
+    if product.shipping_countries is None or country_code not in product.shipping_countries:
+        raise HTTPException(
+            status_code=409,
+            detail="This product cannot be reserved for the selected country. Register your interest instead.",
+        )
 
+    reservation_target = product.reservation_target
+    product_name = product.name
     email = str(payload.email).lower().strip()
     existing = await db.scalar(select(ProductReservation.id).where(
         ProductReservation.product_id == product.id,
         ProductReservation.email == email,
     ))
     if existing is None:
-        db.add(ProductReservation(
-            product_id=product.id,
-            email=email,
-            country=payload.country.strip(),
-        ))
-        db.add(OutboxEvent(event_type="product.reservation_created", payload={
-            "productId": str(product.id), "productName": product.name, "email": email,
-        }))
         try:
+            db.add(ProductReservation(
+                product_id=product.id,
+                email=email,
+                country=country_code,
+            ))
+            db.add(OutboxEvent(event_type="product.reservation_created", payload={
+                "productId": str(product.id), "productName": product.name, "email": email,
+            }))
+            await db.flush()
+            count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+                ProductReservation.product_id == product.id,
+            )) or 0
+            if (
+                reservation_target is not None
+                and count >= reservation_target
+                and product.reservation_minimum_reached_at is None
+            ):
+                product.reservation_minimum_reached_at = utc_now()
+                db.add(OutboxEvent(event_type="product.reservation_minimum_reached", payload={
+                    "productId": str(product.id),
+                    "productName": product_name,
+                    "reservationCount": count,
+                    "target": reservation_target,
+                }))
             await db.commit()
         except IntegrityError:
             await db.rollback()
+            duplicate = await db.scalar(select(ProductReservation.id).where(
+                ProductReservation.product_id == product_id,
+                ProductReservation.email == email,
+            ))
+            if duplicate is None:
+                raise
 
     count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
-        ProductReservation.product_id == product.id,
+        ProductReservation.product_id == product_id,
     )) or 0
     return {"data": {
         "accepted": True,
         "reservationCount": count,
-        "target": product.reservation_target,
+        "target": reservation_target,
     }}
+
+
+@router.post("/{product_id}/interests", response_model=dict)
+async def register_product_interest(
+    product_id: UUID,
+    payload: ProductInterestRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "product-interest", 10, 3600)
+    product = await db.scalar(
+        select(Product)
+        .where(Product.id == product_id, Product.published.is_(True))
+        .with_for_update()
+    )
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
+
+    country_code = shipping_country_code(payload.country)
+    if country_code and product.shipping_countries and country_code in product.shipping_countries:
+        raise HTTPException(
+            status_code=409,
+            detail="This product ships to the selected country. Reserve a spot instead.",
+        )
+
+    email = str(payload.email).lower().strip()
+    country = country_code or payload.country.strip()
+    existing = await db.scalar(select(ProductInterest.id).where(
+        ProductInterest.product_id == product.id,
+        ProductInterest.email == email,
+        ProductInterest.country == country,
+    ))
+    if existing is None:
+        try:
+            db.add(ProductInterest(product_id=product.id, email=email, country=country))
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            duplicate = await db.scalar(select(ProductInterest.id).where(
+                ProductInterest.product_id == product_id,
+                ProductInterest.email == email,
+                ProductInterest.country == country,
+            ))
+            if duplicate is None:
+                raise
+
+    count = await db.scalar(select(func.count()).select_from(ProductInterest).where(
+        ProductInterest.product_id == product_id,
+        ProductInterest.country == country,
+    )) or 0
+    return {"data": {"accepted": True, "interestCount": count, "country": country}}
 
 
 @router.post("/{product_id}/waitlist", response_model=dict)

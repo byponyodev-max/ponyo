@@ -4,6 +4,7 @@ import type { Product } from "@/types/product";
 import { ProductCard } from "@/components/product/product-card";
 import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
+import { sortProductsByDelivery } from "@/lib/product-shipping";
 
 type ProductGridProps = {
   products: Product[];
@@ -24,7 +25,7 @@ const collectionPromos = [
 ];
 
 export function ProductGrid({ products, badges, rail = false, compact = false, fillSlots = false, fillColumns = [2, 3, 4, 5], promoOffset = 0, promoCount = collectionPromos.length }: ProductGridProps) {
-  const { t } = useLocalization();
+  const { country, t } = useLocalization();
   if (products.length === 0 && !fillSlots) {
     return <p className="empty-state">{t("static.empty.products", "There are no products to show right now. Please check back soon.")}</p>;
   }
@@ -34,10 +35,11 @@ export function ProductGrid({ products, badges, rail = false, compact = false, f
     : fillColumns.map((columns) => (columns - products.length % columns) % columns);
   const fillCount = fillSlots ? Math.min(promoCount, collectionPromos.length, Math.max(...fillCounts)) : 0;
   const orderedPromos = [...collectionPromos.slice(promoOffset), ...collectionPromos.slice(0, promoOffset)];
+  const sortedProducts = sortProductsByDelivery(products, country);
 
   return (
     <div className={`product-grid${rail ? " marketplace-rail" : ""}`}>
-      {products.map((product) => (
+      {sortedProducts.map((product) => (
         <ProductCard key={product.id} product={product} badge={badges?.[product.slug]} compact={compact} />
       ))}
       {orderedPromos.slice(0, fillCount).map((promo, index) => (

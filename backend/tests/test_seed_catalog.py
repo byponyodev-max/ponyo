@@ -42,6 +42,7 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
         async with sessions() as db:
             product = await db.scalar(select(Product).where(Product.slug == "mochi-cloud"))
             assert product.reservations_open is True
+            assert product.reservation_target == 50
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id))
             offer = await db.scalar(select(SupplierOffer).where(SupplierOffer.variant_id == variant.id))
             inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == offer.id))
@@ -53,6 +54,8 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
             ))
             bad_translation.name = "Bad cached output"
             bad_translation.provider = "libretranslate"
+            product.reservations_open = False
+            product.reservation_target = 40
             await db.commit()
         await seed.seed_products()
         async with sessions() as db:
@@ -63,6 +66,8 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
                 selectinload(Product.variants), selectinload(Product.category),
                 selectinload(Product.brand), selectinload(Product.images),
             ))
+            assert product.reservations_open is False
+            assert product.reservation_target == 40
             assert product.materials == "Polyester plush; polyester fiber fill; embroidered details."
             assert product.weight_grams == 240
             assert product.edition_count == 240
