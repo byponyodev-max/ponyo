@@ -3,7 +3,13 @@ from sqlalchemy import select
 
 from app.models import Customer, Product, Supplier
 from app.security import hash_password
-from test_api import add_product, csrf_token, seed_customer_session, test_client
+from test_api import (
+	add_product,
+	csrf_token,
+	safe_auth_email_and_cookies as safe_auth_email_and_cookies,
+	seed_customer_session,
+	test_client,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -101,6 +107,50 @@ async def test_admin_reads_and_writes_reject_non_admins(test_client):
 	assert (await client.get("/v1/admin/products")).status_code == 403
 	assert (await client.get("/v1/admin/suppliers")).status_code == 403
 	assert (await client.get("/v1/admin/customers")).status_code == 403
+	assert (await client.get("/v1/admin/admins")).status_code == 403
+	assert (await client.post("/v1/admin/admins", json={
+		"firstName": "Another", "email": "another@example.com", "password": "valid-password-123",
+	}, headers={"X-CSRF-Token": await csrf_token(client)})).status_code == 403
+
+
+async def test_admin_can_provision_verified_admin_accounts_without_exposing_passwords(test_client):
+	client, factory = test_client
+	await admin_session(client, factory, email="account-creator@example.com")
+	payload = {
+		"firstName": "New",
+		"lastName": "Admin",
+		"email": "NEW-ADMIN@example.com",
+		"password": "strong-password-123!",
+	}
+
+	without_csrf = await client.post("/v1/admin/admins", json=payload)
+	assert without_csrf.status_code == 403
+
+	created = await post(client, "/v1/admin/admins", payload)
+	assert created.status_code == 201
+	account_data = created.json()["data"]
+	assert account_data["email"] == "new-admin@example.com"
+	assert account_data["emailVerified"] is True
+	assert "password" not in account_data
+	assert "password_hash" not in account_data
+
+	listed = await client.get("/v1/admin/admins")
+	assert listed.status_code == 200
+	assert {account["email"] for account in listed.json()["data"]} == {"account-creator@example.com", "new-admin@example.com"}
+	assert "password_hash" not in listed.text
+
+	duplicate = await post(client, "/v1/admin/admins", payload)
+	assert duplicate.status_code == 409
+	weak_password = await post(client, "/v1/admin/admins", {**payload, "email": "weak@example.com", "password": "password-only"})
+	assert weak_password.status_code == 422
+
+	async with factory() as db:
+		account = await db.scalar(select(Customer).where(Customer.email == "new-admin@example.com"))
+		assert account is not None
+		assert account.role == "admin"
+		assert account.email_verified is True
+		assert account.password_hash != payload["password"]
+		assert account.password_hash
 
 
 async def test_admin_auth_is_separate_and_requires_admin_role_and_csrf(test_client):

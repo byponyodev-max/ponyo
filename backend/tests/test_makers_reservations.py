@@ -1,4 +1,7 @@
+from io import BytesIO
+
 import pytest
+from openpyxl import load_workbook
 from sqlalchemy import func, select
 
 from app.models import Brand, Customer, MakerApplication, OutboxEvent, Product, ProductInterest, ProductReservation
@@ -326,18 +329,18 @@ async def test_admin_can_configure_product_proof_and_reservation_counter(test_cl
             "editionCount": 24,
             "estimatedDeliveryDate": "2027-01-15",
             "onlyAtPonyo": True,
-            "shippingCountries": ["JP", "KR", "US"],
+            "shippingCountries": ["JP", "KR"],
         },
     )
     assert proof.status_code == 200
     assert proof.json()["data"]["editionCount"] == 24
     assert proof.json()["data"]["onlyAtPonyo"] is True
-    assert proof.json()["data"]["shippingCountries"] == ["JP", "US"]
+    assert proof.json()["data"]["shippingCountries"] == ["JP", "KR"]
 
     invalid_shipping = await client.patch(
         f"/v1/admin/products/{product_id}/proof",
         headers={"X-CSRF-Token": csrf},
-        json={"shippingCountries": ["XX"]},
+        json={"shippingCountries": ["US"]},
     )
     assert invalid_shipping.status_code == 422
 
@@ -395,6 +398,24 @@ async def test_admin_can_configure_product_proof_and_reservation_counter(test_cl
     assert "no-store" in export.headers["cache-control"]
     assert "three@example.com" in export.text
     assert "one@example.com" not in export.text
+
+    workbook_export = await client.get(
+        "/v1/admin/reservations/export.xlsx",
+        params={"productId": str(product_id), "country": "KR"},
+    )
+    assert workbook_export.status_code == 200
+    assert workbook_export.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    assert "no-store" in workbook_export.headers["cache-control"]
+    assert workbook_export.headers["x-export-row-count"] == "1"
+    sheet = load_workbook(BytesIO(workbook_export.content), data_only=True).active
+    assert sheet.freeze_panes == "A7"
+    assert sheet.auto_filter.ref == "A6:E7"
+    assert sheet["A3"].value == f"Filters: Product ID: {product_id} · Country: KR"
+    assert sheet["A7"].value
+    assert sheet["B7"].value == "Admin-Proof-Plush"
+    assert sheet["C7"].value == "three@example.com"
 
     public = await client.get(f"/v1/products/{product_id}/reservations")
     assert public.json()["data"] == {"reservationCount": 3, "target": 40, "open": True}

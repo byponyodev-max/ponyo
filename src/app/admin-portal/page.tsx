@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 import { aggregateReservationsByCountry } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
 import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
-type AdminSection = "dashboard" | "orders" | "products" | "reservations" | "maker-applications" | "suppliers" | "brands" | "customers" | "fulfillment";
+type AdminSection = "dashboard" | "orders" | "products" | "reservations" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
 type OrderPage = { items: AdminOrder[]; total: number; limit: number; offset: number };
 type ProductPage = { items: AdminProduct[]; total: number; limit: number; offset: number };
 
@@ -23,6 +23,7 @@ const navigation: Array<{ id: AdminSection; label: string; labelKey: string; ico
 	{ id: "suppliers", label: "Suppliers", labelKey: "suppliers", icon: "✿", hint: "Partners & access", hintKey: "suppliers_hint" },
 	{ id: "brands", label: "Brands", labelKey: "brands", icon: "✧", hint: "Curated labels", hintKey: "brands_hint" },
 	{ id: "customers", label: "Customers", labelKey: "customers", icon: "♙", hint: "Customer accounts", hintKey: "customers_hint" },
+	{ id: "admin-accounts", label: "Admin accounts", labelKey: "admin_accounts", icon: "⚙", hint: "Manage operations access", hintKey: "admin_accounts_hint" },
 	{ id: "fulfillment", label: "Fulfillment", labelKey: "fulfillment", icon: "↗", hint: "Supplier routing", hintKey: "fulfillment_hint" },
 ];
 
@@ -71,11 +72,15 @@ export default function AdminPortalPage() {
 	const [interestProducts, setInterestProducts] = useState<AdminProduct[]>([]);
 	const [reservationEntries, setReservationEntries] = useState<AdminReservationPage>({ items: [], total: 0, limit: 50, offset: 0 });
 	const [reservationFilters, setReservationFilters] = useState({ productId: "", country: "", query: "" });
+	const [appliedReservationFilters, setAppliedReservationFilters] = useState({ productId: "", country: "", query: "" });
 	const [reservationEntriesLoading, setReservationEntriesLoading] = useState(false);
 	const [reservationExporting, setReservationExporting] = useState(false);
 	const [makerApplications, setMakerApplications] = useState<AdminMakerApplication[]>([]);
 	const [customers, setCustomers] = useState<AdminCustomer[]>([]);
+	const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
+	const [newAdmin, setNewAdmin] = useState({ firstName: "", lastName: "", email: "", password: "" });
 	const [section, setSection] = useState<AdminSection>("dashboard");
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [query, setQuery] = useState("");
 	const [publishedFilter, setPublishedFilter] = useState<"all" | "published" | "pending">("all");
 	const [loading, setLoading] = useState(true);
@@ -88,23 +93,28 @@ export default function AdminPortalPage() {
 	const [selectedOrderId, setSelectedOrderId] = useState("");
 	const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
 
-	const loadReservationEntries = useCallback(async (offset: number) => {
+	const loadReservationEntries = useCallback(async (
+		offset: number,
+		filters = appliedReservationFilters,
+	) => {
 		setReservationEntriesLoading(true);
 		setError("");
 		try {
-			setReservationEntries(await ponyoApi.listAdminReservationEntries({
-				productId: reservationFilters.productId || undefined,
-				country: reservationFilters.country || undefined,
-				q: reservationFilters.query.trim() || undefined,
+			const result = await ponyoApi.listAdminReservationEntries({
+				productId: filters.productId || undefined,
+				country: filters.country || undefined,
+				q: filters.query.trim() || undefined,
 				limit: 50,
 				offset,
-			}));
+			});
+			setReservationEntries(result);
+			setAppliedReservationFilters(filters);
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
 		} finally {
 			setReservationEntriesLoading(false);
 		}
-	}, [reservationFilters, t]);
+	}, [appliedReservationFilters, t]);
 
 	const loadSection = useCallback(async (target: AdminSection, search = query) => {
 		setError("");
@@ -144,8 +154,11 @@ export default function AdminPortalPage() {
 					setBrands(await ponyoApi.listAdminBrands());
 					break;
 				case "customers":
-				setCustomers(await ponyoApi.listAdminCustomers(search));
-				break;
+					setCustomers(await ponyoApi.listAdminCustomers(search));
+					break;
+				case "admin-accounts":
+					setAdminAccounts(await ponyoApi.listAdminAccounts());
+					break;
 			}
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
@@ -197,24 +210,40 @@ export default function AdminPortalPage() {
 		setReservationExporting(true);
 		setError("");
 		try {
-			const file = await ponyoApi.downloadAdminReservationCsv({
-				productId: reservationFilters.productId || undefined,
-				country: reservationFilters.country || undefined,
-				q: reservationFilters.query.trim() || undefined,
+			const file = await ponyoApi.downloadAdminReservationsXlsx({
+				productId: appliedReservationFilters.productId || undefined,
+				country: appliedReservationFilters.country || undefined,
+				q: appliedReservationFilters.query.trim() || undefined,
 			});
 			const url = URL.createObjectURL(file);
 			const link = document.createElement("a");
 			link.href = url;
-			link.download = "ponyo-reservations.csv";
+			link.download = "ponyo-reservations.xlsx";
 			document.body.append(link);
 			link.click();
 			link.remove();
 			window.setTimeout(() => URL.revokeObjectURL(url), 0);
-			setNotice(t("admin.reservations.export_ready", "Filtered reservation data downloaded."));
+			setNotice(t("admin.reservations.export_ready", "Filtered Excel report downloaded."));
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
 		} finally {
 			setReservationExporting(false);
+		}
+	}
+
+	async function createAdminAccount(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setBusyId("create-admin");
+		setError("");
+		try {
+			const account = await ponyoApi.createAdminAccount(newAdmin);
+			setAdminAccounts((current) => [...current, account]);
+			setNewAdmin({ firstName: "", lastName: "", email: "", password: "" });
+			setNotice(ui("admin_account_created", "Admin access created for {{email}}.", { email: account.email }));
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
 		}
 	}
 
@@ -245,6 +274,7 @@ export default function AdminPortalPage() {
 		setProducts({ items: [], total: 0, limit: 100, offset: 0 });
 		setSuppliers([]);
 		setCustomers([]);
+		setAdminAccounts([]);
 		setOrderDetail(null);
 		setSelectedOrderId("");
 		setBusyId("");
@@ -317,10 +347,15 @@ export default function AdminPortalPage() {
 		[ui("metric_low_availability", "LOW AVAILABILITY"), metrics?.lowAvailabilityVariants ?? 0, ui("metric_low_stock", "Variants at 3 units or less"), "mint"],
 	] as const;
 
-	return <main className="ad-layout">
-		<aside className="ad-sidebar"><Link className="ad-brand" href="/" aria-label={ui("home", "Ponyo home")}><Image src="/ponyo-jellyfish.svg" alt="" width={38} height={38} /><span>PONYO<small>{ui("admin_studio", "ADMIN STUDIO")}</small></span></Link><div className="ad-sidebar-rule" /><p className="ad-sidebar-label">{ui("marketplace", "MARKETPLACE")}</p>
-			<nav className="ad-nav">{navigation.map((item) => <button key={item.id} className={`ad-nav-item ${section === item.id ? "is-active" : ""}`} type="button" onClick={() => navigateSection(item.id)}><span>{item.icon}</span><span className="ad-nav-copy"><strong>{ui(item.labelKey, item.label)}</strong><small>{ui(item.hintKey, item.hint)}</small></span></button>)}</nav>
-				<nav className="ad-mobile-nav" aria-label={ui("marketplace", "MARKETPLACE")}>{navigation.map((item) => <button key={item.id} className={section === item.id ? "is-active" : ""} type="button" onClick={() => navigateSection(item.id)}>{ui(item.labelKey, item.label)}</button>)}</nav>
+	return <main className={`ad-layout ${sidebarCollapsed ? "ad-layout--collapsed" : ""}`}>
+		<aside className="ad-sidebar">
+			<div className="ad-sidebar-head">
+				<Link className="ad-brand" href="/" aria-label={ui("home", "Ponyo home")}><Image src="/ponyo-jellyfish.svg" alt="" width={38} height={38} /><span>PONYO<small>{ui("admin_studio", "ADMIN STUDIO")}</small></span></Link>
+				<button className="ad-sidebar-toggle" type="button" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)} aria-expanded={!sidebarCollapsed} aria-controls="admin-navigation admin-mobile-navigation" aria-label={sidebarCollapsed ? ui("expand_sidebar", "Expand sidebar") : ui("collapse_sidebar", "Collapse sidebar")}>{sidebarCollapsed ? "»" : "«"}</button>
+			</div>
+			<div className="ad-sidebar-rule" /><p className="ad-sidebar-label">{ui("marketplace", "MARKETPLACE")}</p>
+			<nav className="ad-nav" id="admin-navigation" aria-label={ui("marketplace", "Marketplace")}>{navigation.map((item) => <button key={item.id} className={`ad-nav-item ${section === item.id ? "is-active" : ""}`} type="button" onClick={() => navigateSection(item.id)} aria-label={sidebarCollapsed ? ui(item.labelKey, item.label) : undefined} aria-current={section === item.id ? "page" : undefined}><span>{item.icon}</span><span className="ad-nav-copy"><strong>{ui(item.labelKey, item.label)}</strong><small>{ui(item.hintKey, item.hint)}</small></span></button>)}</nav>
+			<nav className="ad-mobile-nav" id="admin-mobile-navigation" aria-label={ui("marketplace", "MARKETPLACE")}>{navigation.map((item) => <button key={item.id} className={section === item.id ? "is-active" : ""} type="button" onClick={() => navigateSection(item.id)} aria-current={section === item.id ? "page" : undefined}>{ui(item.labelKey, item.label)}</button>)}</nav>
 			<div className="ad-sidebar-note"><span>✦</span><strong>{ui("sidebar_tagline", "Thoughtfully found. Ready to be loved.")}</strong><small>{ui("sidebar_note", "The little details make the whole marketplace.")}</small></div>
 			<div className="ad-account"><span className="ad-avatar">{admin.firstName.slice(0, 1).toUpperCase() || "A"}</span><div><strong>{admin.firstName} {admin.lastName}</strong><small>{admin.email}</small></div><button type="button" onClick={() => void logout()} disabled={busyId === "logout"} aria-label={ui("sign_out", "Sign out")}>↗</button></div>
 		</aside>
@@ -378,7 +413,7 @@ export default function AdminPortalPage() {
 							<div><span className="ad-eyebrow">ADMIN-ONLY DETAILS · RESERVATIONS</span><h2>{t("admin.reservations.entries_title", "Individual reservations")}</h2><p>{t("admin.reservations.entries_note", "Reservation emails are visible only to signed-in admins and are included in filtered exports.")}</p></div>
 							<span className="ad-count-pill">{reservationEntries.total} {t("admin.reservations.entries_count", "records")}</span>
 						</div>
-						<form className="ad-toolbar ad-reservation-entry-filters" onSubmit={(event) => { event.preventDefault(); void loadReservationEntries(0); }}>
+						<form className="ad-toolbar ad-reservation-entry-filters" onSubmit={(event) => { event.preventDefault(); void loadReservationEntries(0, reservationFilters); }}>
 							<label><span>{t("admin.reservations.filter_product", "Product")}</span>
 								<select value={reservationFilters.productId} onChange={(event) => setReservationFilters((current) => ({ ...current, productId: event.target.value }))}>
 									<option value="">{t("admin.reservations.all_products", "All products")}</option>
@@ -393,8 +428,17 @@ export default function AdminPortalPage() {
 							</label>
 							<label className="ad-search"><span>⌕</span><input value={reservationFilters.query} onChange={(event) => setReservationFilters((current) => ({ ...current, query: event.target.value }))} placeholder={t("admin.reservations.filter_search", "Search email or product")} maxLength={180} /></label>
 							<button type="submit" disabled={reservationEntriesLoading}>{t("admin.reservations.apply_filters", "Apply filters")}</button>
-							<button type="button" onClick={() => void exportReservationEntries()} disabled={reservationExporting || reservationEntries.total === 0}>{reservationExporting ? t("admin.reservations.exporting", "Preparing CSV…") : t("admin.reservations.export", "Export filtered CSV")}</button>
+							<button type="button" onClick={() => void exportReservationEntries()} disabled={reservationExporting || reservationEntriesLoading || reservationEntries.total === 0}>{reservationExporting ? t("admin.reservations.exporting", "Preparing Excel…") : t("admin.reservations.export", "Export filtered Excel")}</button>
 						</form>
+						<div className="ad-reservation-report" aria-label="Filtered reservation report summary">
+							<article><small>FILTERED RESERVATIONS</small><strong>{reservationEntries.total}</strong><span>matching all applied filters</span></article>
+							<article><small>ON THIS PAGE</small><strong>{reservationEntries.items.length}</strong><span>of up to {reservationEntries.limit} rows</span></article>
+							<article><small>APPLIED FILTERS</small><strong>{appliedReservationFilters.productId || appliedReservationFilters.country || appliedReservationFilters.query ? "Customized" : "All reservations"}</strong><span>{[
+								reservationProducts.find((product) => product.id === appliedReservationFilters.productId)?.name,
+								appliedReservationFilters.country ? regionName(appliedReservationFilters.country, language, appliedReservationFilters.country) : undefined,
+								appliedReservationFilters.query.trim() || undefined,
+							].filter(Boolean).join(" · ") || "No filters applied"}</span></article>
+						</div>
 						<div className="ad-table-wrap">
 							<table className="ad-table">
 								<thead><tr><th>{t("admin.reservations.product", "PRODUCT")}</th><th>{t("admin.reservations.email", "EMAIL")}</th><th>{t("admin.reservations.country", "COUNTRY")}</th><th>{t("admin.reservations.created", "RESERVED AT")}</th></tr></thead>
@@ -422,6 +466,21 @@ export default function AdminPortalPage() {
 			{section === "maker-applications" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{makerApplications.map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td><td><select aria-label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} onChange={(event) => void updateMakerApplication(application, event.target.value as MakerApplicationStatus)}><option value="pending">Pending</option><option value="reviewing">Reviewing</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div></section>}
 			{section === "suppliers" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2></div><span className="ad-count-pill">{suppliers.length} suppliers</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{suppliers.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div></section>}
 			{section === "customers" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("customers", query); }} placeholder="Customer name or email" /></label><button type="button" onClick={() => void loadSection("customers")}>Search customers</button></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>CUSTOMER</th><th>EMAIL</th><th>VERIFICATION</th><th>JOINED</th></tr></thead><tbody>{customers.map((customer) => <tr key={customer.id}><td><strong>{customer.firstName} {customer.lastName}</strong></td><td>{customer.email}</td><td><span className={`ad-status ${customer.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{customer.emailVerified ? "Verified" : "Pending"}</span></td><td>{date(customer.createdAt)}</td></tr>)}</tbody></table></div></section></>}
+			{section === "admin-accounts" && <>
+				<section className="ad-panel ad-admin-account-panel">
+					<div className="ad-panel-heading"><div><span className="ad-eyebrow">OPERATIONS ACCESS</span><h2>Create an admin account</h2><p>Only current admins can provision access. Share the temporary password securely with the new admin.</p></div></div>
+					<form className="ad-admin-account-form" onSubmit={createAdminAccount}>
+						<label>First name<input value={newAdmin.firstName} onChange={(event) => setNewAdmin((current) => ({ ...current, firstName: event.target.value }))} autoComplete="given-name" maxLength={120} required /></label>
+						<label>Last name<input value={newAdmin.lastName} onChange={(event) => setNewAdmin((current) => ({ ...current, lastName: event.target.value }))} autoComplete="family-name" maxLength={120} /></label>
+						<label>Email<input type="email" value={newAdmin.email} onChange={(event) => setNewAdmin((current) => ({ ...current, email: event.target.value }))} autoComplete="email" maxLength={320} required /></label>
+						<label>Temporary password<input type="password" value={newAdmin.password} onChange={(event) => setNewAdmin((current) => ({ ...current, password: event.target.value }))} autoComplete="new-password" minLength={8} maxLength={128} required /><small>At least 8 characters, including a number and a special character.</small></label>
+						<button className="ad-primary-button" type="submit" disabled={busyId === "create-admin"}>{busyId === "create-admin" ? "Creating…" : "Create admin access"}<span>↗</span></button>
+					</form>
+				</section>
+				<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">CURRENT ADMINS</span><h2>Admin accounts</h2></div><span className="ad-count-pill">{adminAccounts.length} accounts</span></div>
+					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ADMIN</th><th>EMAIL</th><th>ACCESS</th><th>CREATED</th></tr></thead><tbody>{adminAccounts.map((account) => <tr key={account.id}><td><strong>{account.firstName} {account.lastName}</strong></td><td>{account.email}</td><td><span className={`ad-status ${account.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{account.emailVerified ? "Verified admin" : "Email not verified"}</span></td><td>{date(account.createdAt)}</td></tr>)}</tbody></table>{!adminAccounts.length && <div className="ad-empty">No admin accounts were returned.</div>}</div>
+				</section>
+			</>}
 			{section === "fulfillment" && <><div className="ad-fulfillment-summary"><strong>{metrics?.ordersAwaitingFulfillment ?? 0}</strong><span>paid orders awaiting fulfillment action</span><p>Customer orders may split across suppliers. Select an order to inspect supplier confirmations and shipment tracking.</p></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>FULFILLMENT</th><th>SUPPLIER ROUTING</th><th>TOTAL</th><th>ACTION</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td><td><button className="ad-row-action" type="button" disabled={busyId === order.id || order.paymentStatus !== "paid"} onClick={(event) => { event.stopPropagation(); void planSupplierOrders(order); }}>{busyId === order.id ? "Planning…" : "Plan suppliers"}</button></td></tr>)}</tbody></table>{!orders.items.length && <div className="ad-empty">No paid orders need fulfillment right now.</div>}</div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL</span><h2>{orderDetail.orderNumber}</h2></div><button type="button" onClick={() => setOrderDetail(null)}>Close</button></div><div className="ad-detail-columns"><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")}</small></span><small>{po.items.length} lines</small></article>)}{!orderDetail.supplierFulfillments.length && <p className="ad-detail-empty">No supplier PO has been planned yet.</p>}</section><section><h3>Shipments &amp; tracking</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
 			{section === "brands" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">CURATED PARTNERS</span><h2>Maker profile studio</h2></div><span className="ad-count-pill">{brands.length} profiles</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>SLUG</th><th>CATALOG PRODUCTS</th><th>RECORD TYPE</th><th>PROFILE</th></tr></thead><tbody>{brands.map((brand) => <tr key={brand.id}><td><strong>{brand.name}</strong></td><td>{brand.slug}</td><td>{brand.productCount}</td><td>{brand.isDemo ? "Demo seed" : "Curated catalog"}</td><td>{brand.isDemo ? <small>Demo records are not shown as maker profiles.</small> : <BrandProfileEditor brand={brand} />}</td></tr>)}</tbody></table>{!brands.length && <div className="ad-empty">No maker profiles exist yet.</div>}</div><p className="ad-brand-note">Publish only maker stories, images, materials, and process details confirmed by the maker.</p></section>}
 			<footer className="ad-footer">A softer marketplace, run with care <span>♡</span><Link href="/pages/contact">Need a hand? Contact Ponyo</Link></footer>

@@ -1,11 +1,15 @@
 """Admin-only marketplace operations and read models for the Ponyo dashboard."""
 
 import csv
-from io import StringIO
+from datetime import datetime, timezone
+from io import BytesIO, StringIO
 from uuid import UUID
 
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +25,7 @@ from app.models import (
     ProductCategory,
     ProductInterest,
     ProductReservation,
+    ProductTranslation,
     ProductVariant,
     Shipment,
     Supplier,
@@ -32,6 +37,7 @@ from app.models import (
 )
 from app.rate_limit import enforce_rate_limit
 from app.schemas import (
+    AdminAccountCreateRequest,
     AdminBrandProfileRequest,
     AdminMakerApplicationStatusRequest,
     AdminProductProofRequest,
@@ -39,8 +45,8 @@ from app.schemas import (
     AdminProductReservationSettings,
     AdminSupplierStatusRequest,
 )
-from app.security import require_csrf, require_roles
-from app.translations import TranslationUnavailableError, ensure_product_translations
+from app.security import hash_password, require_csrf, require_roles
+from app.translations import TranslationUnavailableError, ensure_product_translations, source_hash
 
 router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
 
@@ -67,6 +73,102 @@ def safe_csv_cell(value: str) -> str:
     if value.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
         return f"'{value}"
     return value
+
+
+async def reservation_export_data(db: AsyncSession, filters):
+    total = await db.scalar(
+        select(func.count(ProductReservation.id))
+        .join(Product, Product.id == ProductReservation.product_id)
+        .where(*filters)
+    ) or 0
+    if total > MAX_RESERVATION_EXPORT_ROWS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Export is limited to {MAX_RESERVATION_EXPORT_ROWS} rows. Narrow the filters and try again.",
+        )
+    rows = (await db.execute(
+        select(
+            ProductReservation.id,
+            Product.name,
+            ProductReservation.email,
+            ProductReservation.country,
+            ProductReservation.created_at,
+        )
+        .join(Product, Product.id == ProductReservation.product_id)
+        .where(*filters)
+        .order_by(ProductReservation.created_at.desc(), ProductReservation.id.desc())
+    )).all()
+    return total, rows
+
+
+def reservation_workbook(rows, filters: dict[str, str | None]) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Reservations"
+    sheet.sheet_view.showGridLines = False
+    sheet.freeze_panes = "A7"
+    sheet.sheet_properties.pageSetUpPr.fitToPage = True
+    sheet.page_setup.orientation = "landscape"
+    sheet.page_setup.fitToWidth = 1
+    sheet.page_setup.fitToHeight = 0
+
+    sheet.merge_cells("A1:E1")
+    title = sheet["A1"]
+    title.value = "Ponyo · Reservation report"
+    title.fill = PatternFill("solid", fgColor="49372F")
+    title.font = Font(name="Aptos Display", size=18, bold=True, color="FFFFFF")
+    title.alignment = Alignment(vertical="center")
+    sheet.row_dimensions[1].height = 34
+
+    generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    sheet["A2"] = "Generated (UTC)"
+    sheet["B2"] = generated_at
+    sheet["B2"].number_format = "yyyy-mm-dd hh:mm"
+    filter_labels = [
+        f"Product ID: {filters['product_id']}" if filters.get("product_id") else None,
+        f"Country: {filters['country']}" if filters.get("country") else None,
+        f"Search: {filters['q']}" if filters.get("q") else None,
+    ]
+    sheet.merge_cells("A3:E3")
+    sheet["A3"] = "Filters: " + " · ".join(safe_csv_cell(label) for label in filter_labels if label) if any(filter_labels) else "Filters: All reservations"
+    sheet["A3"].font = Font(italic=True, color="75655C")
+    sheet.merge_cells("A4:E4")
+    sheet["A4"] = f"{len(rows)} reservation records"
+    sheet["A4"].font = Font(bold=True, color="8D5F45")
+
+    headers = ("Reservation ID", "Product", "Email", "Country", "Reserved at (UTC)")
+    for column, header in enumerate(headers, start=1):
+        cell = sheet.cell(row=6, column=column, value=header)
+        cell.fill = PatternFill("solid", fgColor="9A7159")
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.alignment = Alignment(vertical="center")
+    sheet.row_dimensions[6].height = 24
+
+    bottom_border = Border(bottom=Side(style="hair", color="E9DED6"))
+    for row_index, (reservation_id, product_name, email, country, created_at) in enumerate(rows, start=7):
+        date_value = created_at.astimezone(timezone.utc).replace(tzinfo=None) if created_at.tzinfo else created_at
+        values = (
+            safe_csv_cell(str(reservation_id)),
+            safe_csv_cell(product_name),
+            safe_csv_cell(email),
+            safe_csv_cell(country),
+            date_value,
+        )
+        for column, value in enumerate(values, start=1):
+            cell = sheet.cell(row=row_index, column=column, value=value)
+            cell.alignment = Alignment(vertical="center")
+            cell.border = bottom_border
+            if row_index % 2:
+                cell.fill = PatternFill("solid", fgColor="FBF7F2")
+        sheet.cell(row=row_index, column=5).number_format = "yyyy-mm-dd hh:mm"
+
+    sheet.auto_filter.ref = f"A6:E{max(6, 6 + len(rows))}"
+    for column, width in {"A": 40, "B": 34, "C": 34, "D": 20, "E": 25}.items():
+        sheet.column_dimensions[column].width = width
+
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 def order_summary(order: Order) -> dict:
@@ -387,28 +489,7 @@ async def export_reservation_entries(
     db: AsyncSession = Depends(get_db),
 ):
     filters = reservation_filters(product_id, country, q)
-    total = await db.scalar(
-        select(func.count(ProductReservation.id))
-        .join(Product, Product.id == ProductReservation.product_id)
-        .where(*filters)
-    ) or 0
-    if total > MAX_RESERVATION_EXPORT_ROWS:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Export is limited to {MAX_RESERVATION_EXPORT_ROWS} rows. Narrow the filters and try again.",
-        )
-    rows = (await db.execute(
-        select(
-            ProductReservation.id,
-            Product.name,
-            ProductReservation.email,
-            ProductReservation.country,
-            ProductReservation.created_at,
-        )
-        .join(Product, Product.id == ProductReservation.product_id)
-        .where(*filters)
-        .order_by(ProductReservation.created_at.desc(), ProductReservation.id.desc())
-    )).all()
+    _, rows = await reservation_export_data(db, filters)
     output = StringIO(newline="")
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow(["Reservation ID", "Product", "Email", "Country", "Created at"])
@@ -426,6 +507,32 @@ async def export_reservation_entries(
         headers={
             "Content-Disposition": 'attachment; filename="ponyo-reservations.csv"',
             "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/reservations/export.xlsx")
+async def export_reservation_workbook(
+    product_id: UUID | None = Query(default=None, alias="productId"),
+    country: str | None = Query(default=None, max_length=100),
+    q: str | None = Query(default=None, max_length=180),
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    filters = reservation_filters(product_id, country, q)
+    total, rows = await reservation_export_data(db, filters)
+    content = reservation_workbook(rows, {
+        "product_id": str(product_id) if product_id else None,
+        "country": country.strip() if country and country.strip() else None,
+        "q": q.strip() if q and q.strip() else None,
+    })
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="ponyo-reservations.xlsx"',
+            "Cache-Control": "no-store",
+            "X-Export-Row-Count": str(total),
         },
     )
 
@@ -638,3 +745,63 @@ async def list_customers(
     return {"data": [{"id": str(customer.id), "firstName": customer.first_name, "lastName": customer.last_name,
                        "email": customer.email, "emailVerified": customer.email_verified,
                        "createdAt": customer.created_at.isoformat()} for customer in rows]}
+
+
+@router.get("/admins", response_model=dict)
+async def list_admin_accounts(
+    response: Response,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    accounts = (await db.scalars(
+        select(Customer).where(Customer.role == "admin")
+        .order_by(Customer.created_at.asc(), Customer.id.asc())
+    )).all()
+    return {"data": [{
+        "id": str(account.id),
+        "firstName": account.first_name,
+        "lastName": account.last_name,
+        "email": account.email,
+        "emailVerified": account.email_verified,
+        "createdAt": account.created_at.isoformat(),
+    } for account in accounts]}
+
+
+@router.post("/admins", response_model=dict, status_code=201)
+async def create_admin_account(
+    payload: AdminAccountCreateRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-account-create", 5, 60)
+    email = str(payload.email).strip().lower()
+    existing = await db.scalar(select(Customer.id).where(func.lower(Customer.email) == email))
+    if existing is not None:
+        raise HTTPException(409, "An account with this email already exists.")
+
+    account = Customer(
+        email=email,
+        first_name=payload.firstName,
+        last_name=payload.lastName,
+        password_hash=hash_password(payload.password),
+        email_verified=True,
+        role="admin",
+    )
+    db.add(account)
+    try:
+        await db.commit()
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(409, "An account with this email already exists.") from error
+    await db.refresh(account)
+    return {"data": {
+        "id": str(account.id),
+        "firstName": account.first_name,
+        "lastName": account.last_name,
+        "email": account.email,
+        "emailVerified": account.email_verified,
+        "createdAt": account.created_at.isoformat(),
+    }}

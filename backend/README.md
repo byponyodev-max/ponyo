@@ -12,6 +12,12 @@ Interactive API docs are available at `http://localhost:8000/docs` in local deve
 
 Seeded demo products support two separate non-payment flows: reservations for destinations confirmed as shippable, and interest registrations for unsupported or unconfirmed destinations. Admins set each product's reservation status and target independently and configure confirmed shipping destinations; a null destination list means shipping has not been confirmed, while an empty list means confirmed unavailable everywhere. Checkout and reservation submissions block products whose destination is unknown or excludes the customer's country, but the catalog keeps those products visible and prioritizes deliverable items. Interest registrations are stored separately from reservations, accept supported country codes or a free-text country/region, and are reported separately by product and country in Admin. When a product's reservation target is reached, the API records the timestamp, creates a `product.reservation_minimum_reached` outbox event, and shows the status in the Admin Reservations report. This is an internal signal for the team to review production; it does not place a maker order automatically. Neither flow takes payment.
 
+Shipping checkout and admin destination controls currently support Japan (`JP`) and South Korea (`KR`) only. Interest submissions remain available for other country/region values so the team can measure unserved demand.
+
+### Phase 0 product and admin workflow
+
+The admin portal at `/admin-portal` operates on catalog records already in the database. Admins can review and publish/unpublish products, set shipping proof, and manage reservation settings, but there is not yet a create-product intake form or supplier-to-admin product approval queue. Supplier catalog access updates offers and inventory for existing approved listings; it does not submit new product records. Maker applications are tracked separately and changing their status does not create a product. New products therefore still need to be added through the development seed or an authorized data/import workflow, then reviewed in Admin; publishing also requires Japanese and Korean translations. Do not treat the supplier portal or a maker application as a product intake path.
+
 The backend uses LibreTranslate for Japanese (`ja`) and Korean (`ko`) translations. In Compose, it is available only on the internal network; direct backend development defaults to `http://localhost:5000`. Set `LIBRETRANSLATE_URL` and, if required by the server, `LIBRETRANSLATE_API_KEY` in the backend environment. Set `TRANSLATION_PROVIDER=disabled` to turn off uncached translations. The development seed writes reviewed Japanese and Korean cache rows for all 20 demo products into `product_translations`; rerunning the seed refreshes those rows without changing the table schema. Real products are translated and cached before admin publication. Product requests return `503` if a required translation cannot be generated; they do not silently substitute English.
 
 ### Contact notification email configuration
@@ -44,7 +50,9 @@ Storefront database entities, supplier demo fixtures, relationships and rollout 
 - Product ratings/reviews and durable per-product coming-soon waitlists
 - One-hour, single-use password reset requests and confirmation (`SMTP_HOST`, `SMTP_FROM_EMAIL`, and SMTP credentials must be configured for delivery)
 - SMTP STARTTLS transactional email for verification/reset plus durable order, payment, shipping, delivery, cancellation and successful-refund notifications with retry tracking; see [operations reliability](../docs/operations-reliability.md)
-- Database-backed customer/supplier/admin roles with explicit role guards; storefront access stays customer-only, with no public role assignment or admin/supplier portal
+- Database-backed customer/supplier/admin roles with explicit role guards; public registration cannot assign elevated roles. The `/admin-portal` UI and `/v1/admin/*` APIs require an admin session.
+- Admin account list/create endpoints (`GET/POST /v1/admin/admins`); account creation is admin-only, CSRF-protected, stores a password hash, and provisions the account as email-verified
+- Product-scoped reservation and separate interest reports, filtered reservation details, and CSV/XLSX exports (`/v1/admin/reservations/export.csv` and `/v1/admin/reservations/export.xlsx`)
 - Revocable session versions: logout revokes all current account sessions; password reset atomically consumes its token and invalidates existing sessions
 - Authenticated order history and detail
 - Authenticated persisted carts (`GET/PUT /v1/cart`); guest browser carts remain local

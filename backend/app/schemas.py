@@ -91,6 +91,24 @@ class AuthCredentials(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class AdminAccountCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    firstName: str = Field(min_length=1, max_length=120)
+    lastName: str = Field(default="", max_length=120)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, password: str) -> str:
+        if not any(character.isdigit() for character in password):
+            raise ValueError("Password must include at least one number.")
+        if not any(not character.isalnum() for character in password):
+            raise ValueError("Password must include at least one special character.")
+        return password
+
+
 class RegisterRequest(AuthCredentials):
     firstName: str = Field(min_length=1, max_length=120)
     lastName: str = Field(default="", max_length=120)

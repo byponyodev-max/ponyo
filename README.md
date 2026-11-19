@@ -19,6 +19,7 @@ Optional backend connection: start the local backend from [backend/README.md](ba
 - `/collections/[slug]` and `/shop` — responsive collection banner, filters, sorting, and product cards.
 - `/products/[slug]` — product gallery and purchase preview.
 - `/account/login`, `/account/register`, `/account/forgot-password`, and `/orders` — account/order screens; they use local preview behavior until the API is configured.
+- `/admin-portal` — role-protected marketplace operations for products, shipping destinations, reservations/interests, orders, and admin accounts.
 - `/cart`, `/checkout`, and `/wishlist` — browser-local interaction previews; configured checkout redirects to the backend-provided hosted payment session.
 - `/blogs/news` — Plush Journal landing page.
 - `/pages/about`, `/pages/faq`, `/pages/contact`, `/pages/domina-xl` — storefront information pages.

@@ -300,6 +300,10 @@ export type AdminCustomer = {
 	createdAt: string;
 };
 
+export type AdminAccount = Omit<AdminCustomer, "emailVerified"> & {
+	emailVerified: boolean;
+};
+
 export type AdminDashboard = {
 	metrics: {
 		totalOrders: number;
@@ -640,13 +644,13 @@ async function apiRequest<T>(
 	return (payload as ApiEnvelope<T>).data;
 }
 
-async function apiDownload(path: string): Promise<Blob> {
+async function apiDownload(path: string, accept = "text/csv"): Promise<Blob> {
 	if (!PONYO_API_BASE_URL) throw new ApiNotConfiguredError();
 	const response = await fetch(apiUrl(path), {
 		credentials: "include",
 		cache: "no-store",
 		referrerPolicy: "no-referrer",
-		headers: { Accept: "text/csv" },
+		headers: { Accept: accept },
 	});
 	if (!response.ok) {
 		let message = "The Ponyo service could not complete this request.";
@@ -961,6 +965,20 @@ export const ponyoApi = {
 		if (filters.q) params.set("q", filters.q);
 		return apiDownload(`/admin/reservations/export.csv?${params.toString()}`);
 	},
+	downloadAdminReservationsXlsx: (filters: {
+		productId?: string;
+		country?: string;
+		q?: string;
+	} = {}) => {
+		const params = new URLSearchParams();
+		if (filters.productId) params.set("productId", filters.productId);
+		if (filters.country) params.set("country", filters.country);
+		if (filters.q) params.set("q", filters.q);
+		return apiDownload(
+			`/admin/reservations/export.xlsx?${params.toString()}`,
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		);
+	},
 	setAdminProductReservations: (
 		id: string,
 		input: { reservationsOpen: boolean; reservationTarget: number | null },
@@ -1021,6 +1039,18 @@ export const ponyoApi = {
 		apiRequest<AdminCustomer[]>(
 			`/admin/customers?${new URLSearchParams({ q: query }).toString()}`,
 		),
+	listAdminAccounts: () =>
+		apiRequest<AdminAccount[]>("/admin/admins"),
+	createAdminAccount: (input: {
+		firstName: string;
+		lastName: string;
+		email: string;
+		password: string;
+	}) =>
+		apiRequest<AdminAccount>("/admin/admins", {
+			method: "POST",
+			body: JSON.stringify(input),
+		}),
 	planAdminSupplierOrders: (orderId: string) =>
 		apiRequest<{
 			orderId: string;
