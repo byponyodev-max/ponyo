@@ -29,13 +29,24 @@ test("admin country totals combine products and sort by reservations", () => {
 });
 
 test("admin shows reservation and interest country reports separately", () => {
-  assert.ok(adminPage.includes("aggregateReservationsByCountry(reservationProducts)"));
-  assert.ok(adminPage.includes("Reservations by country"));
-  assert.ok(adminPage.includes("aggregateReservationsByCountry(\n\t\tinterestProducts.map"));
-  assert.ok(adminPage.includes("Interests by country"));
+  assert.ok(adminPage.includes("Each row is one product; its country counts are shown beside that product."));
+  assert.ok(adminPage.includes("Each row is one product; country counts stay with that product."));
   assert.ok(adminPage.includes("BY COUNTRY"));
   assert.ok(adminPage.includes("reservationProducts.map"));
   assert.ok(adminPage.includes("interestProducts.map((product) => <tr key={product.id}"));
+  assert.ok(!adminPage.includes("Reservations by country across all products"));
+  assert.ok(!adminPage.includes("Interests by country across all products"));
+});
+
+test("admin product rows expose each product's shipping confirmation state and rules", () => {
+  const catalogEditor = readFileSync(new URL("../src/components/admin/catalog-editors.tsx", import.meta.url), "utf8");
+  assert.ok(catalogEditor.includes("Shipping: {shippingStatus} · Manage"));
+  assert.ok(catalogEditor.includes("Shipping destinations for this product"));
+  assert.ok(catalogEditor.includes("I confirmed these destinations with the maker"));
+  assert.ok(catalogEditor.includes("deliveryCountries.map((destination)"));
+  assert.ok(catalogEditor.includes("Japan / South Korea"));
+  assert.ok(catalogEditor.includes("Selected countries can reserve when reservations are open."));
+  assert.ok(catalogEditor.includes("Unconfirmed means reservations are blocked for every country"));
 });
 
 test("available destinations reserve while other destinations register separate interest", () => {

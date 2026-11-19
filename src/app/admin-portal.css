@@ -1151,39 +1151,6 @@
     font-weight: 850;
 }
 
-.ad-reservation-country-summary {
-    margin: 0 15px 14px;
-    padding: 13px 15px;
-    border: 1px solid #f0e5dc;
-    border-radius: 12px;
-    background: #fffaf6;
-    color: #69564c;
-    font-size: 11px;
-}
-
-.ad-reservation-country-totals {
-    margin-top: 9px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
-}
-
-.ad-reservation-country-totals > span {
-    min-width: 120px;
-    padding: 7px 10px;
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    border: 1px solid #eee3dc;
-    border-radius: 9px;
-    background: #fff;
-}
-
-.ad-reservation-country-summary > p {
-    margin: 7px 0 0;
-    color: #8f7c72;
-}
-
 .ad-fulfillment-summary {
     padding: 6px 17px 19px;
     display: grid;

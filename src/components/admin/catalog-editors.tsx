@@ -6,14 +6,23 @@ import {
   type AdminBrand,
   type AdminProduct,
 } from "@/services/ponyo-api.client";
-import { regionName, supportedShippingCountries } from "@/lib/localization-options";
+import { deliveryCountries, regionName } from "@/lib/localization-options";
+
+const deliveryCountryCodes = new Set(deliveryCountries.map(({ code }) => code));
 
 export function ProductProofEditor({ product }: { product: AdminProduct }) {
   const [shippingConfirmed, setShippingConfirmed] = useState(product.shippingCountries != null);
-  const [shippingCountries, setShippingCountries] = useState(product.shippingCountries ?? []);
+  const [shippingCountries, setShippingCountries] = useState(
+    (product.shippingCountries ?? []).filter((code) => deliveryCountryCodes.has(code)),
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const shippingStatus = !shippingConfirmed
+    ? "Not confirmed — configure destinations"
+    : shippingCountries.length
+      ? `Ships to ${shippingCountries.map((code) => regionName(code, "en", code)).join(", ")}`
+      : "Confirmed unavailable in all listed countries";
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,7 +40,7 @@ export function ProductProofEditor({ product }: { product: AdminProduct }) {
         onlyAtPonyo: values.get("onlyAtPonyo") === "on",
         shippingCountries: shippingConfirmed ? shippingCountries : null,
       });
-      setMessage("Verified product details saved.");
+      setMessage("Product details and shipping destinations saved.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Product details could not be saved.");
     } finally {
@@ -39,17 +48,21 @@ export function ProductProofEditor({ product }: { product: AdminProduct }) {
     }
   }
 
-  return <details className="ad-inline-editor"><summary>Edit product proof</summary><form onSubmit={save}>
+  return <details className="ad-inline-editor"><summary>Shipping: {shippingStatus} · Manage</summary><form onSubmit={save}>
     <label>Materials<textarea name="materials" rows={2} defaultValue={product.materials ?? ""} maxLength={3000} placeholder="Only enter maker-confirmed details" /></label>
     <div className="ad-editor-fields"><label>Weight (grams)<input name="weightGrams" type="number" min="0" step="1" defaultValue={product.weightGrams ?? ""} /></label><label>Edition count<input name="editionCount" type="number" min="1" step="1" defaultValue={product.editionCount ?? ""} /></label><label>Estimated delivery date<input name="estimatedDeliveryDate" type="date" defaultValue={product.estimatedDeliveryDate ?? ""} /></label></div>
     <label className="ad-editor-check"><input name="onlyAtPonyo" type="checkbox" defaultChecked={product.onlyAtPonyo} /> Confirmed exclusive to Ponyo</label>
-    <fieldset><legend>Shipping destinations</legend>
-      <label className="ad-editor-check"><input type="checkbox" checked={shippingConfirmed} onChange={(event) => setShippingConfirmed(event.target.checked)} /> Shipping destinations confirmed</label>
-      <div className="ad-editor-fields">{supportedShippingCountries.map((destination) => <label className="ad-editor-check" key={destination.code}><input type="checkbox" checked={shippingCountries.includes(destination.code)} disabled={!shippingConfirmed} onChange={(event) => setShippingCountries((current) => event.target.checked ? [...current, destination.code] : current.filter((code) => code !== destination.code))} /> {regionName(destination.code, "en", destination.label)}</label>)}</div>
-      <small>{shippingConfirmed ? "Select every country confirmed by the maker. No selections means shipping is confirmed unavailable everywhere." : "Unconfirmed destinations block checkout; the product remains visible for interest collection."}</small>
+    <fieldset><legend>Shipping destinations for this product (Japan / South Korea)</legend>
+      <label className="ad-editor-check"><input type="checkbox" checked={shippingConfirmed} onChange={(event) => setShippingConfirmed(event.target.checked)} /> I confirmed these destinations with the maker</label>
+      <div className="ad-editor-fields">{deliveryCountries.map((destination) => <label className="ad-editor-check" key={destination.code}><input type="checkbox" checked={shippingCountries.includes(destination.code)} disabled={!shippingConfirmed} onChange={(event) => setShippingCountries((current) => event.target.checked ? [...current, destination.code] : current.filter((code) => code !== destination.code))} /> {regionName(destination.code, "en", destination.label)}</label>)}</div>
+      <small>{shippingConfirmed
+        ? shippingCountries.length
+          ? "Selected countries can reserve when reservations are open. Other countries can only register interest."
+          : "No countries selected means shipping is confirmed unavailable in all listed countries."
+        : "Unconfirmed means reservations are blocked for every country; customers can still register interest."}</small>
     </fieldset>
     {error && <p className="ad-inline-error" role="alert">{error}</p>}{message && <p className="ad-inline-success" role="status">{message}</p>}
-    <button className="ad-row-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save verified details"}</button>
+    <button className="ad-row-action" type="submit" disabled={saving}>{saving ? "Saving…" : "Save product and shipping details"}</button>
   </form></details>;
 }
 
