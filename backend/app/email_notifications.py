@@ -354,7 +354,15 @@ async def send_verification_email(email: str, verification_url: str) -> bool:
         return False
 
 
-def _send_transactional_email(recipient: str, subject: str, text_body: str, html_body: str, message_id: str) -> None:
+def _send_transactional_email(
+    recipient: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+    message_id: str,
+    in_reply_to: str | None = None,
+    references: str | None = None,
+) -> None:
     sender = settings.smtp_from_email or settings.smtp_username
     if not settings.contact_email_configured or not sender:
         raise RuntimeError("Transactional email transport is not configured")
@@ -363,6 +371,10 @@ def _send_transactional_email(recipient: str, subject: str, text_body: str, html
     message["From"] = formataddr(("Ponyo", sender))
     message["To"] = recipient
     message["Message-ID"] = message_id
+    if in_reply_to:
+        message["In-Reply-To"] = in_reply_to
+    if references:
+        message["References"] = references
     message.set_content(text_body)
     message.add_alternative(html_body, subtype="html")
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
@@ -377,11 +389,13 @@ def _send_transactional_email(recipient: str, subject: str, text_body: str, html
 
 async def send_transactional_email(
     recipient: str, subject: str, text_body: str, html_body: str, message_id: str,
+    *, in_reply_to: str | None = None, references: str | None = None,
 ) -> bool:
     """Send a prepared transactional notice without logging recipient or message content."""
     try:
         await asyncio.to_thread(
             _send_transactional_email, recipient, subject, text_body, html_body, message_id,
+            in_reply_to, references,
         )
         return True
     except Exception as error:

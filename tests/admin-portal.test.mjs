@@ -59,6 +59,26 @@ test("admin MVP includes overview, orders, product publishing, suppliers and cus
     }
 });
 
+test("product workspace explains current database intake and supplier limitations", () => {
+    assert.ok(page.includes("catalog_intake_title"));
+    assert.ok(page.includes("catalog_intake_note"));
+    assert.ok(adminTranslations.includes('"admin.ui.catalog_intake_note"'));
+});
+
+test("admin email inbox supports mailbox sync, queued replies and editable templates", () => {
+    assert.ok(page.includes('id: "email-inbox"'));
+    assert.ok(page.includes("emailReplyTemplates"));
+    assert.ok(page.includes("aria-pressed={emailThreadKey === thread.threadKey}"));
+    assert.ok(page.includes("syncEmailInbox"));
+    assert.ok(page.includes("sendEmailReply"));
+    assert.ok(api.includes('"/admin/email/inbox/status"'));
+    assert.ok(api.includes('"/admin/email/inbox/sync"'));
+    assert.ok(api.includes("/admin/email/inbox/${encodeURIComponent(threadKey)}/reply"));
+    assert.ok(backend.includes('"/email/inbox/{thread_key}/reply"'));
+    assert.ok(backend.includes('require_roles("admin")'));
+    assert.ok(adminTranslations.includes('"admin.ui.email_imap_setup"'));
+});
+
 test("dashboard UI uses Ponyo palette and responsive compact navigation", () => {
     assert.ok(css.includes("--ad-peach: #fff1e8"));
     assert.ok(css.includes("--ad-mint: #e9f5f0"));

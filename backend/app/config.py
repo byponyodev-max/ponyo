@@ -77,6 +77,14 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_x509_strict: bool = True
     smtp_timeout_seconds: int = 8
+    email_inbox_imap_host: str | None = None
+    email_inbox_imap_port: int = 993
+    email_inbox_imap_username: str | None = None
+    email_inbox_imap_password: str | None = None
+    email_inbox_imap_mailbox: str = "INBOX"
+    email_inbox_imap_ssl: bool = True
+    email_inbox_sync_interval_seconds: int = 60
+    email_inbox_initial_sync_limit: int = 500
 
     @property
     def cors_origins(self) -> list[str]:
@@ -94,6 +102,20 @@ class Settings(BaseSettings):
             and (not self.smtp_username or self.smtp_password)
         )
 
+    @property
+    def email_inbox_imap_configured(self) -> bool:
+        return bool(
+            self.email_inbox_imap_host
+            and self.email_inbox_imap_username
+            and self.email_inbox_imap_password
+            and self.email_inbox_imap_mailbox.strip()
+            and 1 <= self.email_inbox_imap_port <= 65535
+        )
+
+    @property
+    def email_inbox_reply_configured(self) -> bool:
+        return self.email_inbox_imap_configured and self.contact_email_configured
+
     @model_validator(mode="after")
     def validate_production_security(self):
         if self.environment != "local" and not self.smtp_x509_strict:
@@ -102,6 +124,10 @@ class Settings(BaseSettings):
             raise ValueError("Supplier retry limits must be 1–10 attempts and 10–3600 base seconds.")
         if not 300 <= self.supplier_confirmation_timeout_seconds <= 604800:
             raise ValueError("Supplier confirmation timeout must be 300–604800 seconds.")
+        if not 10 <= self.email_inbox_sync_interval_seconds <= 3600:
+            raise ValueError("EMAIL_INBOX_SYNC_INTERVAL_SECONDS must be 10–3600.")
+        if not 1 <= self.email_inbox_initial_sync_limit <= 5000:
+            raise ValueError("EMAIL_INBOX_INITIAL_SYNC_LIMIT must be 1–5000.")
         for integration in self.supplier_integrations.values():
             endpoint = urlparse(integration.get("url", ""))
             if endpoint.scheme != "https" or not endpoint.netloc or endpoint.username or endpoint.password or endpoint.fragment:

@@ -470,6 +470,46 @@ class EmailNotification(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
+class EmailInboxMessage(Base):
+    __tablename__ = "email_inbox_messages"
+    __table_args__ = (
+        UniqueConstraint("source_type", "source_key", name="uq_email_inbox_source"),
+        UniqueConstraint("mailbox_name", "uid_validity", "uid", name="uq_email_inbox_mailbox_uid"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    thread_key: Mapped[str] = mapped_column(String(180), index=True)
+    source_type: Mapped[str] = mapped_column(String(32), index=True)
+    source_key: Mapped[str] = mapped_column(String(255))
+    direction: Mapped[str] = mapped_column(String(16))
+    from_email: Mapped[str] = mapped_column(String(320))
+    from_name: Mapped[str] = mapped_column(String(180), default="")
+    to_email: Mapped[str] = mapped_column(String(320), default="")
+    subject: Mapped[str] = mapped_column(String(998))
+    text_body: Mapped[str] = mapped_column(Text)
+    message_id: Mapped[str | None] = mapped_column(String(998), nullable=True, index=True)
+    in_reply_to: Mapped[str | None] = mapped_column(String(998), nullable=True)
+    references_header: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mailbox_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    uid_validity: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    uid: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    delivery_status: Mapped[str] = mapped_column(String(24), default="received", server_default="received")
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class EmailInboxSyncState(Base):
+    __tablename__ = "email_inbox_sync_state"
+
+    mailbox_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    uid_validity: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_uid: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
 class ProductCategory(Base):
     __tablename__ = "product_categories"
 

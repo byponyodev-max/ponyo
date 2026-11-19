@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 import { aggregateReservationsByCountry } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
 import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
-type AdminSection = "dashboard" | "orders" | "products" | "reservations" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
+type AdminSection = "dashboard" | "orders" | "products" | "reservations" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
 type OrderPage = { items: AdminOrder[]; total: number; limit: number; offset: number };
 type ProductPage = { items: AdminProduct[]; total: number; limit: number; offset: number };
 
@@ -19,6 +19,7 @@ const navigation: Array<{ id: AdminSection; label: string; labelKey: string; ico
 	{ id: "orders", label: "Orders", labelKey: "orders", icon: "▤", hint: "Customer orders", hintKey: "orders_hint" },
 	{ id: "products", label: "Products", labelKey: "products", icon: "♡", hint: "Catalog & approval", hintKey: "products_hint" },
 	{ id: "reservations", label: "Reservations & interests", labelKey: "reservations_interest", icon: "✦", hint: "Reservation targets and unshipped demand", hintKey: "reservations_hint" },
+	{ id: "email-inbox", label: "Email inbox", labelKey: "email_inbox", icon: "✉", hint: "Customer messages & replies", hintKey: "email_inbox_hint" },
 	{ id: "maker-applications", label: "Maker applications", labelKey: "maker_applications", icon: "✿", hint: "Review maker submissions", hintKey: "maker_applications_hint" },
 	{ id: "suppliers", label: "Suppliers", labelKey: "suppliers", icon: "✿", hint: "Partners & access", hintKey: "suppliers_hint" },
 	{ id: "brands", label: "Brands", labelKey: "brands", icon: "✧", hint: "Curated labels", hintKey: "brands_hint" },
@@ -28,6 +29,15 @@ const navigation: Array<{ id: AdminSection; label: string; labelKey: string; ico
 ];
 
 type Translate = (key: string, fallback: string, values?: Record<string, string | number>) => string;
+
+const emailReplyTemplates = [
+	{ id: "thanks-en", label: "Thank you · English", body: "Hello,\n\nThank you for reaching out to Ponyo. We appreciate your message and will be happy to help.\n\nWith care,\nThe Ponyo team" },
+	{ id: "thanks-ja", label: "お礼 · 日本語", body: "こんにちは。\n\nPonyoへお問い合わせいただき、ありがとうございます。ご連絡いただけてうれしいです。\n\nPonyoチームより" },
+	{ id: "thanks-ko", label: "감사 인사 · 한국어", body: "안녕하세요.\n\nPonyo에 문의해 주셔서 감사합니다. 보내주신 메시지를 확인했으며 기꺼이 도와드리겠습니다.\n\nPonyo 팀 드림" },
+	{ id: "checking-en", label: "We are checking · English", body: "Hello,\n\nThank you for your message. We are checking the details and will get back to you as soon as we can.\n\nWith care,\nThe Ponyo team" },
+	{ id: "checking-ja", label: "確認中 · 日本語", body: "こんにちは。\n\nお問い合わせいただき、ありがとうございます。内容を確認のうえ、できるだけ早くご連絡いたします。\n\nPonyoチームより" },
+	{ id: "checking-ko", label: "확인 중 · 한국어", body: "안녕하세요.\n\n문의해 주셔서 감사합니다. 내용을 확인한 뒤 가능한 한 빠르게 답변드리겠습니다.\n\nPonyo 팀 드림" },
+];
 
 function messageFor(error: unknown, t: Translate) {
 	if (error instanceof ApiNotConfiguredError) return t("admin.ui.services_unconfigured", "Admin services are not configured for this storefront.");
@@ -70,11 +80,21 @@ export default function AdminPortalPage() {
 	const [brands, setBrands] = useState<AdminBrand[]>([]);
 	const [reservationProducts, setReservationProducts] = useState<AdminProduct[]>([]);
 	const [interestProducts, setInterestProducts] = useState<AdminProduct[]>([]);
+	const [reservationTab, setReservationTab] = useState<"reservations" | "interests">("reservations");
 	const [reservationEntries, setReservationEntries] = useState<AdminReservationPage>({ items: [], total: 0, limit: 50, offset: 0 });
 	const [reservationFilters, setReservationFilters] = useState({ productId: "", country: "", query: "" });
 	const [appliedReservationFilters, setAppliedReservationFilters] = useState({ productId: "", country: "", query: "" });
 	const [reservationEntriesLoading, setReservationEntriesLoading] = useState(false);
 	const [reservationExporting, setReservationExporting] = useState(false);
+	const [emailInboxStatus, setEmailInboxStatus] = useState<AdminEmailInboxStatus | null>(null);
+	const [emailThreads, setEmailThreads] = useState<AdminEmailThread[]>([]);
+	const [emailThreadKey, setEmailThreadKey] = useState("");
+	const [emailThread, setEmailThread] = useState<AdminEmailThreadDetail | null>(null);
+	const [emailThreadLoading, setEmailThreadLoading] = useState(false);
+	const [emailQuery, setEmailQuery] = useState("");
+	const [emailReplyBody, setEmailReplyBody] = useState("");
+	const [emailReplyTemplate, setEmailReplyTemplate] = useState("");
+	const [emailReplyIdempotencyKey, setEmailReplyIdempotencyKey] = useState("");
 	const [makerApplications, setMakerApplications] = useState<AdminMakerApplication[]>([]);
 	const [customers, setCustomers] = useState<AdminCustomer[]>([]);
 	const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
@@ -159,6 +179,15 @@ export default function AdminPortalPage() {
 				case "admin-accounts":
 					setAdminAccounts(await ponyoApi.listAdminAccounts());
 					break;
+				case "email-inbox": {
+					const [status, inbox] = await Promise.all([
+						ponyoApi.getAdminEmailInboxStatus(),
+						ponyoApi.listAdminEmailThreads(),
+					]);
+					setEmailInboxStatus(status);
+					setEmailThreads(inbox.items);
+					break;
+				}
 			}
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
@@ -247,6 +276,88 @@ export default function AdminPortalPage() {
 		}
 	}
 
+	async function loadEmailThreads(search = emailQuery) {
+		setError("");
+		try {
+			const inbox = await ponyoApi.listAdminEmailThreads(search);
+			setEmailThreads(inbox.items);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		}
+	}
+
+	async function openEmailThread(threadKey: string) {
+		setEmailThreadKey(threadKey);
+		setEmailThreadLoading(true);
+		setError("");
+		try {
+			const detail = await ponyoApi.getAdminEmailThread(threadKey);
+			setEmailThread(detail);
+			setEmailThreads((current) => current.map((thread) => thread.threadKey === threadKey
+				? { ...thread, unreadCount: 0 }
+				: thread));
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setEmailThreadLoading(false);
+		}
+	}
+
+	async function syncEmailInbox() {
+		setBusyId("email-sync");
+		setError("");
+		try {
+			const result = await ponyoApi.syncAdminEmailInbox();
+			const [status, inbox] = await Promise.all([
+				ponyoApi.getAdminEmailInboxStatus(),
+				ponyoApi.listAdminEmailThreads(emailQuery),
+			]);
+			setEmailInboxStatus(status);
+			setEmailThreads(inbox.items);
+			setNotice(result.imapConfigured
+				? ui("email_sync_complete", "Inbox sync complete. {{mailbox}} mailbox messages and {{portal}} storefront messages added.", { mailbox: result.importedMailboxMessages, portal: result.importedPortalMessages })
+				: ui("email_portal_only", "Storefront messages are ready. Configure IMAP to sync your mailbox."));
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+			try {
+				setEmailInboxStatus(await ponyoApi.getAdminEmailInboxStatus());
+			} catch (statusError) {
+				setError(messageFor(statusError, t));
+			}
+		} finally {
+			setBusyId("");
+		}
+	}
+
+	async function sendEmailReply(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (!emailThread || !emailReplyBody.trim()) return;
+		setBusyId("email-reply");
+		setError("");
+		const idempotencyKey = emailReplyIdempotencyKey || crypto.randomUUID();
+		setEmailReplyIdempotencyKey(idempotencyKey);
+		try {
+			const result = await ponyoApi.replyAdminEmailThread(emailThread.threadKey, {
+				body: emailReplyBody.trim(),
+				idempotencyKey,
+			});
+			setEmailReplyBody("");
+			setEmailReplyTemplate("");
+			setEmailReplyIdempotencyKey("");
+			setNotice(result.alreadyQueued
+				? ui("email_reply_already_queued", "This reply was already queued.")
+				: ui("email_reply_queued", "Reply queued for delivery."));
+			await Promise.all([
+				openEmailThread(emailThread.threadKey),
+				loadEmailThreads(),
+			]);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
+	}
+
 	async function handleLogin(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setBusyId("login");
@@ -275,6 +386,12 @@ export default function AdminPortalPage() {
 		setSuppliers([]);
 		setCustomers([]);
 		setAdminAccounts([]);
+		setEmailInboxStatus(null);
+		setEmailThreads([]);
+		setEmailThread(null);
+		setEmailThreadKey("");
+		setEmailReplyBody("");
+		setEmailReplyIdempotencyKey("");
 		setOrderDetail(null);
 		setSelectedOrderId("");
 		setBusyId("");
@@ -369,9 +486,19 @@ export default function AdminPortalPage() {
 				<section className="ad-panel ad-pending-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("curated_by_ponyo", "CURATED BY PONYO")}</span><h2>{ui("unpublished_catalog", "Unpublished catalog")}</h2></div><button type="button" onClick={() => navigateSection("products")}>{ui("open_catalog", "Open catalog")} ↗</button></div><div className="ad-pending-list">{dashboard?.unpublishedProducts.map((product) => <article key={product.id}><Image src={product.image} alt="" width={54} height={54} /><span><strong>{product.name}</strong><small>{product.sku} · {ui("variants", "{{count}} variants", { count: product.variantCount })}</small></span><button type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{busyId === product.id ? ui("saving", "Saving…") : ui("publish_listing", "Publish listing")}</button></article>)}{!dashboard?.unpublishedProducts.length && <div className="ad-empty">{ui("no_unpublished", "No unpublished products in the catalog.")}</div>}</div></section>
 			</>}
 			{section === "orders" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("orders", query); }} placeholder="Order number or customer email" /></label><button type="button" onClick={() => void loadSection("orders")}>Search orders</button><span>{orders.total} orders</span></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>PAYMENT</th><th>FULFILLMENT</th><th>SUPPLIER</th><th>TOTAL</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td><span className="ad-status">{order.paymentStatus}</span></td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td></tr>)}</tbody></table></div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL · {orderDetail.paymentStatus}</span><h2>{orderDetail.orderNumber}</h2><p>{orderDetail.customerEmail} · {orderDetail.fulfillmentStatus.replaceAll("_", " ")}</p></div><button type="button" onClick={() => { setOrderDetail(null); setSelectedOrderId(""); }}>Close</button></div><div className="ad-order-facts"><span>Subtotal <strong>{amount(orderDetail.subtotalAmount, orderDetail.currency, formatPrice)}</strong></span><span>Discount <strong>{amount(orderDetail.discountAmount, orderDetail.currency, formatPrice)}</strong></span><span>Shipping <strong>{amount(orderDetail.shippingAmount, orderDetail.currency, formatPrice)}</strong></span><span>Captured <strong>{amount(orderDetail.capturedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Refunded <strong>{amount(orderDetail.refundedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Total <strong>{amount(orderDetail.totalAmount, orderDetail.currency, formatPrice)}</strong></span></div><div className="ad-detail-columns"><section><h3>Customer order lines</h3>{orderDetail.items.map((line) => <article key={line.id}><span><strong>{line.name}</strong><small>Qty {line.quantity} · {line.supplierOfferId ? "Supplier linked" : "Legacy / not routed"}</small></span><b>{amount(line.unitPrice * line.quantity, line.currency, formatPrice)}</b></article>)}</section><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")} {po.supplierOrderId ? `· Ref ${po.supplierOrderId}` : ""}</small></span><small>{po.items.length} lines</small></article>)}{orderDetail.paymentStatus === "paid" && <button className="ad-row-action" type="button" disabled={busyId === orderDetail.id} onClick={() => { const row = orders.items.find((item) => item.id === orderDetail.id); if (row) void planSupplierOrders(row); }}>{busyId === orderDetail.id ? "Planning…" : "Plan / refresh supplier routing"}</button>}</section><section><h3>Shipments</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
+			{section === "products" && <aside className="ad-product-intake-note" role="note"><strong>{ui("catalog_intake_title", "Product intake status")}</strong><p>{ui("catalog_intake_note", "This catalog lists products already in the database. Supplier accounts update offers and inventory; they do not submit new products. Maker applications are separate. New products need an approved data/import workflow before they appear here for review and publishing.")}</p></aside>}
 			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("products", query); }} placeholder="Product name, SKU or slug" /></label><select value={publishedFilter} onChange={(event) => { setPublishedFilter(event.target.value as typeof publishedFilter); }}><option value="all">All products</option><option value="pending">Unpublished</option><option value="published">Published</option></select><button type="button" onClick={() => void loadSection("products")}>Search catalog</button><span>{products.total} products</span></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION / SHIPPING</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? "ad-status--published" : "ad-status--pending"}`}>{product.published ? "Published" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button><ProductProofEditor product={product} /></td></tr>)}</tbody></table></div></section></>}
 			{section === "reservations" && (
 				<>
+					<div className="ad-report-tabs" role="tablist" aria-label={ui("reservation_reports", "Reservation reports")}>
+						<button id="reservation-report-tab" type="button" role="tab" aria-selected={reservationTab === "reservations"} aria-controls="reservation-report-panel reservation-details-panel" className={reservationTab === "reservations" ? "is-active" : ""} onClick={() => setReservationTab("reservations")}>
+							{ui("reservation_tab", "Reservations")} <span>{reservationProducts.reduce((total, product) => total + (product.reservationCount ?? 0), 0)}</span>
+						</button>
+						<button id="interest-report-tab" type="button" role="tab" aria-selected={reservationTab === "interests"} aria-controls="interest-report-panel" className={reservationTab === "interests" ? "is-active" : ""} onClick={() => setReservationTab("interests")}>
+							{ui("interest_tab", "Interests")} <span>{interestProducts.reduce((total, product) => total + (product.interestCount ?? 0), 0)}</span>
+						</button>
+					</div>
+					{reservationTab === "reservations" && <div id="reservation-report-panel" role="tabpanel" aria-labelledby="reservation-report-tab">
 					<section className="ad-panel">
 						<div className="ad-panel-heading">
 							<div><span className="ad-eyebrow">RESERVE A SPOT · NO PAYMENT</span><h2>Reservations</h2><p>Each row is one product; its country counts are shown beside that product. Manage destinations in Products.</p></div>
@@ -393,6 +520,8 @@ export default function AdminPortalPage() {
 							{!reservationProducts.length && <div className="ad-empty">No products are available for reservation setup.</div>}
 						</div>
 					</section>
+					</div>}
+					{reservationTab === "interests" && <div id="interest-report-panel" role="tabpanel" aria-labelledby="interest-report-tab">
 					<section className="ad-panel">
 						<div className="ad-panel-heading">
 							<div><span className="ad-eyebrow">UNSHIPPED DEMAND</span><h2>Interests (separate from reservations)</h2><p>Each row is one product; country counts stay with that product. Interest requests never create a reservation.</p></div>
@@ -406,8 +535,11 @@ export default function AdminPortalPage() {
 									<td className="ad-reservation-country-list">{product.interestsByCountry?.length ? product.interestsByCountry.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}: <strong>{entry.count}</strong></span>) : <small>No interests yet</small>}</td>
 								</tr>)}</tbody>
 							</table>
+							{!interestProducts.length && <div className="ad-empty">{ui("no_interests", "No interest requests yet.")}</div>}
 						</div>
 					</section>
+					</div>}
+					{reservationTab === "reservations" && <div id="reservation-details-panel" role="tabpanel" aria-labelledby="reservation-report-tab">
 					<section className="ad-panel ad-reservation-entries-panel">
 						<div className="ad-panel-heading">
 							<div><span className="ad-eyebrow">ADMIN-ONLY DETAILS · RESERVATIONS</span><h2>{t("admin.reservations.entries_title", "Individual reservations")}</h2><p>{t("admin.reservations.entries_note", "Reservation emails are visible only to signed-in admins and are included in filtered exports.")}</p></div>
@@ -461,24 +593,83 @@ export default function AdminPortalPage() {
 							</div>
 						</footer>
 					</section>
+					</div>}
 				</>
 			)}
+			{section === "email-inbox" && <section className="ad-panel ad-email-inbox">
+				<div className="ad-panel-heading">
+					<div><span className="ad-eyebrow">{ui("email_center_eyebrow", "CUSTOMER CARE")}</span><h2>{ui("email_center_title", "Email & messages")}</h2><p>{ui("email_center_note", "Storefront contact and maker messages, plus mail synced from your IMAP inbox.")}</p></div>
+					<div className="ad-email-heading-actions">
+						<span className={`ad-status ${emailInboxStatus?.imapConfigured ? "ad-status--published" : "ad-status--pending"}`}>{emailInboxStatus?.imapConfigured ? ui("email_imap_connected", "IMAP configured") : ui("email_imap_missing", "IMAP not configured")}</span>
+						<button type="button" onClick={() => void syncEmailInbox()} disabled={busyId === "email-sync"}>{busyId === "email-sync" ? ui("email_syncing", "Syncing…") : ui("email_sync", "Sync inbox")}</button>
+					</div>
+				</div>
+				{(!emailInboxStatus?.imapConfigured || !emailInboxStatus.smtpConfigured) && <aside className="ad-email-config-note" role="note">
+					<strong>{ui("email_setup_title", "Mailbox setup")}</strong>
+					<p>{!emailInboxStatus?.imapConfigured ? ui("email_imap_setup", "Website contact and maker messages appear below. To receive other email, configure EMAIL_INBOX_IMAP_* in the backend environment.") : ""} {!emailInboxStatus?.smtpConfigured ? ui("email_smtp_setup", "Configure SMTP settings in the backend environment to send replies.") : ""}</p>
+				</aside>}
+				{emailInboxStatus?.lastSyncedAt && <p className="ad-email-sync-note">{ui("email_last_synced", "Last synced {{date}}", { date: date(emailInboxStatus.lastSyncedAt) })}</p>}
+				{emailInboxStatus?.lastError && <p className="ad-email-sync-error" role="status">{ui("email_last_sync_error", "Last mailbox sync failed: {{error}}", { error: emailInboxStatus.lastError })}</p>}
+				<div className="ad-email-toolbar">
+					<form onSubmit={(event) => { event.preventDefault(); void loadEmailThreads(); }}>
+						<label className="ad-search"><span>⌕</span><input aria-label={ui("email_search", "Search inbox")} value={emailQuery} maxLength={180} onChange={(event) => setEmailQuery(event.target.value)} placeholder={ui("email_search_placeholder", "Search sender, subject or message")} /></label>
+						<button type="submit">{ui("email_search", "Search inbox")}</button>
+					</form>
+					<span>{ui("email_thread_count", "{{count}} conversations", { count: emailThreads.length })}</span>
+				</div>
+				<div className="ad-email-workspace">
+					<div className="ad-email-threads" aria-label={ui("email_conversations", "Conversations")}>
+						{emailThreads.map((thread) => <button
+							className={`ad-email-thread ${emailThreadKey === thread.threadKey ? "is-selected" : ""}`}
+							type="button"
+							key={thread.threadKey}
+							aria-pressed={emailThreadKey === thread.threadKey}
+							onClick={() => void openEmailThread(thread.threadKey)}
+						>
+							<span className="ad-email-thread-top"><strong>{thread.fromName || thread.fromEmail}</strong><time dateTime={thread.latestAt}>{date(thread.latestAt)}</time></span>
+							<span className="ad-email-thread-address">{thread.fromEmail}</span>
+							<strong className="ad-email-thread-subject">{thread.subject}</strong>
+							<span className="ad-email-thread-preview">{thread.preview || ui("email_no_preview", "No text preview available.")}</span>
+							<span className="ad-email-thread-meta"><span>{ui(`email_source_${thread.source}`, thread.source.replaceAll("_", " "))}</span>{thread.unreadCount > 0 && <b>{ui("email_unread", "{{count}} unread", { count: thread.unreadCount })}</b>}{thread.deliveryStatus !== "received" && <small>{thread.deliveryStatus}</small>}</span>
+						</button>)}
+						{!emailThreads.length && <div className="ad-empty">{ui("email_empty", "No conversations found.")}</div>}
+					</div>
+					<section className="ad-email-conversation" aria-label={ui("email_conversation", "Email conversation")}>
+						{emailThreadLoading && <div className="ad-empty" role="status">{ui("email_loading_thread", "Loading conversation…")}</div>}
+						{!emailThreadLoading && emailThread && <div className="ad-email-conversation-inner">
+							<header className="ad-email-conversation-header"><div><span className="ad-eyebrow">{ui("email_conversation", "CONVERSATION")}</span><h3>{emailThread.subject}</h3><p>{emailThread.messages.find((message) => message.direction === "inbound")?.fromEmail}</p></div><span className="ad-count-pill">{ui("email_messages_count", "{{count}} messages", { count: emailThread.messages.length })}</span></header>
+							<div className="ad-email-messages">{emailThread.messages.map((message) => <article className={`ad-email-message ${message.direction === "outbound" ? "is-outbound" : ""}`} key={message.id}>
+								<div className="ad-email-message-heading"><strong>{message.direction === "outbound" ? ui("email_from_ponyo", "Ponyo") : message.fromName || message.fromEmail}</strong><time dateTime={message.receivedAt}>{date(message.receivedAt)}</time></div>
+								{message.direction === "outbound" && <small className="ad-email-delivery-status">{ui(`email_delivery_${message.deliveryStatus}`, message.deliveryStatus)}</small>}
+								<p className="ad-email-message-body">{message.body || ui("email_no_body", "No message text was provided.")}</p>
+							</article>)}</div>
+							<form className="ad-email-reply-form" onSubmit={(event) => void sendEmailReply(event)}>
+								<div className="ad-email-reply-heading"><h4>{ui("email_reply_title", "Reply")}</h4><label>{ui("email_template", "Reply template")}<select value={emailReplyTemplate} onChange={(event) => { const selected = emailReplyTemplates.find((template) => template.id === event.target.value); setEmailReplyTemplate(event.target.value); if (selected) setEmailReplyBody(selected.body); }}><option value="">{ui("email_template_custom", "Write a reply")}</option>{emailReplyTemplates.map((template) => <option value={template.id} key={template.id}>{template.label}</option>)}</select></label></div>
+								<label className="ad-email-reply-label" htmlFor="admin-email-reply">{ui("email_reply_body", "Message")}</label>
+								<textarea id="admin-email-reply" value={emailReplyBody} onChange={(event) => setEmailReplyBody(event.target.value)} maxLength={5000} rows={6} required disabled={!emailInboxStatus?.smtpConfigured} placeholder={ui("email_reply_placeholder", "Write your reply. Templates can be edited before sending.")} />
+								<div className="ad-email-reply-footer"><span>{emailThread.messages.find((message) => message.direction === "inbound")?.fromEmail}</span><button className="ad-primary-button" type="submit" disabled={!emailInboxStatus?.smtpConfigured || !emailReplyBody.trim() || busyId === "email-reply"}>{busyId === "email-reply" ? ui("email_sending", "Queueing…") : ui("email_send_reply", "Send reply")}<span>↗</span></button></div>
+							</form>
+						</div>}
+						{!emailThreadLoading && !emailThread && <div className="ad-empty">{ui("email_select_conversation", "Select a conversation to view and reply.")}</div>}
+					</section>
+				</div>
+			</section>}
 			{section === "maker-applications" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{makerApplications.map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td><td><select aria-label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} onChange={(event) => void updateMakerApplication(application, event.target.value as MakerApplicationStatus)}><option value="pending">Pending</option><option value="reviewing">Reviewing</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div></section>}
 			{section === "suppliers" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2></div><span className="ad-count-pill">{suppliers.length} suppliers</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{suppliers.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div></section>}
 			{section === "customers" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("customers", query); }} placeholder="Customer name or email" /></label><button type="button" onClick={() => void loadSection("customers")}>Search customers</button></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>CUSTOMER</th><th>EMAIL</th><th>VERIFICATION</th><th>JOINED</th></tr></thead><tbody>{customers.map((customer) => <tr key={customer.id}><td><strong>{customer.firstName} {customer.lastName}</strong></td><td>{customer.email}</td><td><span className={`ad-status ${customer.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{customer.emailVerified ? "Verified" : "Pending"}</span></td><td>{date(customer.createdAt)}</td></tr>)}</tbody></table></div></section></>}
 			{section === "admin-accounts" && <>
 				<section className="ad-panel ad-admin-account-panel">
-					<div className="ad-panel-heading"><div><span className="ad-eyebrow">OPERATIONS ACCESS</span><h2>Create an admin account</h2><p>Only current admins can provision access. Share the temporary password securely with the new admin.</p></div></div>
+					<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("admin_accounts_hint", "Manage operations access")}</span><h2>{ui("admin_account_form_title", "Create an admin account")}</h2><p>{ui("admin_account_form_note", "Only current admins can provision access. Share the temporary password securely with the new admin.")}</p></div></div>
 					<form className="ad-admin-account-form" onSubmit={createAdminAccount}>
-						<label>First name<input value={newAdmin.firstName} onChange={(event) => setNewAdmin((current) => ({ ...current, firstName: event.target.value }))} autoComplete="given-name" maxLength={120} required /></label>
-						<label>Last name<input value={newAdmin.lastName} onChange={(event) => setNewAdmin((current) => ({ ...current, lastName: event.target.value }))} autoComplete="family-name" maxLength={120} /></label>
-						<label>Email<input type="email" value={newAdmin.email} onChange={(event) => setNewAdmin((current) => ({ ...current, email: event.target.value }))} autoComplete="email" maxLength={320} required /></label>
-						<label>Temporary password<input type="password" value={newAdmin.password} onChange={(event) => setNewAdmin((current) => ({ ...current, password: event.target.value }))} autoComplete="new-password" minLength={8} maxLength={128} required /><small>At least 8 characters, including a number and a special character.</small></label>
-						<button className="ad-primary-button" type="submit" disabled={busyId === "create-admin"}>{busyId === "create-admin" ? "Creating…" : "Create admin access"}<span>↗</span></button>
+						<label>{ui("first_name", "First name")}<input value={newAdmin.firstName} onChange={(event) => setNewAdmin((current) => ({ ...current, firstName: event.target.value }))} autoComplete="given-name" maxLength={120} required /></label>
+						<label>{ui("last_name", "Last name")}<input value={newAdmin.lastName} onChange={(event) => setNewAdmin((current) => ({ ...current, lastName: event.target.value }))} autoComplete="family-name" maxLength={120} /></label>
+						<label>{ui("email", "Email")}<input type="email" value={newAdmin.email} onChange={(event) => setNewAdmin((current) => ({ ...current, email: event.target.value }))} autoComplete="email" maxLength={320} required /></label>
+						<label>{ui("temporary_password", "Temporary password")}<input type="password" value={newAdmin.password} onChange={(event) => setNewAdmin((current) => ({ ...current, password: event.target.value }))} autoComplete="new-password" minLength={8} maxLength={128} required /><small>{ui("temporary_password_requirements", "At least 8 characters, including a number and a special character.")}</small></label>
+						<button className="ad-primary-button" type="submit" disabled={busyId === "create-admin"}>{busyId === "create-admin" ? ui("creating", "Creating…") : ui("create_admin_access", "Create admin access")}<span>↗</span></button>
 					</form>
 				</section>
-				<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">CURRENT ADMINS</span><h2>Admin accounts</h2></div><span className="ad-count-pill">{adminAccounts.length} accounts</span></div>
-					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ADMIN</th><th>EMAIL</th><th>ACCESS</th><th>CREATED</th></tr></thead><tbody>{adminAccounts.map((account) => <tr key={account.id}><td><strong>{account.firstName} {account.lastName}</strong></td><td>{account.email}</td><td><span className={`ad-status ${account.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{account.emailVerified ? "Verified admin" : "Email not verified"}</span></td><td>{date(account.createdAt)}</td></tr>)}</tbody></table>{!adminAccounts.length && <div className="ad-empty">No admin accounts were returned.</div>}</div>
+				<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("current_admins", "CURRENT ADMINS")}</span><h2>{ui("admin_accounts_title", "Admin accounts")}</h2></div><span className="ad-count-pill">{ui("admin_count", "{{count}} accounts", { count: adminAccounts.length })}</span></div>
+					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>{ui("admin_table_name", "ADMIN")}</th><th>{ui("admin_table_email", "EMAIL")}</th><th>{ui("admin_table_access", "ACCESS")}</th><th>{ui("admin_table_created", "CREATED")}</th></tr></thead><tbody>{adminAccounts.map((account) => <tr key={account.id}><td><strong>{account.firstName} {account.lastName}</strong></td><td>{account.email}</td><td><span className={`ad-status ${account.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{account.emailVerified ? ui("verified_admin", "Verified admin") : ui("admin_email_unverified", "Email not verified")}</span></td><td>{date(account.createdAt)}</td></tr>)}</tbody></table>{!adminAccounts.length && <div className="ad-empty">{ui("no_admin_accounts", "No admin accounts were returned.")}</div>}</div>
 				</section>
 			</>}
 			{section === "fulfillment" && <><div className="ad-fulfillment-summary"><strong>{metrics?.ordersAwaitingFulfillment ?? 0}</strong><span>paid orders awaiting fulfillment action</span><p>Customer orders may split across suppliers. Select an order to inspect supplier confirmations and shipment tracking.</p></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>FULFILLMENT</th><th>SUPPLIER ROUTING</th><th>TOTAL</th><th>ACTION</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td><td><button className="ad-row-action" type="button" disabled={busyId === order.id || order.paymentStatus !== "paid"} onClick={(event) => { event.stopPropagation(); void planSupplierOrders(order); }}>{busyId === order.id ? "Planning…" : "Plan suppliers"}</button></td></tr>)}</tbody></table>{!orders.items.length && <div className="ad-empty">No paid orders need fulfillment right now.</div>}</div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL</span><h2>{orderDetail.orderNumber}</h2></div><button type="button" onClick={() => setOrderDetail(null)}>Close</button></div><div className="ad-detail-columns"><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")}</small></span><small>{po.items.length} lines</small></article>)}{!orderDetail.supplierFulfillments.length && <p className="ad-detail-empty">No supplier PO has been planned yet.</p>}</section><section><h3>Shipments &amp; tracking</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}

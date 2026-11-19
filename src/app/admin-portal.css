@@ -2116,6 +2116,383 @@
     align-self: end;
 }
 
+.ad-product-intake-note {
+    margin: 18px 0 0;
+    padding: 14px 16px;
+    border: 1px solid #e8dfd3;
+    border-radius: 14px;
+    background: linear-gradient(120deg, #fffdfa, #f3f7f2);
+}
+
+.ad-product-intake-note strong {
+    color: #705444;
+    font-size: 13px;
+}
+
+.ad-product-intake-note p {
+    margin: 5px 0 0;
+    color: #806f65;
+    font-size: 11px;
+    line-height: 1.65;
+}
+
+.ad-report-tabs {
+    margin: 18px 0 12px;
+    padding: 5px;
+    border: 1px solid #eee3dc;
+    border-radius: 14px;
+    display: flex;
+    gap: 5px;
+    background: #f5f0ec;
+}
+
+.ad-report-tabs button {
+    min-height: 42px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    color: #816e64;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.ad-report-tabs button span {
+    min-width: 22px;
+    padding: 2px 6px;
+    border-radius: 99px;
+    background: #ece3dc;
+    color: #786459;
+    font-size: 10px;
+    text-align: center;
+}
+
+.ad-report-tabs button.is-active {
+    border-color: #ecdfd6;
+    background: #fff;
+    color: #754d38;
+    box-shadow: 0 2px 6px rgb(87 57 43 / 6%);
+}
+
+.ad-report-tabs button.is-active span {
+    background: #fff1e8;
+    color: #925f43;
+}
+
+.ad-report-tabs button:focus-visible {
+    outline: 3px solid rgb(210 157 131 / 28%);
+    outline-offset: 2px;
+}
+
+.ad-email-inbox {
+    margin-top: 18px;
+}
+
+.ad-email-heading-actions,
+.ad-email-toolbar,
+.ad-email-toolbar form,
+.ad-email-thread-top,
+.ad-email-thread-meta,
+.ad-email-message-heading,
+.ad-email-reply-heading,
+.ad-email-reply-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ad-email-heading-actions > button,
+.ad-email-toolbar form > button {
+    min-height: 39px;
+    padding: 8px 13px;
+    border: 1px solid #e8d9cf;
+    border-radius: 11px;
+    background: #fffaf7;
+    color: #745443;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.ad-email-heading-actions > button:disabled {
+    cursor: wait;
+    opacity: .6;
+}
+
+.ad-email-config-note {
+    margin: 14px 0;
+    padding: 13px 15px;
+    border: 1px solid #eadfd1;
+    border-radius: 13px;
+    background: #fff9ee;
+    color: #755f4e;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.ad-email-config-note p {
+    margin: 4px 0 0;
+}
+
+.ad-email-sync-note,
+.ad-email-sync-error {
+    margin: 8px 0;
+    color: #89766e;
+    font-size: 10px;
+}
+
+.ad-email-sync-error {
+    color: #a34a34;
+}
+
+.ad-email-toolbar {
+    margin: 16px 0 12px;
+    color: #89766e;
+    font-size: 11px;
+}
+
+.ad-email-toolbar form {
+    flex: 1;
+    justify-content: flex-start;
+}
+
+.ad-email-toolbar .ad-search {
+    width: min(100%, 400px);
+}
+
+.ad-email-workspace {
+    min-height: 540px;
+    border: 1px solid #eee3dc;
+    border-radius: 15px;
+    display: grid;
+    grid-template-columns: minmax(230px, .72fr) minmax(0, 1.65fr);
+    overflow: hidden;
+    background: #fff;
+}
+
+.ad-email-threads {
+    max-height: 760px;
+    overflow-y: auto;
+    border-right: 1px solid #eee3dc;
+    background: #fcfaf8;
+}
+
+.ad-email-thread {
+    width: 100%;
+    padding: 13px 14px;
+    border: 0;
+    border-bottom: 1px solid #f0e9e4;
+    display: grid;
+    gap: 5px;
+    background: transparent;
+    color: #4a3b34;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.ad-email-thread:hover,
+.ad-email-thread.is-selected {
+    background: #fff3ea;
+}
+
+.ad-email-thread.is-selected {
+    box-shadow: inset 3px 0 #d5805a;
+}
+
+.ad-email-thread:focus-visible,
+.ad-email-heading-actions > button:focus-visible,
+.ad-email-toolbar form > button:focus-visible {
+    outline: 3px solid rgb(210 157 131 / 30%);
+    outline-offset: -2px;
+}
+
+.ad-email-thread-top strong,
+.ad-email-thread-subject {
+    overflow: hidden;
+    color: #493b34;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ad-email-thread-top time,
+.ad-email-message-heading time {
+    flex: 0 0 auto;
+    color: #9a877d;
+    font-size: 9px;
+}
+
+.ad-email-thread-address,
+.ad-email-thread-preview {
+    overflow: hidden;
+    color: #8c7a71;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ad-email-thread-meta {
+    justify-content: flex-start;
+    color: #9a877d;
+    font-size: 9px;
+    text-transform: capitalize;
+}
+
+.ad-email-thread-meta b {
+    color: #a05234;
+    font-weight: 800;
+}
+
+.ad-email-conversation {
+    min-width: 0;
+    background: #fff;
+}
+
+.ad-email-conversation > .ad-empty {
+    min-height: 100%;
+    display: grid;
+    place-content: center;
+}
+
+.ad-email-conversation-inner {
+    display: grid;
+    grid-template-rows: auto minmax(160px, 1fr) auto;
+    min-height: 540px;
+}
+
+.ad-email-conversation-header {
+    padding: 17px 19px;
+    border-bottom: 1px solid #eee3dc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.ad-email-conversation-header h3 {
+    margin: 4px 0;
+    color: #4b3b34;
+    font-family: var(--font-playfair), Georgia, serif;
+    font-size: 18px;
+}
+
+.ad-email-conversation-header p {
+    margin: 0;
+    color: #8a776e;
+    font-size: 10px;
+}
+
+.ad-email-messages {
+    max-height: 480px;
+    padding: 16px 19px;
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    overflow-y: auto;
+    background: #fdfbf9;
+}
+
+.ad-email-message {
+    max-width: min(100%, 680px);
+    padding: 12px 14px;
+    border: 1px solid #eee3dc;
+    border-radius: 13px 13px 13px 3px;
+    background: #fff;
+}
+
+.ad-email-message.is-outbound {
+    justify-self: end;
+    border-color: #f1dfd2;
+    border-radius: 13px 13px 3px 13px;
+    background: #fff4eb;
+}
+
+.ad-email-message-heading strong {
+    color: #59463b;
+    font-size: 10px;
+}
+
+.ad-email-delivery-status {
+    display: block;
+    margin-top: 5px;
+    color: #9b6b4d;
+    font-size: 9px;
+    text-transform: capitalize;
+}
+
+.ad-email-message-body {
+    margin: 9px 0 0;
+    color: #5d4c44;
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.ad-email-reply-form {
+    padding: 15px 19px 18px;
+    border-top: 1px solid #eee3dc;
+    display: grid;
+    gap: 8px;
+}
+
+.ad-email-reply-heading h4 {
+    margin: 0;
+    color: #59463b;
+    font-size: 13px;
+}
+
+.ad-email-reply-heading label,
+.ad-email-reply-label {
+    display: grid;
+    gap: 5px;
+    color: #806b61;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.ad-email-reply-heading select,
+.ad-email-reply-form textarea {
+    padding: 9px 11px;
+    border: 1px solid #e8ddd6;
+    border-radius: 10px;
+    background: #fff;
+    color: #4e4039;
+    font: inherit;
+    font-size: 11px;
+}
+
+.ad-email-reply-form textarea {
+    min-height: 110px;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.ad-email-reply-form textarea:focus-visible,
+.ad-email-reply-heading select:focus-visible {
+    outline: 3px solid rgb(210 157 131 / 25%);
+    outline-offset: 1px;
+}
+
+.ad-email-reply-footer > span {
+    overflow: hidden;
+    color: #8c7a71;
+    font-size: 10px;
+    text-overflow: ellipsis;
+}
+
+.ad-email-reply-footer .ad-primary-button {
+    min-height: 38px;
+}
+
 @media (max-width: 1100px) and (min-width: 761px) {
     .ad-layout--collapsed {
         grid-template-columns: 72px minmax(0, 1fr);
@@ -2137,5 +2514,36 @@
 
     .ad-admin-account-form {
         grid-template-columns: 1fr;
+    }
+
+    .ad-report-tabs button {
+        min-height: 44px;
+        flex: 1;
+        justify-content: center;
+    }
+
+    .ad-email-heading-actions {
+        align-items: flex-end;
+        flex-direction: column;
+    }
+
+    .ad-email-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .ad-email-threads {
+        max-height: 300px;
+        border-right: 0;
+        border-bottom: 1px solid #eee3dc;
+    }
+
+    .ad-email-toolbar,
+    .ad-email-toolbar form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ad-email-toolbar .ad-search {
+        width: 100%;
     }
 }

@@ -1,22 +1,29 @@
 """Admin-only marketplace operations and read models for the Ponyo dashboard."""
 
 import csv
+import re
 from datetime import datetime, timezone
 from io import BytesIO, StringIO
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from sqlalchemy import func, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
+from pydantic import EmailStr, TypeAdapter, ValidationError
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.db import get_db
+from app.email_queue import enqueue_email_notification
+from app.mailbox_sync import MailboxSyncError, mailbox_message_id, sync_mailbox_once, sync_portal_messages
 from app.models import (
     Brand,
     Customer,
+    EmailInboxMessage,
+    EmailInboxSyncState,
     MakerApplication,
     Order,
     OrderItem,
@@ -25,7 +32,6 @@ from app.models import (
     ProductCategory,
     ProductInterest,
     ProductReservation,
-    ProductTranslation,
     ProductVariant,
     Shipment,
     Supplier,
@@ -39,6 +45,7 @@ from app.rate_limit import enforce_rate_limit
 from app.schemas import (
     AdminAccountCreateRequest,
     AdminBrandProfileRequest,
+    AdminEmailReplyRequest,
     AdminMakerApplicationStatusRequest,
     AdminProductProofRequest,
     AdminProductPublicationRequest,
@@ -46,11 +53,12 @@ from app.schemas import (
     AdminSupplierStatusRequest,
 )
 from app.security import hash_password, require_csrf, require_roles
-from app.translations import TranslationUnavailableError, ensure_product_translations, source_hash
+from app.translations import TranslationUnavailableError, ensure_product_translations
 
 router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
 
 MAX_RESERVATION_EXPORT_ROWS = 10_000
+MESSAGE_ID_PATTERN = re.compile(r"<[^<>\s]+>")
 
 
 def reservation_filters(product_id: UUID | None, country: str | None, q: str | None):
@@ -804,4 +812,271 @@ async def create_admin_account(
         "email": account.email,
         "emailVerified": account.email_verified,
         "createdAt": account.created_at.isoformat(),
+    }}
+
+
+@router.get("/email/inbox/status", response_model=dict)
+async def get_email_inbox_status(
+    response: Response,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    settings = get_settings()
+    mailbox_key = (
+        f"{settings.email_inbox_imap_username}:{settings.email_inbox_imap_mailbox}"
+        if settings.email_inbox_imap_username else None
+    )
+    state = await db.get(EmailInboxSyncState, mailbox_key) if mailbox_key else None
+    return {"data": {
+        "imapConfigured": settings.email_inbox_imap_configured,
+        "smtpConfigured": settings.contact_email_configured,
+        "replyConfigured": settings.contact_email_configured,
+        "lastSyncedAt": state.last_synced_at.isoformat() if state and state.last_synced_at else None,
+        "lastError": state.last_error if state else None,
+    }}
+
+
+@router.post("/email/inbox/sync", response_model=dict)
+async def sync_admin_email_inbox(
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-email-inbox-sync", 5, 60)
+    imported_portal_messages = await sync_portal_messages(db)
+    settings = get_settings()
+    if not settings.email_inbox_imap_configured:
+        return {"data": {
+            "imapConfigured": False,
+            "importedPortalMessages": imported_portal_messages,
+            "importedMailboxMessages": 0,
+            "lastSyncedAt": None,
+        }}
+    try:
+        result = await sync_mailbox_once(db)
+    except MailboxSyncError as error:
+        mailbox_key = f"{settings.email_inbox_imap_username}:{settings.email_inbox_imap_mailbox}"
+        state = await db.get(EmailInboxSyncState, mailbox_key)
+        if state is None:
+            state = EmailInboxSyncState(mailbox_name=mailbox_key)
+            db.add(state)
+        state.last_error = type(error).__name__
+        await db.commit()
+        raise HTTPException(503, "Mailbox sync failed. Check the IMAP settings and try again.") from error
+    return {"data": {
+        "imapConfigured": True,
+        "importedPortalMessages": imported_portal_messages,
+        "importedMailboxMessages": result["imported"],
+        "lastSyncedAt": result["lastSyncedAt"].isoformat(),
+    }}
+
+
+@router.get("/email/inbox", response_model=dict)
+async def list_admin_email_threads(
+    response: Response,
+    q: str | None = Query(default=None, max_length=180),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store"
+    await sync_portal_messages(db)
+    query = select(EmailInboxMessage)
+    if q and q.strip():
+        term = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{term}%"
+        query = query.where(or_(
+            EmailInboxMessage.subject.ilike(pattern, escape="\\"),
+            EmailInboxMessage.from_email.ilike(pattern, escape="\\"),
+            EmailInboxMessage.from_name.ilike(pattern, escape="\\"),
+            EmailInboxMessage.text_body.ilike(pattern, escape="\\"),
+        ))
+    rows = (await db.scalars(
+        query.order_by(EmailInboxMessage.received_at.desc(), EmailInboxMessage.id.desc()).limit(5000)
+    )).all()
+    grouped: dict[str, list[EmailInboxMessage]] = {}
+    for row in rows:
+        grouped.setdefault(row.thread_key, []).append(row)
+    threads = []
+    for thread_key, messages in grouped.items():
+        latest = messages[0]
+        preview = " ".join(latest.text_body.split())[:220]
+        threads.append({
+            "threadKey": thread_key,
+            "subject": latest.subject,
+            "fromEmail": latest.from_email,
+            "fromName": latest.from_name,
+            "latestAt": latest.received_at.isoformat(),
+            "preview": preview,
+            "messageCount": len(messages),
+            "unreadCount": sum(1 for message in messages if message.direction == "inbound" and not message.is_read),
+            "source": latest.source_type,
+            "deliveryStatus": latest.delivery_status,
+        })
+    return {"data": {
+        "items": threads[offset:offset + limit],
+        "total": len(threads),
+        "limit": limit,
+        "offset": offset,
+    }}
+
+
+@router.get("/email/inbox/{thread_key}", response_model=dict)
+async def get_admin_email_thread(
+    response: Response,
+    thread_key: str = Path(min_length=1, max_length=180),
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store"
+    await sync_portal_messages(db)
+    await db.execute(
+        update(EmailInboxMessage)
+        .where(
+            EmailInboxMessage.thread_key == thread_key,
+            EmailInboxMessage.direction == "inbound",
+            EmailInboxMessage.is_read.is_(False),
+        )
+        .values(is_read=True)
+    )
+    await db.commit()
+    rows = (await db.scalars(
+        select(EmailInboxMessage)
+        .where(EmailInboxMessage.thread_key == thread_key)
+        .order_by(EmailInboxMessage.received_at, EmailInboxMessage.created_at, EmailInboxMessage.id)
+    )).all()
+    if not rows:
+        raise HTTPException(404, "Email thread not found.")
+    return {"data": {
+        "threadKey": thread_key,
+        "subject": rows[-1].subject,
+        "messages": [{
+            "id": str(message.id),
+            "direction": message.direction,
+            "fromEmail": message.from_email,
+            "fromName": message.from_name,
+            "toEmail": message.to_email,
+            "subject": message.subject,
+            "body": message.text_body,
+            "receivedAt": message.received_at.isoformat(),
+            "deliveryStatus": message.delivery_status,
+            "source": message.source_type,
+        } for message in rows],
+    }}
+
+
+@router.post("/email/inbox/{thread_key}/reply", response_model=dict)
+async def reply_to_admin_email_thread(
+    thread_key: str,
+    payload: AdminEmailReplyRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-email-reply", 30, 60)
+    settings = get_settings()
+    if not settings.contact_email_configured:
+        raise HTTPException(503, "SMTP is not configured for sending email replies.")
+    if len(thread_key) > 180:
+        raise HTTPException(404, "Email thread not found.")
+    existing = await db.scalar(select(EmailInboxMessage).where(
+        EmailInboxMessage.source_type == "admin_reply",
+        EmailInboxMessage.source_key == str(payload.idempotencyKey),
+    ))
+    if existing is not None:
+        return {"data": {
+            "threadKey": existing.thread_key,
+            "messageId": str(existing.id),
+            "deliveryStatus": existing.delivery_status,
+            "alreadyQueued": True,
+        }}
+
+    messages = (await db.scalars(
+        select(EmailInboxMessage)
+        .where(EmailInboxMessage.thread_key == thread_key)
+        .order_by(EmailInboxMessage.received_at, EmailInboxMessage.created_at, EmailInboxMessage.id)
+    )).all()
+    if not messages:
+        raise HTTPException(404, "Email thread not found.")
+    inbound = next((message for message in reversed(messages) if message.direction == "inbound"), None)
+    if inbound is None:
+        raise HTTPException(400, "This thread has no incoming message to reply to.")
+    try:
+        recipient = str(TypeAdapter(EmailStr).validate_python(inbound.from_email))
+    except ValidationError as error:
+        raise HTTPException(400, "The sender address is not valid for a reply.") from error
+
+    subject = messages[0].subject
+    if not subject.casefold().startswith("re:"):
+        subject = f"Re: {subject}"
+    reference_ids = []
+    for message in messages:
+        if message.references_header:
+            reference_ids.extend(MESSAGE_ID_PATTERN.findall(message.references_header))
+        if message.message_id:
+            reference_ids.append(message.message_id)
+    references = " ".join(dict.fromkeys(reference_ids[-20:]))[-900:] or None
+    in_reply_to = messages[-1].message_id or messages[-1].in_reply_to
+    now = utc_now()
+    event_id = uuid4()
+    reply_id = uuid4()
+    notification_key = f"{event_id}:admin_email_reply"
+    reply = EmailInboxMessage(
+        id=reply_id,
+        thread_key=thread_key,
+        source_type="admin_reply",
+        source_key=str(payload.idempotencyKey),
+        direction="outbound",
+        from_email=settings.smtp_from_email or settings.smtp_username,
+        from_name="Ponyo",
+        to_email=recipient,
+        subject=subject[:998],
+        text_body=payload.body,
+        message_id=mailbox_message_id(notification_key),
+        in_reply_to=in_reply_to,
+        references_header=references,
+        is_read=True,
+        delivery_status="queued",
+        received_at=now,
+    )
+    db.add(reply)
+    event = OutboxEvent(
+        id=event_id,
+        event_type="admin.email_reply_queued",
+        payload={"inboxMessageId": str(reply_id)},
+    )
+    enqueue_email_notification(
+        db,
+        event,
+        template="admin_email_reply",
+        recipient=recipient,
+        payload={
+            "idempotencyKey": str(payload.idempotencyKey),
+            "subject": subject[:998],
+            "body": payload.body,
+            "inReplyTo": in_reply_to,
+            "references": references,
+        },
+    )
+    try:
+        await db.commit()
+    except IntegrityError as error:
+        await db.rollback()
+        existing = await db.scalar(select(EmailInboxMessage).where(
+            EmailInboxMessage.source_type == "admin_reply",
+            EmailInboxMessage.source_key == str(payload.idempotencyKey),
+        ))
+        if existing is None:
+            raise HTTPException(409, "The reply could not be queued. Please try again.") from error
+        reply = existing
+    return {"data": {
+        "threadKey": reply.thread_key,
+        "messageId": str(reply.id),
+        "deliveryStatus": reply.delivery_status,
+        "alreadyQueued": False,
     }}

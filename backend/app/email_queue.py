@@ -6,6 +6,7 @@ import html
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from uuid import UUID
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.currency import CURRENCY_DIGITS
 from app.db import SessionLocal
 from app.email_notifications import ponyo_branded_email_html, send_transactional_email
-from app.models import EmailNotification, OutboxEvent, utc_now
+from app.models import ContactRequest, EmailInboxMessage, EmailNotification, OutboxEvent, utc_now
 
 logger = logging.getLogger("ponyo.email_queue")
 MAX_ATTEMPTS = 10
@@ -64,6 +65,20 @@ def _detail_panel(rows: list[tuple[str, str]]) -> str:
 def _content(notification: EmailNotification) -> tuple[str, str, str]:
     payload = notification.payload
     template = notification.template
+    if template == "admin_email_reply":
+        subject = str(payload["subject"])[:998]
+        text = str(payload["body"])
+        safe_body = html.escape(text).replace("\n", "<br>")
+        html_body = ponyo_branded_email_html(
+            eyebrow="A reply from Ponyo",
+            title=subject,
+            intro="Our team has replied to your message.",
+            content_html=(
+                '<div style="margin-top:22px;padding:18px;border:1px solid #eedfd5;'
+                f'border-radius:15px;background:#fffaf6;color:#3f302b;line-height:24px">{safe_body}</div>'
+            ),
+        )
+        return subject, text, html_body
     order_number = str(payload.get("orderNumber", "your order"))
     order_url = str(payload.get("orderUrl", ""))
     lines: list[str]
@@ -177,13 +192,29 @@ async def send_one(db: AsyncSession) -> bool:
     notification.status = "processing"
     notification.attempts += 1
     notification.lease_until = now + timedelta(seconds=LEASE_SECONDS)
+    if notification.template == "admin_email_reply":
+        reply_message = await db.scalar(
+            select(EmailInboxMessage).where(
+                EmailInboxMessage.source_type == "admin_reply",
+                EmailInboxMessage.source_key == str(notification.payload.get("idempotencyKey", "")),
+            )
+        )
+        if reply_message is not None:
+            reply_message.delivery_status = "sending"
     await db.commit()
     try:
         subject, text_body, html_body = _content(notification)
         message_digest = hashlib.sha256(notification.notification_key.encode()).hexdigest()
         message_id = f"<{message_digest}@mail.byponyo.com>"
+        threading_headers = {}
+        if notification.template == "admin_email_reply":
+            threading_headers = {
+                "in_reply_to": notification.payload.get("inReplyTo"),
+                "references": notification.payload.get("references"),
+            }
         sent = await send_transactional_email(
             notification.recipient, subject, text_body, html_body, message_id,
+            **threading_headers,
         )
     except Exception as error:
         logger.warning("Email notification preparation failed id=%s exception_type=%s",
@@ -198,18 +229,41 @@ async def send_one(db: AsyncSession) -> bool:
         current.sent_at = datetime.now(timezone.utc)
         current.last_error = None
         current.lease_until = None
+        reply_status = "sent"
     elif current.attempts >= MAX_ATTEMPTS:
         current.status = "failed"
         current.last_error = error_name[:80]
         current.lease_until = None
+        reply_status = "failed"
         logger.error("Email notification exhausted retries id=%s", current.notification_key)
     else:
         current.status = "pending"
         current.last_error = error_name[:80]
         current.next_attempt_at = datetime.now(timezone.utc) + timedelta(seconds=min(3600, 15 * (2 ** (current.attempts - 1))))
         current.lease_until = None
+        reply_status = "queued"
         logger.warning("Email notification scheduled retry id=%s attempt=%s",
                        current.notification_key, current.attempts)
+    if current.template == "admin_email_reply":
+        reply_message = await db.scalar(
+            select(EmailInboxMessage).where(
+                EmailInboxMessage.source_type == "admin_reply",
+                EmailInboxMessage.source_key == str(current.payload.get("idempotencyKey", "")),
+            )
+        )
+        if reply_message is not None:
+            reply_message.delivery_status = reply_status
+            if sent:
+                contact_key = await db.scalar(
+                    select(EmailInboxMessage.source_key).where(
+                        EmailInboxMessage.thread_key == reply_message.thread_key,
+                        EmailInboxMessage.source_type == "contact_form",
+                    ).limit(1)
+                )
+                if contact_key:
+                    contact = await db.get(ContactRequest, UUID(contact_key))
+                    if contact is not None:
+                        contact.status = "replied"
     await db.commit()
     return True
 

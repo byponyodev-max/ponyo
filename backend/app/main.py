@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException
 from app.config import settings
 from app.db import engine
 from app.email_queue import transactional_email_worker
+from app.mailbox_sync import email_inbox_worker
 from app.outbox import publish_outbox_events
 from app.reservation_expiry import recover_expired_reservations
 from app.supplier_forwarding import supplier_order_worker
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
     expiry_task = None
     supplier_task = None
     email_task = None
+    inbox_task = None
     try:
         from redis.asyncio import Redis
 
@@ -47,10 +49,12 @@ async def lifespan(app: FastAPI):
         supplier_task = asyncio.create_task(supplier_order_worker())
     if settings.contact_email_configured:
         email_task = asyncio.create_task(transactional_email_worker())
+    if settings.email_inbox_imap_configured:
+        inbox_task = asyncio.create_task(email_inbox_worker())
     try:
         yield
     finally:
-        tasks = [task for task in (outbox_task, expiry_task, supplier_task, email_task) if task is not None]
+        tasks = [task for task in (outbox_task, expiry_task, supplier_task, email_task, inbox_task) if task is not None]
         for task in tasks:
             task.cancel()
         try:

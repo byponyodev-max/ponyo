@@ -222,6 +222,46 @@ export type AdminReservationPage = {
 	offset: number;
 };
 
+export type AdminEmailInboxStatus = {
+	imapConfigured: boolean;
+	smtpConfigured: boolean;
+	replyConfigured: boolean;
+	lastSyncedAt: string | null;
+	lastError: string | null;
+};
+
+export type AdminEmailThread = {
+	threadKey: string;
+	subject: string;
+	fromEmail: string;
+	fromName: string;
+	latestAt: string;
+	preview: string;
+	messageCount: number;
+	unreadCount: number;
+	source: string;
+	deliveryStatus: string;
+};
+
+export type AdminEmailMessage = {
+	id: string;
+	direction: "inbound" | "outbound";
+	fromEmail: string;
+	fromName: string;
+	toEmail: string;
+	subject: string;
+	body: string;
+	receivedAt: string;
+	deliveryStatus: string;
+	source: string;
+};
+
+export type AdminEmailThreadDetail = {
+	threadKey: string;
+	subject: string;
+	messages: AdminEmailMessage[];
+};
+
 export type MakerProfile = {
 	id: string;
 	slug: string;
@@ -1048,6 +1088,37 @@ export const ponyoApi = {
 		password: string;
 	}) =>
 		apiRequest<AdminAccount>("/admin/admins", {
+			method: "POST",
+			body: JSON.stringify(input),
+		}),
+	getAdminEmailInboxStatus: () =>
+		apiRequest<AdminEmailInboxStatus>("/admin/email/inbox/status"),
+	listAdminEmailThreads: (query = "", limit = 100, offset = 0) => {
+		const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+		if (query.trim()) params.set("q", query.trim());
+		return apiRequest<{ items: AdminEmailThread[]; total: number; limit: number; offset: number }>(
+			`/admin/email/inbox?${params.toString()}`,
+		);
+	},
+	getAdminEmailThread: (threadKey: string) =>
+		apiRequest<AdminEmailThreadDetail>(`/admin/email/inbox/${encodeURIComponent(threadKey)}`),
+	syncAdminEmailInbox: () =>
+		apiRequest<{
+			imapConfigured: boolean;
+			importedPortalMessages: number;
+			importedMailboxMessages: number;
+			lastSyncedAt: string | null;
+		}>("/admin/email/inbox/sync", { method: "POST", body: JSON.stringify({}) }),
+	replyAdminEmailThread: (
+		threadKey: string,
+		input: { body: string; idempotencyKey: string },
+	) =>
+		apiRequest<{
+			threadKey: string;
+			messageId: string;
+			deliveryStatus: string;
+			alreadyQueued: boolean;
+		}>(`/admin/email/inbox/${encodeURIComponent(threadKey)}/reply`, {
 			method: "POST",
 			body: JSON.stringify(input),
 		}),

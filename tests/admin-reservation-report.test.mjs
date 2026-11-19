@@ -29,6 +29,10 @@ test("admin country totals combine products and sort by reservations", () => {
 });
 
 test("admin shows reservation and interest country reports separately", () => {
+  assert.ok(adminPage.includes('role="tablist"'));
+  assert.ok(adminPage.includes('aria-controls="interest-report-panel"'));
+  assert.ok(adminPage.includes('reservationTab === "reservations"'));
+  assert.ok(adminPage.includes('reservationTab === "interests"'));
   assert.ok(adminPage.includes("Each row is one product; its country counts are shown beside that product."));
   assert.ok(adminPage.includes("Each row is one product; country counts stay with that product."));
   assert.ok(adminPage.includes("BY COUNTRY"));

@@ -109,6 +109,13 @@ class AdminAccountCreateRequest(BaseModel):
         return password
 
 
+class AdminEmailReplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    idempotencyKey: UUID
+    body: str = Field(min_length=1, max_length=5000)
+
+
 class RegisterRequest(AuthCredentials):
     firstName: str = Field(min_length=1, max_length=120)
     lastName: str = Field(default="", max_length=120)
