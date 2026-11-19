@@ -57,26 +57,15 @@ test("catalog filters dismiss outside and with Escape without navigation", () =>
 	);
 });
 
-test("homepage campaigns have one silver jumbo and one gold decorative jellyfish", () => {
+test("homepage size guide maps decorative jellyfish tones and keeps the art non-interactive", () => {
 	const source = read("../src/app/page.tsx");
 	const css = read("../src/app/home-size-spotlight.css");
-	assert.equal((source.match(/id="rare-jumbo-silver"/g) || []).length, 1);
-	assert.equal((source.match(/id="coming-soon-gold"/g) || []).length, 1);
-	assert.match(source, /home-campaign-jellyfish--silver" aria-hidden="true"/);
-	assert.match(
-		source,
-		/decoration=\{<span className="home-campaign-jellyfish home-campaign-jellyfish--gold"/,
-	);
-	assert.match(css, /\.home-campaign-jellyfish\s*\{[^}]*pointer-events: none;/);
-	const shelf = read("../src/components/product/product-shelf.tsx");
-	assert.match(
-		shelf,
-		/<Link className="view-all"[^\n]*\n\s*\{decoration\}\s*<\/div>\s*<ProductGrid/,
-	);
-	assert.ok(
-		!css.includes("is-single-product"),
-		"gold decoration is not positioned next to the product grid",
-	);
+	assert.match(source, /tone: "silver"/);
+	assert.match(source, /tone: "gold"/);
+	assert.match(source, /tone=\{jellyfish\.tone\} direction=\{jellyfish\.direction\}/);
+	assert.match(source, /aria-hidden="true"><JellyfishArtwork/);
+	assert.match(css, /\.size-guide-hero-jellyfish\s*\{[^}]*pointer-events: none;/);
+	assert.doesNotMatch(source, /coming-soon-gold|rare-jumbo-silver/);
 	assert.match(
 		css,
 		/\.coming-soon-shelf \.section-head\s*\{[^}]*padding-right: 36%;[^}]*padding-bottom: 0;/,

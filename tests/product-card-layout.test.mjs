@@ -69,7 +69,7 @@ test("the detail page passes six-item selection to its recommendations grid usin
 	);
 });
 
-test("the detail page shows seven product proofs and a separate maker-story link", () => {
+test("the detail page shows six maker-supplied facts and a conditional exclusivity badge", () => {
 	const page = read("../src/app/products/[id]/page.tsx");
 	assert.match(page, /const proofFacts = \[/);
 	for (const proof of [
@@ -82,11 +82,11 @@ test("the detail page shows seven product proofs and a separate maker-story link
 	]) {
 		assert.match(page, new RegExp(`key: "${proof}"`));
 	}
-	assert.match(page, /product-proof-fact--exclusive/);
-	assert.match(page, /src="\/ponyo-jellyfish\.svg" width=\{52\} height=\{52\}/);
+	assert.match(page, /product\.onlyAtPonyo && <span className="product-gallery-approval-badge"/);
+	assert.match(page, /src="\/ponyo-jellyfish\.svg" width=\{22\} height=\{22\}/);
 	assert.match(
 		page,
-		/<\/section>\s*\{product\.makerSlug && !isExample && <Link className="product-brand-story"/,
+		/\{product\.makerSlug && <Link className="product-brand-story"/,
 	);
 });
 
@@ -264,7 +264,7 @@ test("product waitlist shows the lantern-lit waiting-list character panorama", (
 
 test("home does not promote the retired Coming Soon notify shelf", () => {
 	const page = read("../src/app/page.tsx");
-	assert.doesNotMatch(page, /comingSoon|id="coming-soon"|HomeInterestForms/);
+	assert.doesNotMatch(page, /comingSoon|id="coming-soon"|HomeInterestForms|Ask us to let you know/);
 });
 
 test("size guide keeps large jellyfish and Domina quote outside the size tiles", () => {

@@ -216,5 +216,6 @@ test("shared auth stylesheet stays opt-in, follows theme imports, and protects m
   const layout = read("src/app/layout.tsx");
   assert.ok(layout.indexOf('"./auth-studio.css"') > layout.indexOf('"./collection-theme.css"'));
   const provider = read("src/components/layout/localization-provider.tsx");
-  assert.match(provider, /const appValue = authTranslations\[language\]/);
+  assert.match(provider, /const intlTranslate = useTranslations\(\)/);
+  assert.match(provider, /if \(intlTranslate\.has\(key\)\) return intlTranslate\(key, values\)/);
 });

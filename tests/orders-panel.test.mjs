@@ -36,11 +36,11 @@ function deferred() {
 function nodes(tree, predicate) {
     if (!tree || typeof tree !== "object") return [];
     if (Array.isArray(tree)) return tree.flatMap((node) => nodes(node, predicate));
-    return [...(predicate(tree) ? [tree] : []), ...nodes(tree.props ? .children, predicate)];
+    return [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
 }
-const byClass = (tree, name) => nodes(tree, (node) => node.props ? .className ? .split(" ").includes(name))[0];
+const byClass = (tree, name) => nodes(tree, (node) => node.props?.className?.split(" ").includes(name))[0];
 
-function text(tree) { return tree == null || typeof tree === "boolean" ? "" : typeof tree !== "object" ? String(tree) : Array.isArray(tree) ? tree.map(text).join("") : text(tree.props ? .children); }
+function text(tree) { return tree == null || typeof tree === "boolean" ? "" : typeof tree !== "object" ? String(tree) : Array.isArray(tree) ? tree.map(text).join("") : text(tree.props?.children); }
 
 function harness({ locale = "en", baseUrl = "/api", local = [], search = "", get = async() => [], receipt = async() => ({}), hydrated = true } = {}) {
     let stateCursor = 0,
@@ -89,12 +89,12 @@ function harness({ locale = "en", baseUrl = "/api", local = [], search = "", get
                     const i = effectCursor++;
                     const previous = effects[i];
                     if (!previous || deps.some((value, index) => value !== previous.deps[index])) {
-                        previous ? .cleanup ? .();
+                        previous?.cleanup?.();
                         effects[i] = { callback, deps, pending: true };
                     }
                 },
             };
-            if (id.endsWith("localization-provider")) return { useLocalization: () => ({ language: locale, formatPrice: (amount, currency) => `${currency} ${amount.toFixed(2)}`, t: (key, fallback, values = {}) => (translations[locale][key] ? ? fallback).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => String(values[key])) }) };
+            if (id.endsWith("localization-provider")) return { useLocalization: () => ({ language: locale, formatPrice: (amount, currency) => `${currency} ${amount.toFixed(2)}`, t: (key, fallback, values = {}) => (translations[locale][key] ?? fallback).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => String(values[key])) }) };
             if (id === "@/lib/local-orders") return { subscribeToLocalOrders: () => {}, getLocalOrdersSnapshot: () => JSON.stringify(local) };
             if (id.endsWith("ponyo-api.client")) return { PONYO_API_BASE_URL: baseUrl, ApiRequestError, ApiNotConfiguredError, ponyoApi: { getOrders: () => { calls.push("orders"); return get(); }, getCheckoutReceipt: (id) => { calls.push(["receipt", id]); return receipt(id); } } };
             throw new Error(`Unexpected import ${id}`);
@@ -117,7 +117,7 @@ function harness({ locale = "en", baseUrl = "/api", local = [], search = "", get
                 }
             return tree;
         },
-        unmount() { mounted = false; for (const effect of effects) effect.cleanup ? .(); },
+        unmount() { mounted = false; for (const effect of effects) effect.cleanup?.(); },
     };
 }
 
@@ -125,7 +125,7 @@ for (const locale of locales) {
     test(`${locale}: complete reviewed dictionary covers every orders call and placeholder`, () => {
         for (const match of `${panelSource}\n${actionSource}`.matchAll(/copy\("([^"]+)",\s*"([^"]+)"/g)) {
             const value = translations[locale][`orders.${match[1]}`];
-            assert.ok(value ? .trim(), match[1]);
+            assert.ok(value?.trim(), match[1]);
             assert.deepEqual([...value.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]).sort(), [...match[2].matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]).sort());
         }
     });
@@ -260,7 +260,9 @@ test("unmounted requests cannot commit customer data", async() => {
 test("scoped stylesheet is imported and primary buttons are brown with cream text", () => {
     const css = read("../src/app/orders-studio.css");
     assert.match(read("../src/app/layout.tsx"), /import "\.\/orders-studio.css"/);
-    assert.match(read("../src/components/layout/localization-provider.tsx"), /authTranslations\[language\]\?\.\[key\] \?\? accountTranslations\[language\]\?\.\[key\] \?\? orderTranslations\[language\]/);
+    const localizationProvider = read("../src/components/layout/localization-provider.tsx");
+    assert.match(localizationProvider, /const intlTranslate = useTranslations\(\)/);
+    assert.match(localizationProvider, /if \(intlTranslate\.has\(key\)\) return intlTranslate\(key, values\)/);
     assert.match(css, /--orders-ink: #483126/);
     assert.match(css, /background: var\(--orders-ink\);\s+color: #fff8e9/);
     assert.match(css, /font-size: 16px/);

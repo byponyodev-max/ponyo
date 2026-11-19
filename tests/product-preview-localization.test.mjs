@@ -20,6 +20,9 @@ function loadPreviewCatalog() {
 			if (id === "@/services/ponyo-api.client") {
 				return { PONYO_API_BASE_URL: "", ponyoApi: {} };
 			}
+			if (id === "@/lib/localization-options") {
+				return { productTranslationLocale: (locale) => locale === "ja" || locale === "ko" ? locale : "en" };
+			}
 			throw new Error(`Unexpected dependency: ${id}`);
 		},
 	});
@@ -125,7 +128,7 @@ test("reviewed Japanese and Korean preview translations cover every catalog fiel
 				const key = `preview.product.${source.slug}.${field}`;
 				assert.equal(
 					localized[field],
-					translationCache.get(`${locale}:${key}`) ?? reviewed[field],
+					reviewed[field] || translationCache.get(`${locale}:${key}`),
 					`${locale} did not localize ${source.slug}.${field}`,
 				);
 			}
@@ -135,7 +138,7 @@ test("reviewed Japanese and Korean preview translations cover every catalog fiel
 				const galleryKey = `preview.product.${source.slug}.gallery.${index}.alt`;
 				assert.equal(
 					localized.galleryImages[index].alt,
-					translationCache.get(`${locale}:${galleryKey}`) ?? reviewed.imageAlt,
+					reviewed.imageAlt || translationCache.get(`${locale}:${galleryKey}`),
 					`${locale} did not localize ${source.slug}.galleryImages[${index}].alt`,
 				);
 				assert.equal(typeof image.alt, "string");
@@ -147,7 +150,10 @@ test("reviewed Japanese and Korean preview translations cover every catalog fiel
 		}
 
 		const cachedProduct = payload.data.find((product) => product.slug === "haneul-bunny");
-		assert.equal(cachedProduct.name, cachedName);
+		assert.equal(
+			cachedProduct.name,
+			service.translationCatalog.reviewedPreviewTranslations[locale]["haneul-bunny"].name,
+		);
 		assert.equal(cachedProduct.description, service.translationCatalog.reviewedPreviewTranslations[locale]["haneul-bunny"].description);
 		assert.ok(providerCalls > 0, "the mocked provider should handle cache misses");
 	}

@@ -94,5 +94,6 @@ test("delivery trigger has no country flag and reviewed translations outrank aut
 		),
 		"utf8",
 	);
-	assert.ok(provider.includes("const value = reviewedValue ?? automaticValue"));
+	assert.ok(provider.includes("const intlTranslate = useTranslations()"));
+	assert.ok(provider.includes("if (intlTranslate.has(key)) return intlTranslate(key, values)"));
 });

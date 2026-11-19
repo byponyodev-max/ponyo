@@ -17,7 +17,7 @@ test("signed-in dashboard includes honest shop-again and returns-help destinatio
   assert.match(dashboard, /account-shop-again-tile" href="\/collections\/all"/);
   assert.match(dashboard, /account\.shop_title", "Shop again"/);
   assert.match(dashboard, /account-returns-tile" href="\/pages\/contact"/);
-  assert.match(dashboard, /account\.returns_title", "Returns & order help"/);
+  assert.match(dashboard, /static\.account\.dashboard\.returns", "Returns & order help"/);
   assert.match(dashboard, /account\.orders_title", "Orders & tracking"/);
   assert.match(dashboard, /account-buy-again-tile/);
   assert.match(dashboard, /refreshCartItems\(proposed, currency\)/);

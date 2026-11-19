@@ -371,10 +371,10 @@ test("wishlist styles stay scoped, including shared product cards and keyboard f
   assert.match(css, /\.wishlist-studio \.product-grid\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
 });
 
-test("responsive wishlist layout uses three then two grid columns and a single-column mobile hero", () => {
+test("responsive wishlist layout uses four then two grid columns and a single-column mobile hero", () => {
   const tablet = mediaBlock("max-width: 1000px");
   const mobile = mediaBlock("max-width: 640px");
-  assert.match(tablet, /\.wishlist-studio \.product-grid\s*\{[^}]*repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(tablet, /\.wishlist-studio \.product-grid\s*\{[^}]*repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(mobile, /\.wishlist-studio \.product-grid\s*\{[^}]*repeat\(2, minmax\(0, 1fr\)\)[^}]*gap: 12px;/);
   assert.match(mobile, /\.wishlist-studio-hero\s*\{[^}]*grid-template-columns: 1fr;/);
   assert.match(mobile, /\.wishlist-studio-keepsake\s*\{[^}]*position: absolute;/);

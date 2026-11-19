@@ -88,6 +88,11 @@ test("changing delivery country applies defaults while manual language and curre
 				};
 			}
 			if (id === "next/navigation") return { useRouter: () => ({ refresh: () => refreshCount++ }) };
+			if (id === "next-intl") {
+				const translate = () => "";
+				translate.has = () => false;
+				return { useTranslations: () => translate };
+			}
 			if (id === "@/lib/localization-options") return context.exports;
 			if (id === "@/services/ponyo-api.client") return { ponyoApi: {}, PONYO_API_BASE_URL: "" };
 			if (id === "react/jsx-runtime") return { jsx: (type, props) => ({ type, props }) };

@@ -82,6 +82,12 @@ function harness(t, { customer = null, isLoading = false, baseUrl = "/ponyo-api"
       if (id === "next/navigation") return { useRouter: () => router };
       if (id === "next/link") return { default: "a" };
       if (id === "@/components/account/account-auth-form") return { AccountAuthForm };
+      if (id === "@/components/layout/localization-provider") return {
+        useLocalization: () => ({
+          t: (_key, fallback, values = {}) =>
+            fallback.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, name) => String(values[name] ?? "")),
+        }),
+      };
       if (id === "@/components/layout/customer-session-provider") return {
         useCustomerSession: () => ({ ...session, setCustomer }),
       };

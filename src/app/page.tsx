@@ -5,7 +5,6 @@ import { HomeCarousel } from "@/components/home/home-carousel";
 import { HomeSparkleRain } from "@/components/home/home-sparkle-rain";
 import { AnimalTabs } from "@/components/home/animal-tabs";
 import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
-import { HomeInterestForms } from "@/components/layout/local-store-forms";
 import { ProductShelf } from "@/components/product/product-shelf";
 import { HomeBudgetLinks } from "@/components/home/home-budget-links";
 import { getLocalizedProducts } from "@/services/localized-products.server";
@@ -74,7 +73,6 @@ export default async function Home() {
   const premium = byTag(products, "premium", 12);
   const domina = byTag(products, "domina-xl", 6);
   const arrivals = byTag(products, "new-arrival", 10);
-  const comingSoon = products.filter((product) => product.availabilityStatus === "Coming Soon");
   const allTrending = products.filter((product) => !product.tags?.includes("new-arrival")).slice(0, 12);
   const aisles = [
     { title: "Premium Plushies", description: "Top-quality plush with extra-soft finishes.", titleKey: "home.aisles.premium_title", descriptionKey: "home.aisles.premium_sub", href: "/collections/premium", products: premium.slice(0, 4) },
@@ -116,7 +114,6 @@ export default async function Home() {
       </section>
 
       <ProductShelf className="home-live-shelf" id="new-arrivals" eyebrow="Just landed" title="Just landed" description="The newest plush on Ponyo. Swipe to see them all." products={arrivals} href="/collections/new-arrivals" linkLabel="See all →" rail compact />
-      {comingSoon.length > 0 && <ProductShelf className="home-live-shelf coming-soon-shelf" id="coming-soon" eyebrow="A little preview" title="Coming soon" description="Meet the next plush friends on their way to Ponyo. Ask us to let you know when they arrive." products={comingSoon} href="/collections/all" linkLabel="Explore all plush →" decoration={<span className="home-campaign-jellyfish home-campaign-jellyfish--gold" aria-hidden="true"><JellyfishArtwork id="coming-soon-gold" tone="gold" direction={-1} /></span>} />}
       <ProductShelf className="home-live-shelf" id="more-plush" eyebrow="Trending now" title="More plush to discover" description="A fresh mix from across the Ponyo catalog." products={allTrending} href="/collections/all" linkLabel="See all →" />
       <AnimalTabs products={products} />
 
@@ -171,7 +168,6 @@ export default async function Home() {
         <div className="quick-faq-list">{faqRows.map(([questionKey, answerKey]) => <details key={questionKey}><summary><LocalizedText className="quick-faq-question" translationKey={`home.faq.${questionKey}`} fallback={faq[questionKey]} /><span className="quick-faq-toggle">+</span></summary><p><LocalizedText translationKey={`home.faq.${answerKey}`} fallback={faq[answerKey]} /></p></details>)}</div>
       </section>
 
-      <HomeInterestForms />
     </SiteFrame>
   );
 }

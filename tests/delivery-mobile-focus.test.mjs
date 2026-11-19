@@ -7,7 +7,7 @@ const read = (file) => readFileSync(new URL(file,
 
 test("country search avoids iOS focus zoom without disabling user zoom", () => {
     const component = read("../src/components/layout/delivery-region-banner.tsx");
-    const input = component.match(/<input\s+type="search"[^\n]*?\/>/) ? .[0];
+    const input = component.match(/<input\s+type="search"[^\n]*?\/>/)?.[0];
     assert.ok(input);
     assert.doesNotMatch(input, /autoFocus/);
     assert.match(input, /aria-label=/);

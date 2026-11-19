@@ -33,9 +33,11 @@ def contact_notification_recipient(request_type: str) -> str:
 
 def _smtp_ssl_context() -> ssl.SSLContext:
     context = ssl.create_default_context()
+    strict_flag = getattr(ssl, "VERIFY_X509_STRICT", 0)
     if not settings.smtp_x509_strict:
-        strict_flag = getattr(ssl, "VERIFY_X509_STRICT", 0)
         context.verify_flags &= ~strict_flag
+    else:
+        context.verify_flags |= strict_flag
     return context
 
 

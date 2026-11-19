@@ -12,12 +12,12 @@ test("Domina has a dedicated image container and a separate results row", () => 
 		/className="domina-catalog-results">\s*<span[^>]*role="status"/,
 	);
 	assert.match(page, /className="domina-size-filter"/);
-	assert.match(page, /aria-label="Filter XL plush"/);
+	assert.match(page, /<PageCopy[^>]*id="domina\.filter_aria" fallback="Filter XL plush"/);
 	assert.equal((page.match(/inputMode="numeric"/g) || []).length, 2);
 	assert.match(page, /<input type="hidden" name="sort_by" value=\{sort\}/);
 	assert.match(
 		page,
-		/preservedFilters=\{preservedFilters\} options=\{dominaSortOptions\}/,
+		/preservedFilters=\{preservedFilters\} options=\{localizedSortOptions\}/,
 	);
 });
 
