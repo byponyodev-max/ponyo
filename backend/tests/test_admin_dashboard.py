@@ -76,7 +76,7 @@ async def test_admin_dashboard_orders_products_customers_and_supplier_controls(t
 
 	customers = await client.get("/v1/admin/customers?q=buyer@example.com")
 	assert customers.status_code == 200
-	assert any(row["email"] == "buyer@example.com" for row in customers.json()["data"])
+	assert any(row["email"] == "buyer@example.com" for row in customers.json()["data"]["items"])
 
 
 async def test_admin_analytics_filters_period_and_keeps_currency_totals_separate(test_client):

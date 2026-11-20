@@ -1,19 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
-import { aggregateReservationsByCountry } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
+import { aggregateReservationsByCountry, filterAndSortDemandProducts, type DemandSortOrder } from "@/lib/admin-reservation-report";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminListPage, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
 import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
 type AdminSection = "dashboard" | "analytics" | "orders" | "products" | "reservations" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
 type EmailStatusFilter = "all" | "unread" | "needs_reply" | "replied" | "pending" | "failed";
-type OrderPage = { items: AdminOrder[]; total: number; limit: number; offset: number };
-type ProductPage = { items: AdminProduct[]; total: number; limit: number; offset: number };
+type AdminTableId = "orders" | "products" | "reservations" | "interests" | "reservation-entries" | "maker-applications" | "suppliers" | "customers" | "admin-accounts" | "fulfillment" | "brands";
+type OrderPage = AdminListPage<AdminOrder>;
+type ProductPage = AdminListPage<AdminProduct>;
+type TablePaging = { page: number; pageSize: number };
+type DemandReportFilters = { query: string; country: string; sort: DemandSortOrder };
 type AdminAccountEditDraft = Pick<AdminAccount, "id" | "firstName" | "lastName" | "email"> & { password: string };
 
 const navigation: Array<{ id: AdminSection; label: string; labelKey: string; icon: string; hint: string; hintKey: string }> = [
@@ -24,14 +27,83 @@ const navigation: Array<{ id: AdminSection; label: string; labelKey: string; ico
 	{ id: "reservations", label: "Reservations & interests", labelKey: "reservations_interest", icon: "✦", hint: "Reservation targets and unshipped demand", hintKey: "reservations_hint" },
 	{ id: "email-inbox", label: "Email inbox", labelKey: "email_inbox", icon: "✉", hint: "Customer messages & replies", hintKey: "email_inbox_hint" },
 	{ id: "maker-applications", label: "Maker applications", labelKey: "maker_applications", icon: "✿", hint: "Review maker submissions", hintKey: "maker_applications_hint" },
-	{ id: "suppliers", label: "Suppliers", labelKey: "suppliers", icon: "✿", hint: "Partners & access", hintKey: "suppliers_hint" },
-	{ id: "brands", label: "Brands", labelKey: "brands", icon: "✧", hint: "Curated labels", hintKey: "brands_hint" },
+	{ id: "suppliers", label: "Suppliers", labelKey: "suppliers", icon: "✿", hint: "Stock, offers & supplier purchase orders", hintKey: "suppliers_hint" },
+	{ id: "brands", label: "Brands", labelKey: "brands", icon: "✧", hint: "Customer-facing maker identity & story", hintKey: "brands_hint" },
 	{ id: "customers", label: "Customers", labelKey: "customers", icon: "♙", hint: "Customer accounts", hintKey: "customers_hint" },
 	{ id: "admin-accounts", label: "Admin accounts", labelKey: "admin_accounts", icon: "⚙", hint: "Manage operations access", hintKey: "admin_accounts_hint" },
 	{ id: "fulfillment", label: "Fulfillment", labelKey: "fulfillment", icon: "↗", hint: "Supplier routing", hintKey: "fulfillment_hint" },
 ];
 
+const tableIdBySection: Partial<Record<AdminSection, AdminTableId>> = {
+	orders: "orders",
+	products: "products",
+	reservations: "reservations",
+	"maker-applications": "maker-applications",
+	suppliers: "suppliers",
+	brands: "brands",
+	customers: "customers",
+	"admin-accounts": "admin-accounts",
+	fulfillment: "fulfillment",
+};
+
 type Translate = (key: string, fallback: string, values?: Record<string, string | number>) => string;
+
+function AdminTablePagination({ page, pageSize, total, onPageChange, onPageSizeChange, t }: {
+	page: number;
+	pageSize: number;
+	total: number;
+	onPageChange: (page: number) => void;
+	onPageSizeChange: (pageSize: number) => void;
+	t: Translate;
+}) {
+	const from = total ? page * pageSize + 1 : 0;
+	const to = Math.min((page + 1) * pageSize, total);
+	const lastPage = Math.max(0, Math.ceil(total / pageSize) - 1);
+	return <footer className="ad-table-pagination">
+		<label>{t("admin.ui.table_rows_per_page", "Rows per page")}
+			<select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+				<option value={10}>10</option>
+				<option value={50}>50</option>
+				<option value={100}>100</option>
+			</select>
+		</label>
+		<span>{t("admin.ui.table_page_summary", "Showing {{from}}–{{to}} of {{total}}", { from, to, total })}</span>
+		<div>
+			<button type="button" onClick={() => onPageChange(Math.max(0, page - 1))} disabled={page === 0}>{t("admin.ui.table_previous", "Previous")}</button>
+			<button type="button" onClick={() => onPageChange(Math.min(lastPage, page + 1))} disabled={page >= lastPage}>{t("admin.ui.table_next", "Next")}</button>
+		</div>
+	</footer>;
+}
+
+function AdminTableCollapseButton({ collapsed, onClick, t }: {
+	collapsed: boolean;
+	onClick: () => void;
+	t: Translate;
+}) {
+	return <button className="ad-table-collapse" type="button" aria-expanded={!collapsed} onClick={onClick}>
+		{collapsed ? t("admin.ui.table_expand", "Show table") : t("admin.ui.table_collapse", "Hide table")}
+	</button>;
+}
+
+function AdminDemandReportFilters({ filters, countries, language, onChange, t }: {
+	filters: DemandReportFilters;
+	countries: string[];
+	language: string;
+	onChange: (filters: DemandReportFilters) => void;
+	t: Translate;
+}) {
+	return <div className="ad-demand-filters">
+		<label className="ad-search"><span>⌕</span><input value={filters.query} onChange={(event) => onChange({ ...filters, query: event.target.value })} placeholder={t("admin.ui.demand_search", "Search product or SKU")} /></label>
+		<label><span>{t("admin.ui.demand_country_label", "Country")}</span><select value={filters.country} onChange={(event) => onChange({ ...filters, country: event.target.value })}>
+			<option value="">{t("admin.ui.demand_country", "All countries")}</option>
+			{countries.map((country) => <option key={country} value={country}>{regionName(country, language, country)}</option>)}
+		</select></label>
+		<label><span>{t("admin.ui.demand_sort", "Sort by count")}</span><select value={filters.sort} onChange={(event) => onChange({ ...filters, sort: event.target.value as DemandSortOrder })}>
+			<option value="most">{t("admin.ui.demand_sort_most", "Most to least")}</option>
+			<option value="least">{t("admin.ui.demand_sort_least", "Least to most")}</option>
+		</select></label>
+	</div>;
+}
 
 const emailReplyTemplates = [
 	{ id: "thanks-en", label: "Thank you · English", body: "Hello,\n\nThank you for reaching out to Ponyo. We appreciate your message and will be happy to help.\n\nWith care,\nThe Ponyo team" },
@@ -57,19 +129,24 @@ function date(value: string) {
 	return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(parsed);
 }
 
-function AdminLanguageSelect({ language, setLanguage, label }: {
+function AdminLanguageSelect({ language, setLanguage, label, showLiveStatus = false }: {
 	language: string;
 	setLanguage: (language: string) => Promise<void>;
 	label: string;
+	showLiveStatus?: boolean;
 }) {
-	return <label className="ad-language-control">
-		<span>{label}</span>
-		<select aria-label={label} value={language} onChange={(event) => void setLanguage(event.target.value)}>
-			<option value="en">English</option>
-			<option value="ja">日本語</option>
-			<option value="ko">한국어</option>
-		</select>
-	</label>;
+	const { t } = useLocalization();
+	return <>
+		{showLiveStatus && <span className="ad-live-indicator" role="status"><i aria-hidden="true" />{t("admin.ui.live_updates", "Live updates · every 15 seconds")}</span>}
+		<label className="ad-language-control">
+			<span>{label}</span>
+			<select aria-label={label} value={language} onChange={(event) => void setLanguage(event.target.value)}>
+				<option value="en">English</option>
+				<option value="ja">日本語</option>
+				<option value="ko">한국어</option>
+			</select>
+		</label>
+	</>;
 }
 
 function periodLabel(value: string) {
@@ -191,14 +268,16 @@ export default function AdminPortalPage() {
 	const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
 	const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
 	const [analyticsRange, setAnalyticsRange] = useState<AdminAnalytics["period"]["range"]>("30d");
-	const [orders, setOrders] = useState<OrderPage>({ items: [], total: 0, limit: 50, offset: 0 });
-	const [products, setProducts] = useState<ProductPage>({ items: [], total: 0, limit: 100, offset: 0 });
+	const [orders, setOrders] = useState<OrderPage>({ items: [], total: 0, limit: 10, offset: 0 });
+	const [products, setProducts] = useState<ProductPage>({ items: [], total: 0, limit: 10, offset: 0 });
 	const [suppliers, setSuppliers] = useState<AdminSupplier[]>([]);
 	const [brands, setBrands] = useState<AdminBrand[]>([]);
 	const [reservationProducts, setReservationProducts] = useState<AdminProduct[]>([]);
 	const [interestProducts, setInterestProducts] = useState<AdminProduct[]>([]);
 	const [reservationTab, setReservationTab] = useState<"reservations" | "interests">("reservations");
-	const [reservationEntries, setReservationEntries] = useState<AdminReservationPage>({ items: [], total: 0, limit: 50, offset: 0 });
+	const [reservationReportFilters, setReservationReportFilters] = useState<DemandReportFilters>({ query: "", country: "", sort: "most" });
+	const [interestReportFilters, setInterestReportFilters] = useState<DemandReportFilters>({ query: "", country: "", sort: "most" });
+	const [reservationEntries, setReservationEntries] = useState<AdminReservationPage>({ items: [], total: 0, limit: 10, offset: 0 });
 	const [reservationFilters, setReservationFilters] = useState({ productId: "", country: "", query: "" });
 	const [appliedReservationFilters, setAppliedReservationFilters] = useState({ productId: "", country: "", query: "" });
 	const [reservationEntriesLoading, setReservationEntriesLoading] = useState(false);
@@ -218,7 +297,7 @@ export default function AdminPortalPage() {
 	const [emailReplyIdempotencyKey, setEmailReplyIdempotencyKey] = useState("");
 	const [emailReplyIdempotencyScope, setEmailReplyIdempotencyScope] = useState("");
 	const [makerApplications, setMakerApplications] = useState<AdminMakerApplication[]>([]);
-	const [customers, setCustomers] = useState<AdminCustomer[]>([]);
+	const [customers, setCustomers] = useState<AdminListPage<AdminCustomer>>({ items: [], total: 0, limit: 10, offset: 0 });
 	const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
 	const [newAdmin, setNewAdmin] = useState({ firstName: "", lastName: "", email: "", password: "" });
 	const [editingAdmin, setEditingAdmin] = useState<AdminAccountEditDraft | null>(null);
@@ -235,10 +314,42 @@ export default function AdminPortalPage() {
 	const [notice, setNotice] = useState("");
 	const [selectedOrderId, setSelectedOrderId] = useState("");
 	const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
+	const [tablePaging, setTablePaging] = useState<Record<AdminTableId, TablePaging>>({
+		orders: { page: 0, pageSize: 10 },
+		products: { page: 0, pageSize: 10 },
+		reservations: { page: 0, pageSize: 10 },
+		interests: { page: 0, pageSize: 10 },
+		"reservation-entries": { page: 0, pageSize: 10 },
+		"maker-applications": { page: 0, pageSize: 10 },
+		suppliers: { page: 0, pageSize: 10 },
+		customers: { page: 0, pageSize: 10 },
+		"admin-accounts": { page: 0, pageSize: 10 },
+		fulfillment: { page: 0, pageSize: 10 },
+		brands: { page: 0, pageSize: 10 },
+	});
+	const reservationEntryPageSize = tablePaging["reservation-entries"].pageSize;
+	const refreshVisibleDataRef = useRef<() => Promise<void>>(async () => {});
+	const lastAutoRefreshAtRef = useRef(0);
+	const selectedOrderIdRef = useRef(selectedOrderId);
+	const emailThreadKeyRef = useRef(emailThreadKey);
+	const [collapsedTables, setCollapsedTables] = useState<Record<AdminTableId, boolean>>({
+		orders: false,
+		products: false,
+		reservations: false,
+		interests: false,
+		"reservation-entries": false,
+		"maker-applications": false,
+		suppliers: false,
+		customers: false,
+		"admin-accounts": false,
+		fulfillment: false,
+		brands: false,
+	});
 
 	const loadReservationEntries = useCallback(async (
 		offset: number,
 		filters = appliedReservationFilters,
+		limit = reservationEntryPageSize,
 	) => {
 		setReservationEntriesLoading(true);
 		setError("");
@@ -247,19 +358,20 @@ export default function AdminPortalPage() {
 				productId: filters.productId || undefined,
 				country: filters.country || undefined,
 				q: filters.query.trim() || undefined,
-				limit: 50,
+				limit,
 				offset,
 			});
 			setReservationEntries(result);
 			setAppliedReservationFilters(filters);
+			setTablePaging((current) => ({ ...current, "reservation-entries": { page: Math.floor(offset / limit), pageSize: limit } }));
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
 		} finally {
 			setReservationEntriesLoading(false);
 		}
-	}, [appliedReservationFilters, t]);
+	}, [appliedReservationFilters, reservationEntryPageSize, t]);
 
-	const loadSection = useCallback(async (target: AdminSection, search = query) => {
+	const loadSection = useCallback(async (target: AdminSection, search = query, page = 0, pageSize?: number) => {
 		setError("");
 		try {
 			switch (target) {
@@ -270,14 +382,26 @@ export default function AdminPortalPage() {
 					setAnalytics(await ponyoApi.getAdminAnalytics(analyticsRange));
 					break;
 				case "orders":
-				setOrders(await ponyoApi.listAdminOrders(search));
+					{
+						const size = pageSize ?? tablePaging.orders.pageSize;
+						setOrders(await ponyoApi.listAdminOrders(search, size, {}, page * size));
+						setTablePaging((current) => ({ ...current, orders: { page, pageSize: size } }));
+					}
 				break;
 				case "fulfillment":
-					setOrders(await ponyoApi.listAdminOrders(search, 100, { paymentStatus: "paid" }));
+					{
+						const size = pageSize ?? tablePaging.fulfillment.pageSize;
+						setOrders(await ponyoApi.listAdminOrders(search, size, { paymentStatus: "paid" }, page * size));
+						setTablePaging((current) => ({ ...current, fulfillment: { page, pageSize: size } }));
+					}
 					setDashboard(await ponyoApi.getAdminDashboard());
 					break;
 				case "products":
-				setProducts(await ponyoApi.listAdminProducts(search, publishedFilter === "all" ? undefined : publishedFilter === "published"));
+					{
+						const size = pageSize ?? tablePaging.products.pageSize;
+						setProducts(await ponyoApi.listAdminProducts(search, publishedFilter === "all" ? undefined : publishedFilter === "published", size, page * size));
+						setTablePaging((current) => ({ ...current, products: { page, pageSize: size } }));
+					}
 				break;
 				case "reservations":
 					{
@@ -288,7 +412,11 @@ export default function AdminPortalPage() {
 						setReservationProducts(reservations);
 						setInterestProducts(interests);
 					}
-					await loadReservationEntries(0);
+					await loadReservationEntries(
+						tablePaging["reservation-entries"].page * tablePaging["reservation-entries"].pageSize,
+						appliedReservationFilters,
+						tablePaging["reservation-entries"].pageSize,
+					);
 					break;
 				case "maker-applications":
 					setMakerApplications(await ponyoApi.listAdminMakerApplications());
@@ -300,7 +428,11 @@ export default function AdminPortalPage() {
 					setBrands(await ponyoApi.listAdminBrands());
 					break;
 				case "customers":
-					setCustomers(await ponyoApi.listAdminCustomers(search));
+					{
+						const size = pageSize ?? tablePaging.customers.pageSize;
+						setCustomers(await ponyoApi.listAdminCustomers(search, size, page * size));
+						setTablePaging((current) => ({ ...current, customers: { page, pageSize: size } }));
+					}
 					break;
 				case "admin-accounts":
 					setAdminAccounts(await ponyoApi.listAdminAccounts());
@@ -325,7 +457,7 @@ export default function AdminPortalPage() {
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
 		}
-	}, [analyticsRange, emailMailboxKey, emailQuery, emailStatusFilter, publishedFilter, query, loadReservationEntries, t]);
+	}, [analyticsRange, appliedReservationFilters, emailMailboxKey, emailQuery, emailStatusFilter, publishedFilter, query, loadReservationEntries, tablePaging, t]);
 
 	const loadAnalytics = useCallback(async (range = analyticsRange) => {
 		setError("");
@@ -357,9 +489,38 @@ export default function AdminPortalPage() {
 
 	const refreshAll = useCallback(async () => {
 		setRefreshing(true);
-		await loadSection(section);
+		await refreshVisibleDataRef.current();
 		setRefreshing(false);
-	}, [loadSection, section]);
+	}, []);
+
+	const refreshVisibleData = useCallback(async () => {
+		const paging = tableIdBySection[section] ? tablePaging[tableIdBySection[section]!] : undefined;
+		await loadSection(section, query, paging?.page, paging?.pageSize);
+		if (section === "orders" && selectedOrderId) {
+			const orderId = selectedOrderId;
+			try {
+				const detail = await ponyoApi.getAdminOrder(orderId);
+				if (selectedOrderIdRef.current === orderId) setOrderDetail(detail);
+			} catch (requestError) {
+				setError(messageFor(requestError, t));
+			}
+		}
+		if (section === "email-inbox" && emailThreadKey) {
+			const threadKey = emailThreadKey;
+			try {
+				const detail = await ponyoApi.getAdminEmailThread(threadKey);
+				if (emailThreadKeyRef.current === threadKey) setEmailThread(detail);
+			} catch (requestError) {
+				setError(messageFor(requestError, t));
+			}
+		}
+	}, [emailThreadKey, loadSection, query, section, selectedOrderId, t, tablePaging]);
+
+	useEffect(() => {
+		selectedOrderIdRef.current = selectedOrderId;
+		emailThreadKeyRef.current = emailThreadKey;
+		refreshVisibleDataRef.current = refreshVisibleData;
+	}, [emailThreadKey, refreshVisibleData, selectedOrderId]);
 
 	useEffect(() => {
 		let active = true;
@@ -385,13 +546,63 @@ export default function AdminPortalPage() {
 	}, [admin, section, selectedOrderId, t]);
 
 	useEffect(() => {
-		if (!admin || section !== "email-inbox" || !emailInboxSummary?.pending) return;
-		const timer = window.setInterval(() => { void loadEmailThreads(); }, 5000);
-		return () => window.clearInterval(timer);
-	}, [admin, section, emailInboxSummary?.pending, loadEmailThreads]);
+		if (!admin) return;
+		const refreshWhenActive = () => {
+			if (document.visibilityState !== "visible") return;
+			const now = Date.now();
+			if (now - lastAutoRefreshAtRef.current < 3000) return;
+			lastAutoRefreshAtRef.current = now;
+			void refreshVisibleDataRef.current();
+		};
+		const timer = window.setInterval(refreshWhenActive, 15000);
+		window.addEventListener("focus", refreshWhenActive);
+		document.addEventListener("visibilitychange", refreshWhenActive);
+		return () => {
+			window.clearInterval(timer);
+			window.removeEventListener("focus", refreshWhenActive);
+			document.removeEventListener("visibilitychange", refreshWhenActive);
+		};
+	}, [admin]);
 
-	const productView = useMemo(() => publishedFilter === "pending" ? products.items.filter((product) => !product.published) : products.items, [products.items, publishedFilter]);
+	const productView = products.items;
+	const visibleRows = <T,>(rows: T[], id: AdminTableId) => {
+		const { page, pageSize } = tablePaging[id];
+		return rows.slice(page * pageSize, (page + 1) * pageSize);
+	};
+	const changeTablePage = (id: AdminTableId, page: number) => {
+		setTablePaging((current) => ({ ...current, [id]: { ...current[id], page } }));
+		if (id === "orders" || id === "fulfillment" || id === "products" || id === "customers") {
+			void loadSection(id === "fulfillment" ? "fulfillment" : id, query, page);
+		} else if (id === "reservation-entries") {
+			void loadReservationEntries(page * tablePaging[id].pageSize);
+		}
+	};
+	const changeTablePageSize = (id: AdminTableId, pageSize: number) => {
+		setTablePaging((current) => ({ ...current, [id]: { page: 0, pageSize } }));
+		if (id === "orders" || id === "fulfillment" || id === "products" || id === "customers") {
+			void loadSection(id === "fulfillment" ? "fulfillment" : id, query, 0, pageSize);
+		} else if (id === "reservation-entries") {
+			void loadReservationEntries(0, appliedReservationFilters, pageSize);
+		}
+	};
+	const toggleTableCollapsed = (id: AdminTableId) => {
+		setCollapsedTables((current) => ({ ...current, [id]: !current[id] }));
+	};
+	const changeDemandFilters = (id: "reservations" | "interests", filters: DemandReportFilters) => {
+		if (id === "reservations") setReservationReportFilters(filters);
+		else setInterestReportFilters(filters);
+		setTablePaging((current) => ({ ...current, [id]: { ...current[id], page: 0 } }));
+	};
 	const reservationCountryTotals = useMemo(() => aggregateReservationsByCountry(reservationProducts), [reservationProducts]);
+	const interestCountries = useMemo(() => [...new Set(interestProducts.flatMap((product) => product.interestsByCountry?.map((entry) => entry.country) ?? []))].sort(), [interestProducts]);
+	const reservationReportProducts = useMemo(
+		() => filterAndSortDemandProducts(reservationProducts, "reservations", reservationReportFilters.query, reservationReportFilters.country, reservationReportFilters.sort),
+		[reservationProducts, reservationReportFilters],
+	);
+	const interestReportProducts = useMemo(
+		() => filterAndSortDemandProducts(interestProducts, "interests", interestReportFilters.query, interestReportFilters.country, interestReportFilters.sort),
+		[interestProducts, interestReportFilters],
+	);
 	const analyticsTrendSeries = useMemo(() => {
 		if (!analytics) return [];
 		const existing = new Map(analytics.series.map((row) => [row.period.slice(0, 10), row]));
@@ -652,7 +863,7 @@ export default function AdminPortalPage() {
 		setOrders({ items: [], total: 0, limit: 50, offset: 0 });
 		setProducts({ items: [], total: 0, limit: 100, offset: 0 });
 		setSuppliers([]);
-		setCustomers([]);
+		setCustomers({ items: [], total: 0, limit: 10, offset: 0 });
 		setAdminAccounts([]);
 		setEmailInboxStatus(null);
 		setEmailThreads([]);
@@ -732,6 +943,11 @@ export default function AdminPortalPage() {
 		[ui("metric_low_availability", "LOW AVAILABILITY"), metrics?.lowAvailabilityVariants ?? 0, ui("metric_low_stock", "Variants at 3 units or less"), "mint"],
 	] as const;
 	const emailStatusCounts = emailInboxSummary?.byMailbox[emailMailboxKey];
+	const configuredEmailMailboxes = emailInboxStatus?.mailboxes.filter((mailbox) => mailbox.imapConfigured).length ?? 0;
+	const connectedEmailMailboxes = emailInboxStatus?.mailboxes.filter((mailbox) =>
+		mailbox.imapConfigured && Boolean(mailbox.lastSyncedAt) && !mailbox.lastError,
+	).length ?? 0;
+	const unconfiguredEmailMailboxes = emailInboxStatus?.mailboxes.filter((mailbox) => !mailbox.imapConfigured) ?? [];
 	const emailFilterOptions: Array<{ key: EmailStatusFilter; label: string; count: number }> = [
 		{ key: "all", label: ui("email_filter_all", "All"), count: emailStatusCounts?.total ?? emailThreadTotal },
 		{ key: "unread", label: ui("email_filter_unread", "Unread"), count: emailStatusCounts?.unread ?? 0 },
@@ -753,7 +969,7 @@ export default function AdminPortalPage() {
 			<div className="ad-sidebar-note"><span>✦</span><strong>{ui("sidebar_tagline", "Thoughtfully found. Ready to be loved.")}</strong><small>{ui("sidebar_note", "The little details make the whole marketplace.")}</small></div>
 			<div className="ad-account"><span className="ad-avatar">{admin.firstName.slice(0, 1).toUpperCase() || "A"}</span><div><strong>{admin.firstName} {admin.lastName}</strong><small>{admin.email}</small></div><button type="button" onClick={() => void logout()} disabled={busyId === "logout"} aria-label={ui("sign_out", "Sign out")}>↗</button></div>
 		</aside>
-		<section className="ad-main"><header className="ad-topbar"><div><span className="ad-eyebrow">{ui("management", "PONYO MARKETPLACE MANAGEMENT")}</span><h1>{section === "dashboard" ? ui("good_morning", "Good morning, {{name}}", { name: admin.firstName || ui("admin_fallback", "Admin") }) : ui(navigation.find((item) => item.id === section)?.labelKey ?? "dashboard", navigation.find((item) => item.id === section)?.label ?? "Dashboard")}<span> ✦</span></h1><p>{ui(navigation.find((item) => item.id === section)?.hintKey ?? "dashboard_hint", navigation.find((item) => item.id === section)?.hint ?? "Marketplace overview")} · {ui("dashboard_subtitle", "One calm view of the moving parts.")}</p></div><div className="ad-topbar-actions"><AdminLanguageSelect language={language} setLanguage={setLanguage} label={ui("language", "Language")} /><button className="ad-refresh" type="button" onClick={() => void refreshAll()} disabled={refreshing}>{refreshing ? ui("refreshing", "Refreshing…") : `↻ ${ui("refresh", "Refresh")}`}</button></div></header>
+		<section className="ad-main"><header className="ad-topbar"><div><span className="ad-eyebrow">{ui("management", "PONYO MARKETPLACE MANAGEMENT")}</span><h1>{section === "dashboard" ? ui("good_morning", "Good morning, {{name}}", { name: admin.firstName || ui("admin_fallback", "Admin") }) : ui(navigation.find((item) => item.id === section)?.labelKey ?? "dashboard", navigation.find((item) => item.id === section)?.label ?? "Dashboard")}<span> ✦</span></h1><p>{ui(navigation.find((item) => item.id === section)?.hintKey ?? "dashboard_hint", navigation.find((item) => item.id === section)?.hint ?? "Marketplace overview")} · {ui("dashboard_subtitle", "One calm view of the moving parts.")}</p></div><div className="ad-topbar-actions"><AdminLanguageSelect language={language} setLanguage={setLanguage} label={ui("language", "Language")} showLiveStatus /><button className="ad-refresh" type="button" onClick={() => void refreshAll()} disabled={refreshing}>{refreshing ? ui("refreshing", "Refreshing…") : `↻ ${ui("refresh", "Refresh")}`}</button></div></header>
 			{notice && <div className="ad-alert ad-alert--success" role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label={ui("dismiss", "Dismiss")}>×</button></div>}{error && <div className="ad-alert ad-alert--error" role="alert">{error}<button type="button" onClick={() => setError("")} aria-label={ui("dismiss", "Dismiss")}>×</button></div>}
 			{section === "dashboard" && <>
 				<div className="ad-metrics">{cards.map(([label, value, note, tone]) => <article className={`ad-metric ad-metric--${tone}`} key={label}><small>{label}</small><strong>{value}</strong><span>{note}</span></article>)}</div>
@@ -787,7 +1003,7 @@ export default function AdminPortalPage() {
 					</div>
 					<div className="ad-dashboard-grid ad-analytics-grid">
 						<section className="ad-panel">
-							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_activity_eyebrow", "MARKETPLACE ACTIVITY")}</span><h2>{ui("analytics_activity_title", "Demand & customer trend")}</h2></div></div>
+							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("analytics_activity_eyebrow", "MARKETPLACE ACTIVITY")}</span><h2>{ui("analytics_activity_title", "Demand & customer trend")}</h2><p>{ui("analytics_activity_note", "Compare orders, reservations, interest requests, and new customers across the selected period.")}</p></div></div>
 							<AnalyticsTrendChart series={analyticsTrendSeries} labels={{
 								orders: ui("analytics_orders", "Orders"),
 								reservations: ui("analytics_reservations", "Reservations"),
@@ -831,9 +1047,9 @@ export default function AdminPortalPage() {
 					</div>
 				</>}
 			</>}
-			{section === "orders" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("orders", query); }} placeholder="Order number or customer email" /></label><button type="button" onClick={() => void loadSection("orders")}>Search orders</button><span>{orders.total} orders</span></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>PAYMENT</th><th>FULFILLMENT</th><th>SUPPLIER</th><th>TOTAL</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td><span className="ad-status">{order.paymentStatus}</span></td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td></tr>)}</tbody></table></div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL · {orderDetail.paymentStatus}</span><h2>{orderDetail.orderNumber}</h2><p>{orderDetail.customerEmail} · {orderDetail.fulfillmentStatus.replaceAll("_", " ")}</p></div><button type="button" onClick={() => { setOrderDetail(null); setSelectedOrderId(""); }}>Close</button></div><div className="ad-order-facts"><span>Subtotal <strong>{amount(orderDetail.subtotalAmount, orderDetail.currency, formatPrice)}</strong></span><span>Discount <strong>{amount(orderDetail.discountAmount, orderDetail.currency, formatPrice)}</strong></span><span>Shipping <strong>{amount(orderDetail.shippingAmount, orderDetail.currency, formatPrice)}</strong></span><span>Captured <strong>{amount(orderDetail.capturedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Refunded <strong>{amount(orderDetail.refundedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Total <strong>{amount(orderDetail.totalAmount, orderDetail.currency, formatPrice)}</strong></span></div><div className="ad-detail-columns"><section><h3>Customer order lines</h3>{orderDetail.items.map((line) => <article key={line.id}><span><strong>{line.name}</strong><small>Qty {line.quantity} · {line.supplierOfferId ? "Supplier linked" : "Legacy / not routed"}</small></span><b>{amount(line.unitPrice * line.quantity, line.currency, formatPrice)}</b></article>)}</section><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")} {po.supplierOrderId ? `· Ref ${po.supplierOrderId}` : ""}</small></span><small>{po.items.length} lines</small></article>)}{orderDetail.paymentStatus === "paid" && <button className="ad-row-action" type="button" disabled={busyId === orderDetail.id} onClick={() => { const row = orders.items.find((item) => item.id === orderDetail.id); if (row) void planSupplierOrders(row); }}>{busyId === orderDetail.id ? "Planning…" : "Plan / refresh supplier routing"}</button>}</section><section><h3>Shipments</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
+			{section === "orders" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, orders: { ...current.orders, page: 0 } })); void loadSection("orders", query, 0); } }} placeholder="Order number or customer email" /></label><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, orders: { ...current.orders, page: 0 } })); void loadSection("orders", query, 0); }}>Search orders</button><span>{orders.total} orders</span></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.orders ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CUSTOMER ORDERS</span><h2>Orders</h2></div><span className="ad-count-pill">{orders.total} orders</span><AdminTableCollapseButton collapsed={collapsedTables.orders} onClick={() => toggleTableCollapsed("orders")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>PAYMENT</th><th>FULFILLMENT</th><th>SUPPLIER</th><th>TOTAL</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td><span className="ad-status">{order.paymentStatus}</span></td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.orders.page} pageSize={tablePaging.orders.pageSize} total={orders.total} onPageChange={(page) => changeTablePage("orders", page)} onPageSizeChange={(pageSize) => changeTablePageSize("orders", pageSize)} t={ui} /></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL · {orderDetail.paymentStatus}</span><h2>{orderDetail.orderNumber}</h2><p>{orderDetail.customerEmail} · {orderDetail.fulfillmentStatus.replaceAll("_", " ")}</p></div><button type="button" onClick={() => { setOrderDetail(null); setSelectedOrderId(""); }}>Close</button></div><div className="ad-order-facts"><span>Subtotal <strong>{amount(orderDetail.subtotalAmount, orderDetail.currency, formatPrice)}</strong></span><span>Discount <strong>{amount(orderDetail.discountAmount, orderDetail.currency, formatPrice)}</strong></span><span>Shipping <strong>{amount(orderDetail.shippingAmount, orderDetail.currency, formatPrice)}</strong></span><span>Captured <strong>{amount(orderDetail.capturedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Refunded <strong>{amount(orderDetail.refundedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Total <strong>{amount(orderDetail.totalAmount, orderDetail.currency, formatPrice)}</strong></span></div><div className="ad-detail-columns"><section><h3>Customer order lines</h3>{orderDetail.items.map((line) => <article key={line.id}><span><strong>{line.name}</strong><small>Qty {line.quantity} · {line.supplierOfferId ? "Supplier linked" : "Legacy / not routed"}</small></span><b>{amount(line.unitPrice * line.quantity, line.currency, formatPrice)}</b></article>)}</section><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")} {po.supplierOrderId ? `· Ref ${po.supplierOrderId}` : ""}</small></span><small>{po.items.length} lines</small></article>)}{orderDetail.paymentStatus === "paid" && <button className="ad-row-action" type="button" disabled={busyId === orderDetail.id} onClick={() => { const row = orders.items.find((item) => item.id === orderDetail.id); if (row) void planSupplierOrders(row); }}>{busyId === orderDetail.id ? "Planning…" : "Plan / refresh supplier routing"}</button>}</section><section><h3>Shipments</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
 			{section === "products" && <aside className="ad-product-intake-note" role="note"><strong>{ui("catalog_intake_title", "Product intake status")}</strong><p>{ui("catalog_intake_note", "This catalog lists products already in the database. Supplier accounts update offers and inventory; they do not submit new products. Maker applications are separate. New products need an approved data/import workflow before they appear here for review and publishing.")}</p></aside>}
-			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("products", query); }} placeholder="Product name, SKU or slug" /></label><select value={publishedFilter} onChange={(event) => { setPublishedFilter(event.target.value as typeof publishedFilter); }}><option value="all">All products</option><option value="pending">Unpublished</option><option value="published">Published</option></select><button type="button" onClick={() => void loadSection("products")}>Search catalog</button><span>{products.total} products</span></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION / SHIPPING</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? "ad-status--published" : "ad-status--pending"}`}>{product.published ? "Published" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button><ProductProofEditor product={product} /></td></tr>)}</tbody></table></div></section></>}
+			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); } }} placeholder="Product name, SKU or slug" /></label><select value={publishedFilter} onChange={(event) => { setPublishedFilter(event.target.value as typeof publishedFilter); }}><option value="all">All products</option><option value="pending">Unpublished</option><option value="published">Published</option></select><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); }}>Search catalog</button><span>{products.total} products</span></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.products ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CATALOG</span><h2>Products</h2></div><span className="ad-count-pill">{products.total} products</span><AdminTableCollapseButton collapsed={collapsedTables.products} onClick={() => toggleTableCollapsed("products")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION / SHIPPING</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? "ad-status--published" : "ad-status--pending"}`}>{product.published ? "Published" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button><ProductProofEditor product={product} /></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.products.page} pageSize={tablePaging.products.pageSize} total={products.total} onPageChange={(page) => changeTablePage("products", page)} onPageSizeChange={(pageSize) => changeTablePageSize("products", pageSize)} t={ui} /></section></>}
 			{section === "reservations" && (
 				<>
 					<div className="ad-report-tabs" role="tablist" aria-label={ui("reservation_reports", "Reservation reports")}>
@@ -845,14 +1061,16 @@ export default function AdminPortalPage() {
 						</button>
 					</div>
 					{reservationTab === "reservations" && <div id="reservation-report-panel" role="tabpanel" aria-labelledby="reservation-report-tab">
-					<section className="ad-panel">
+					<section className={`ad-panel ad-collapsible-table ${collapsedTables.reservations ? "is-collapsed" : ""}`}>
 						<div className="ad-panel-heading">
 							<div><span className="ad-eyebrow">RESERVE A SPOT · NO PAYMENT</span><h2>Reservations</h2><p>Each row is one product; its country counts are shown beside that product. Manage destinations in Products.</p></div>
 							<span className="ad-count-pill">{reservationProducts.reduce((total, product) => total + (product.reservationCount ?? 0), 0)} reservations</span>
+							<AdminTableCollapseButton collapsed={collapsedTables.reservations} onClick={() => toggleTableCollapsed("reservations")} t={ui} />
 						</div>
+						<AdminDemandReportFilters filters={reservationReportFilters} countries={reservationCountryTotals.map((entry) => entry.country)} language={language} onChange={(filters) => changeDemandFilters("reservations", filters)} t={ui} />
 						<div className="ad-table-wrap">
 							<table className="ad-table"><thead><tr><th>PRODUCT</th><th>RESERVED</th><th>BY COUNTRY</th><th>STATUS</th><th>SETTINGS</th></tr></thead>
-								<tbody>{reservationProducts.map((product) => <tr key={product.id}>
+								<tbody>{visibleRows(reservationReportProducts, "reservations").map((product) => <tr key={product.id}>
 									<td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td>
 									<td><strong>{product.reservationCount ?? 0}</strong>{product.reservationTarget ? ` / ${product.reservationTarget}` : " · no target"}</td>
 									<td className="ad-reservation-country-list">{product.reservationsByCountry?.length ? product.reservationsByCountry.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}: <strong>{entry.count}</strong></span>) : <small>No reservations yet</small>}</td>
@@ -863,33 +1081,38 @@ export default function AdminPortalPage() {
 									<td><ReservationSettingsEditor product={product} /></td>
 								</tr>)}</tbody>
 							</table>
-							{!reservationProducts.length && <div className="ad-empty">No products are available for reservation setup.</div>}
+							{!reservationReportProducts.length && <div className="ad-empty">{reservationProducts.length ? ui("demand_no_matches", "No products match these filters.") : "No products are available for reservation setup."}</div>}
 						</div>
+						<AdminTablePagination page={tablePaging.reservations.page} pageSize={tablePaging.reservations.pageSize} total={reservationReportProducts.length} onPageChange={(page) => changeTablePage("reservations", page)} onPageSizeChange={(pageSize) => changeTablePageSize("reservations", pageSize)} t={ui} />
 					</section>
 					</div>}
 					{reservationTab === "interests" && <div id="interest-report-panel" role="tabpanel" aria-labelledby="interest-report-tab">
-					<section className="ad-panel">
+					<section className={`ad-panel ad-collapsible-table ${collapsedTables.interests ? "is-collapsed" : ""}`}>
 						<div className="ad-panel-heading">
 							<div><span className="ad-eyebrow">UNSHIPPED DEMAND</span><h2>Interests (separate from reservations)</h2><p>Each row is one product; country counts stay with that product. Interest requests never create a reservation.</p></div>
 							<span className="ad-count-pill">{interestProducts.reduce((total, product) => total + (product.interestCount ?? 0), 0)} interests</span>
+							<AdminTableCollapseButton collapsed={collapsedTables.interests} onClick={() => toggleTableCollapsed("interests")} t={ui} />
 						</div>
+						<AdminDemandReportFilters filters={interestReportFilters} countries={interestCountries} language={language} onChange={(filters) => changeDemandFilters("interests", filters)} t={ui} />
 						<div className="ad-table-wrap">
 							<table className="ad-table"><thead><tr><th>PRODUCT</th><th>INTEREST</th><th>BY COUNTRY</th></tr></thead>
-								<tbody>{interestProducts.map((product) => <tr key={product.id}>
+								<tbody>{visibleRows(interestReportProducts, "interests").map((product) => <tr key={product.id}>
 									<td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td>
 									<td><strong>{product.interestCount ?? 0}</strong></td>
 									<td className="ad-reservation-country-list">{product.interestsByCountry?.length ? product.interestsByCountry.map((entry) => <span key={entry.country}>{regionName(entry.country, language, entry.country)}: <strong>{entry.count}</strong></span>) : <small>No interests yet</small>}</td>
 								</tr>)}</tbody>
 							</table>
-							{!interestProducts.length && <div className="ad-empty">{ui("no_interests", "No interest requests yet.")}</div>}
+							{!interestReportProducts.length && <div className="ad-empty">{interestProducts.length ? ui("demand_no_matches", "No products match these filters.") : ui("no_interests", "No interest requests yet.")}</div>}
 						</div>
+						<AdminTablePagination page={tablePaging.interests.page} pageSize={tablePaging.interests.pageSize} total={interestReportProducts.length} onPageChange={(page) => changeTablePage("interests", page)} onPageSizeChange={(pageSize) => changeTablePageSize("interests", pageSize)} t={ui} />
 					</section>
 					</div>}
 					{reservationTab === "reservations" && <div id="reservation-details-panel" role="tabpanel" aria-labelledby="reservation-report-tab">
-					<section className="ad-panel ad-reservation-entries-panel">
+					<section className={`ad-panel ad-reservation-entries-panel ad-collapsible-table ${collapsedTables["reservation-entries"] ? "is-collapsed" : ""}`}>
 						<div className="ad-panel-heading">
 							<div><span className="ad-eyebrow">ADMIN-ONLY DETAILS · RESERVATIONS</span><h2>{t("admin.reservations.entries_title", "Individual reservations")}</h2><p>{t("admin.reservations.entries_note", "Reservation emails are visible only to signed-in admins and are included in filtered exports.")}</p></div>
 							<span className="ad-count-pill">{reservationEntries.total} {t("admin.reservations.entries_count", "records")}</span>
+							<AdminTableCollapseButton collapsed={collapsedTables["reservation-entries"]} onClick={() => toggleTableCollapsed("reservation-entries")} t={ui} />
 						</div>
 						<form className="ad-toolbar ad-reservation-entry-filters" onSubmit={(event) => { event.preventDefault(); void loadReservationEntries(0, reservationFilters); }}>
 							<label><span>{t("admin.reservations.filter_product", "Product")}</span>
@@ -927,17 +1150,7 @@ export default function AdminPortalPage() {
 							{reservationEntriesLoading && <div className="ad-empty" role="status">{t("admin.reservations.loading", "Loading reservations…")}</div>}
 							{!reservationEntriesLoading && !reservationEntries.items.length && <div className="ad-empty">{t("admin.reservations.empty", "No reservations match these filters.")}</div>}
 						</div>
-						<footer className="ad-reservation-entry-pagination">
-							<span>{t("admin.reservations.pagination", "Showing {{from}}–{{to}} of {{total}}", {
-								from: reservationEntries.total ? reservationEntries.offset + 1 : 0,
-								to: Math.min(reservationEntries.offset + reservationEntries.limit, reservationEntries.total),
-								total: reservationEntries.total,
-							})}</span>
-							<div>
-								<button type="button" onClick={() => void loadReservationEntries(Math.max(0, reservationEntries.offset - reservationEntries.limit))} disabled={reservationEntries.offset === 0 || reservationEntriesLoading}>{t("admin.reservations.previous", "Previous")}</button>
-								<button type="button" onClick={() => void loadReservationEntries(reservationEntries.offset + reservationEntries.limit)} disabled={reservationEntries.offset + reservationEntries.limit >= reservationEntries.total || reservationEntriesLoading}>{t("admin.reservations.next", "Next")}</button>
-							</div>
-						</footer>
+						<AdminTablePagination page={tablePaging["reservation-entries"].page} pageSize={tablePaging["reservation-entries"].pageSize} total={reservationEntries.total} onPageChange={(page) => changeTablePage("reservation-entries", page)} onPageSizeChange={(pageSize) => changeTablePageSize("reservation-entries", pageSize)} t={ui} />
 					</section>
 					</div>}
 				</>
@@ -946,24 +1159,25 @@ export default function AdminPortalPage() {
 				<div className="ad-panel-heading">
 					<div><span className="ad-eyebrow">{ui("email_center_eyebrow", "CUSTOMER CARE")}</span><h2>{ui("email_center_title", "Email & messages")}</h2><p>{ui("email_center_note", "Storefront contact and maker messages, plus mail synced from your IMAP inbox.")}</p></div>
 					<div className="ad-email-heading-actions">
-						<span className={`ad-status ${emailInboxStatus?.imapConfigured ? "ad-status--published" : "ad-status--pending"}`}>{ui("email_imap_progress", "IMAP configured: {{configured}} / {{total}} mailboxes", { configured: emailInboxStatus?.mailboxes.filter((mailbox) => mailbox.imapConfigured).length ?? 0, total: emailInboxStatus?.mailboxes.length ?? 3 })}</span>
+						<span className={`ad-status ${configuredEmailMailboxes > 0 && connectedEmailMailboxes === configuredEmailMailboxes ? "ad-status--published" : "ad-status--pending"}`}>{configuredEmailMailboxes ? ui("email_imap_progress", "IMAP connected: {{connected}} / {{configured}} configured mailboxes", { connected: connectedEmailMailboxes, configured: configuredEmailMailboxes }) : ui("email_no_imap_accounts", "IMAP is not configured")}</span>
 						<button type="button" onClick={() => void syncEmailInbox()} disabled={busyId === "email-sync"}>{busyId === "email-sync" ? ui("email_syncing", "Syncing…") : ui("email_sync", "Sync inbox")}</button>
 					</div>
 				</div>
-				{emailInboxStatus?.mailboxes.some((mailbox) => !mailbox.imapConfigured || !mailbox.smtpConfigured) && <aside className="ad-email-config-note" role="note">
-					<strong>{ui("email_setup_title", "Mailbox setup")}</strong>
-					<p>{ui("email_account_setup_note", "Add the password for each address in backend/.env.local, then restart the API. A mailbox must have both IMAP and SMTP configured before its messages sync and can be replied to.")}</p>
+				{unconfiguredEmailMailboxes.length > 0 && <aside className="ad-email-config-note" role="note">
+					<strong>{ui("email_setup_title", "Inbox setup needed")}</strong>
+					<p>{ui("email_account_setup_note", "{{mailboxes}} need IMAP setup before they can receive messages.", { mailboxes: unconfiguredEmailMailboxes.map((mailbox) => mailbox.address || mailbox.key).join(", ") })}</p>
 				</aside>}
 				<div className="ad-email-mailbox-status" aria-label={ui("email_mailbox_status", "Mailbox connection status")}>
-					{emailInboxStatus?.mailboxes.map((mailbox) => <article key={mailbox.key}>
-						<strong>{mailbox.address || mailbox.key}</strong>
-						<span className={mailbox.imapConfigured ? "is-ready" : ""}>{ui("email_status_imap", "IMAP")}: {mailbox.imapConfigured ? ui("email_configured", "Configured") : ui("email_not_configured", "Not configured")}</span>
-						<span className={mailbox.smtpConfigured ? "is-ready" : ""}>{ui("email_status_smtp", "SMTP")}: {mailbox.smtpConfigured ? ui("email_configured", "Configured") : ui("email_not_configured", "Not configured")}</span>
-						{mailbox.lastSyncedAt && <small>{ui("email_last_synced", "Last synced {{date}}", { date: date(mailbox.lastSyncedAt) })}</small>}
-						{mailbox.lastError && <small role="status">{ui("email_last_sync_error", "Last mailbox sync failed: {{error}}", { error: mailbox.lastError })}</small>}
-					</article>)}
+					{emailInboxStatus?.mailboxes.map((mailbox) => {
+						const imapConnected = mailbox.imapConfigured && Boolean(mailbox.lastSyncedAt) && !mailbox.lastError;
+						return <article key={mailbox.key}>
+							<strong>{mailbox.address || mailbox.key}</strong>
+							<span className={imapConnected ? "is-ready" : mailbox.lastError ? "is-error" : ""}>{ui("email_status_imap", "IMAP")}: {!mailbox.imapConfigured ? ui("email_not_configured", "Not configured") : mailbox.lastError ? ui("email_connection_failed", "Sync failed") : imapConnected ? ui("email_connected", "Connected") : ui("email_not_checked", "Not connected yet")}</span>
+							<span className={mailbox.smtpConfigured ? "is-ready" : ""}>{ui("email_replies_status", "Replies")}: {mailbox.smtpConfigured ? ui("email_replies_ready", "Ready") : ui("email_replies_unavailable", "Unavailable")}</span>
+							{mailbox.lastError && <small role="status">{ui("email_sync_error_generic", "Sync failed. Check this mailbox's settings.")}</small>}
+						</article>;
+					})}
 				</div>
-				<p className="ad-email-status-note">{ui("email_status_note", "Configured means settings are present; it does not confirm a live connection or successful delivery. Actual reply status appears in each conversation.")}</p>
 				<div className="ad-email-mailbox-tabs" role="tablist" aria-label={ui("email_mailbox_tabs", "Mailboxes")}>
 					{emailInboxStatus?.mailboxes.map((mailbox) => {
 						const count = emailInboxSummary?.byMailbox[mailbox.key];
@@ -1036,9 +1250,9 @@ export default function AdminPortalPage() {
 					</section>
 				</div>
 			</section>}
-			{section === "maker-applications" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{makerApplications.map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td><td><select aria-label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} onChange={(event) => void updateMakerApplication(application, event.target.value as MakerApplicationStatus)}><option value="pending">Pending</option><option value="reviewing">Reviewing</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div></section>}
-			{section === "suppliers" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2></div><span className="ad-count-pill">{suppliers.length} suppliers</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{suppliers.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div></section>}
-			{section === "customers" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("customers", query); }} placeholder="Customer name or email" /></label><button type="button" onClick={() => void loadSection("customers")}>Search customers</button></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>CUSTOMER</th><th>EMAIL</th><th>VERIFICATION</th><th>JOINED</th></tr></thead><tbody>{customers.map((customer) => <tr key={customer.id}><td><strong>{customer.firstName} {customer.lastName}</strong></td><td>{customer.email}</td><td><span className={`ad-status ${customer.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{customer.emailVerified ? "Verified" : "Pending"}</span></td><td>{date(customer.createdAt)}</td></tr>)}</tbody></table></div></section></>}
+			{section === "maker-applications" && <section className={`ad-panel ad-collapsible-table ${collapsedTables["maker-applications"] ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span><AdminTableCollapseButton collapsed={collapsedTables["maker-applications"]} onClick={() => toggleTableCollapsed("maker-applications")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{visibleRows(makerApplications, "maker-applications").map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td><td><select aria-label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} onChange={(event) => void updateMakerApplication(application, event.target.value as MakerApplicationStatus)}><option value="pending">Pending</option><option value="reviewing">Reviewing</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div><AdminTablePagination page={tablePaging["maker-applications"].page} pageSize={tablePaging["maker-applications"].pageSize} total={makerApplications.length} onPageChange={(page) => changeTablePage("maker-applications", page)} onPageSizeChange={(pageSize) => changeTablePageSize("maker-applications", pageSize)} t={ui} /></section>}
+			{section === "suppliers" && <section className={`ad-panel ad-collapsible-table ${collapsedTables.suppliers ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2><p className="ad-partner-difference">{ui("supplier_brand_difference", "A supplier is a sourcing and stock partner for Ponyo. A brand is the customer-facing maker name and story shown with products.")}</p></div><span className="ad-count-pill">{suppliers.length} suppliers</span><AdminTableCollapseButton collapsed={collapsedTables.suppliers} onClick={() => toggleTableCollapsed("suppliers")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{visibleRows(suppliers, "suppliers").map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.suppliers.page} pageSize={tablePaging.suppliers.pageSize} total={suppliers.length} onPageChange={(page) => changeTablePage("suppliers", page)} onPageSizeChange={(pageSize) => changeTablePageSize("suppliers", pageSize)} t={ui} /></section>}
+			{section === "customers" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, customers: { ...current.customers, page: 0 } })); void loadSection("customers", query, 0); } }} placeholder="Customer name or email" /></label><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, customers: { ...current.customers, page: 0 } })); void loadSection("customers", query, 0); }}>Search customers</button></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.customers ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CUSTOMER DIRECTORY</span><h2>Customers</h2></div><span className="ad-count-pill">{customers.total} customers</span><AdminTableCollapseButton collapsed={collapsedTables.customers} onClick={() => toggleTableCollapsed("customers")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>CUSTOMER</th><th>EMAIL</th><th>VERIFICATION</th><th>JOINED</th></tr></thead><tbody>{customers.items.map((customer) => <tr key={customer.id}><td><strong>{customer.firstName} {customer.lastName}</strong></td><td>{customer.email}</td><td><span className={`ad-status ${customer.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{customer.emailVerified ? "Verified" : "Pending"}</span></td><td>{date(customer.createdAt)}</td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.customers.page} pageSize={tablePaging.customers.pageSize} total={customers.total} onPageChange={(page) => changeTablePage("customers", page)} onPageSizeChange={(pageSize) => changeTablePageSize("customers", pageSize)} t={ui} /></section></>}
 			{section === "admin-accounts" && <>
 				<section className="ad-panel ad-admin-account-panel">
 					<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("admin_accounts_hint", "Manage operations access")}</span><h2>{ui("admin_account_form_title", "Create an admin account")}</h2><p>{ui("admin_account_form_note", "Only current admins can provision access. Share the temporary password securely with the new admin.")}</p></div></div>
@@ -1050,8 +1264,8 @@ export default function AdminPortalPage() {
 						<button className="ad-primary-button" type="submit" disabled={busyId === "create-admin"}>{busyId === "create-admin" ? ui("creating", "Creating…") : ui("create_admin_access", "Create admin access")}<span>↗</span></button>
 					</form>
 				</section>
-				<section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("current_admins", "CURRENT ADMINS")}</span><h2>{ui("admin_accounts_title", "Admin accounts")}</h2></div><span className="ad-count-pill">{ui("admin_count", "{{count}} accounts", { count: adminAccounts.length })}</span></div>
-					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>{ui("admin_table_name", "ADMIN")}</th><th>{ui("admin_table_email", "EMAIL")}</th><th>{ui("admin_table_access", "ACCESS")}</th><th>{ui("admin_table_created", "CREATED")}</th><th>{ui("admin_table_actions", "ACTIONS")}</th></tr></thead><tbody>{adminAccounts.map((account) => {
+				<section className={`ad-panel ad-collapsible-table ${collapsedTables["admin-accounts"] ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("current_admins", "CURRENT ADMINS")}</span><h2>{ui("admin_accounts_title", "Admin accounts")}</h2></div><span className="ad-count-pill">{ui("admin_count", "{{count}} accounts", { count: adminAccounts.length })}</span><AdminTableCollapseButton collapsed={collapsedTables["admin-accounts"]} onClick={() => toggleTableCollapsed("admin-accounts")} t={ui} /></div>
+					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>{ui("admin_table_name", "ADMIN")}</th><th>{ui("admin_table_email", "EMAIL")}</th><th>{ui("admin_table_access", "ACCESS")}</th><th>{ui("admin_table_created", "CREATED")}</th><th>{ui("admin_table_actions", "ACTIONS")}</th></tr></thead><tbody>{visibleRows(adminAccounts, "admin-accounts").map((account) => {
 						const revokeDisabled = account.id === admin?.id || adminAccounts.length <= 1;
 						return <tr key={account.id}>
 							<td><strong>{account.firstName} {account.lastName}</strong></td>
@@ -1064,6 +1278,7 @@ export default function AdminPortalPage() {
 							</div>{revokeDisabled && <small>{ui("admin_access_protected_hint", "You cannot revoke your own or the last admin account.")}</small>}</td>
 						</tr>;
 					})}</tbody></table>{!adminAccounts.length && <div className="ad-empty">{ui("no_admin_accounts", "No admin accounts were returned.")}</div>}</div>
+					<AdminTablePagination page={tablePaging["admin-accounts"].page} pageSize={tablePaging["admin-accounts"].pageSize} total={adminAccounts.length} onPageChange={(page) => changeTablePage("admin-accounts", page)} onPageSizeChange={(pageSize) => changeTablePageSize("admin-accounts", pageSize)} t={ui} />
 					{editingAdmin && <form className="ad-admin-account-form ad-admin-account-edit-form" onSubmit={saveAdminAccount}>
 						<div className="ad-admin-account-edit-heading"><h3>{ui("admin_edit_title", "Edit admin account")}</h3><button className="ad-row-action" type="button" onClick={() => setEditingAdmin(null)}>{ui("cancel_admin_edit", "Cancel")}</button></div>
 						<label>{ui("first_name", "First name")}<input value={editingAdmin.firstName} onChange={(event) => setEditingAdmin((current) => current ? { ...current, firstName: event.target.value } : current)} autoComplete="given-name" maxLength={120} required /></label>
@@ -1074,8 +1289,8 @@ export default function AdminPortalPage() {
 					</form>}
 				</section>
 			</>}
-			{section === "fulfillment" && <><div className="ad-fulfillment-summary"><strong>{metrics?.ordersAwaitingFulfillment ?? 0}</strong><span>paid orders awaiting fulfillment action</span><p>Customer orders may split across suppliers. Select an order to inspect supplier confirmations and shipment tracking.</p></div><section className="ad-panel"><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>FULFILLMENT</th><th>SUPPLIER ROUTING</th><th>TOTAL</th><th>ACTION</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td><td><button className="ad-row-action" type="button" disabled={busyId === order.id || order.paymentStatus !== "paid"} onClick={(event) => { event.stopPropagation(); void planSupplierOrders(order); }}>{busyId === order.id ? "Planning…" : "Plan suppliers"}</button></td></tr>)}</tbody></table>{!orders.items.length && <div className="ad-empty">No paid orders need fulfillment right now.</div>}</div></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL</span><h2>{orderDetail.orderNumber}</h2></div><button type="button" onClick={() => setOrderDetail(null)}>Close</button></div><div className="ad-detail-columns"><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")}</small></span><small>{po.items.length} lines</small></article>)}{!orderDetail.supplierFulfillments.length && <p className="ad-detail-empty">No supplier PO has been planned yet.</p>}</section><section><h3>Shipments &amp; tracking</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
-			{section === "brands" && <section className="ad-panel"><div className="ad-panel-heading"><div><span className="ad-eyebrow">CURATED PARTNERS</span><h2>Maker profile studio</h2></div><span className="ad-count-pill">{brands.length} profiles</span></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>SLUG</th><th>CATALOG PRODUCTS</th><th>RECORD TYPE</th><th>PROFILE</th></tr></thead><tbody>{brands.map((brand) => <tr key={brand.id}><td><strong>{brand.name}</strong></td><td>{brand.slug}</td><td>{brand.productCount}</td><td>{brand.isDemo ? "Demo seed" : "Curated catalog"}</td><td>{brand.isDemo ? <small>Demo records are not shown as maker profiles.</small> : <BrandProfileEditor brand={brand} />}</td></tr>)}</tbody></table>{!brands.length && <div className="ad-empty">No maker profiles exist yet.</div>}</div><p className="ad-brand-note">Publish only maker stories, images, materials, and process details confirmed by the maker.</p></section>}
+			{section === "fulfillment" && <><div className="ad-fulfillment-summary"><strong>{metrics?.ordersAwaitingFulfillment ?? 0}</strong><span>paid orders awaiting fulfillment action</span><p>Customer orders may split across suppliers. Select an order to inspect supplier confirmations and shipment tracking.</p></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.fulfillment ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">SUPPLIER ROUTING</span><h2>Orders to fulfill</h2></div><span className="ad-count-pill">{orders.total} orders</span><AdminTableCollapseButton collapsed={collapsedTables.fulfillment} onClick={() => toggleTableCollapsed("fulfillment")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>FULFILLMENT</th><th>SUPPLIER ROUTING</th><th>TOTAL</th><th>ACTION</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td><td><button className="ad-row-action" type="button" disabled={busyId === order.id || order.paymentStatus !== "paid"} onClick={(event) => { event.stopPropagation(); void planSupplierOrders(order); }}>{busyId === order.id ? "Planning…" : "Plan suppliers"}</button></td></tr>)}</tbody></table>{!orders.items.length && <div className="ad-empty">No paid orders need fulfillment right now.</div>}</div><AdminTablePagination page={tablePaging.fulfillment.page} pageSize={tablePaging.fulfillment.pageSize} total={orders.total} onPageChange={(page) => changeTablePage("fulfillment", page)} onPageSizeChange={(pageSize) => changeTablePageSize("fulfillment", pageSize)} t={ui} /></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL</span><h2>{orderDetail.orderNumber}</h2></div><button type="button" onClick={() => setOrderDetail(null)}>Close</button></div><div className="ad-detail-columns"><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")}</small></span><small>{po.items.length} lines</small></article>)}{!orderDetail.supplierFulfillments.length && <p className="ad-detail-empty">No supplier PO has been planned yet.</p>}</section><section><h3>Shipments &amp; tracking</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
+			{section === "brands" && <section className={`ad-panel ad-collapsible-table ${collapsedTables.brands ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CURATED PARTNERS</span><h2>Maker profile studio</h2><p className="ad-partner-difference">{ui("brand_supplier_difference", "A brand is the public maker identity and story customers see. It is different from a supplier, which manages sourcing and product stock for Ponyo.")}</p></div><span className="ad-count-pill">{brands.length} profiles</span><AdminTableCollapseButton collapsed={collapsedTables.brands} onClick={() => toggleTableCollapsed("brands")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>SLUG</th><th>CATALOG PRODUCTS</th><th>RECORD TYPE</th><th>PROFILE</th></tr></thead><tbody>{visibleRows(brands, "brands").map((brand) => <tr key={brand.id}><td><strong>{brand.name}</strong></td><td>{brand.slug}</td><td>{brand.productCount}</td><td>{brand.isDemo ? "Demo seed" : "Curated catalog"}</td><td>{brand.isDemo ? <small>Demo records are not shown as maker profiles.</small> : <BrandProfileEditor brand={brand} />}</td></tr>)}</tbody></table>{!brands.length && <div className="ad-empty">No maker profiles exist yet.</div>}</div><AdminTablePagination page={tablePaging.brands.page} pageSize={tablePaging.brands.pageSize} total={brands.length} onPageChange={(page) => changeTablePage("brands", page)} onPageSizeChange={(pageSize) => changeTablePageSize("brands", pageSize)} t={ui} /><p className="ad-brand-note">Publish only maker stories, images, materials, and process details confirmed by the maker.</p></section>}
 			<footer className="ad-footer">A softer marketplace, run with care <span>♡</span><Link href="/pages/contact">Need a hand? Contact Ponyo</Link></footer>
 		</section>
 	</main>;

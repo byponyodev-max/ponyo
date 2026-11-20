@@ -8,8 +8,8 @@ from sqlalchemy import select
 from app.config import EmailInboxMailboxSettings, settings
 from app.email_notifications import _send_transactional_email
 from app.email_queue import send_one
-from app.mailbox_sync import FetchedMessage, _parse_remote_message, sync_mailbox_once
-from app.models import ContactRequest, EmailInboxMessage, EmailNotification
+from app.mailbox_sync import FetchedMessage, MailboxSyncError, _parse_remote_message, _plain_email_body, sync_mailbox_once
+from app.models import ContactRequest, EmailInboxMessage, EmailInboxSyncState, EmailNotification
 from test_admin_dashboard import admin_session
 from test_api import (
     csrf_token,
@@ -252,6 +252,98 @@ def test_imap_message_parser_extracts_plain_body_and_thread_headers():
     assert parsed["references"] == ["<previous@example.com>", "<root@example.com>"]
 
 
+def test_imap_message_parser_converts_html_to_readable_text_and_ignores_scripts():
+    raw = (
+        b"From: Mika Example <mika@example.com>\r\n"
+        b"To: hello@example.com\r\n"
+        b"Subject: HTML message\r\n"
+        b"Content-Type: text/html; charset=utf-8\r\n\r\n"
+        b"<html><head><style>.hidden{display:none}</style><title>Ignored</title></head>"
+        b"<body><p>Hello &amp; welcome</p><p>Please check <strong>your order</strong>.</p>"
+        b"<ul><li>First item</li><li>Second item</li></ul><script>alert('ignored')</script></body></html>"
+    )
+
+    parsed = _parse_remote_message(8, raw)
+
+    assert parsed is not None
+    assert "Hello & welcome" in parsed["text_body"]
+    assert "Please check your order." in parsed["text_body"]
+    assert "- First item" in parsed["text_body"]
+    assert "- Second item" in parsed["text_body"]
+    assert "<p>" not in parsed["text_body"]
+    assert "display:none" not in parsed["text_body"]
+    assert "alert(" not in parsed["text_body"]
+
+
+def test_email_body_removes_invisible_tracking_and_decoding_characters():
+    body = "Welcome!\ufeff \u034f\u200b\u2060 2004\ufffd\ufffd2026"
+
+    assert _plain_email_body(body) == "Welcome! 20042026"
+
+
+@pytest.mark.asyncio
+async def test_existing_html_inbox_message_is_normalized_before_thread_response(test_client):
+    client, factory = test_client
+    await admin_session(client, factory, email="html-inbox-admin@example.com")
+    async with factory() as db:
+        db.add(EmailInboxMessage(
+            thread_key="old-html-message",
+            source_type="contact_form",
+            source_key="old-html-source",
+            direction="inbound",
+            from_email="mika@example.com",
+            to_email="hello@byponyo.com",
+            subject="Old HTML message",
+            text_body="<html><body><p>Hello &amp; welcome</p><script>ignored()</script></body></html>",
+            mailbox_name="HELLO",
+            uid_validity="1",
+            uid=500,
+        ))
+        db.add(EmailInboxMessage(
+            thread_key="old-html-message",
+            source_type="imap",
+            source_key="old-html-reply",
+            direction="outbound",
+            from_email="hello@byponyo.com",
+            to_email="mika@example.com",
+            subject="Re: Old HTML message",
+            text_body="<html><body><p>We are checking.</p></body></html>",
+            mailbox_name="HELLO",
+        ))
+        db.add(EmailInboxMessage(
+            thread_key="old-html-message",
+            source_type="imap",
+            source_key="old-html-filler",
+            direction="inbound",
+            from_email="mika@example.com",
+            to_email="hello@byponyo.com",
+            subject="Re: Old HTML message",
+            text_body="Welcome!\ufeff \u034f\u200b\u2060 2004\ufffd\ufffd2026",
+            mailbox_name="HELLO",
+            uid_validity="1",
+            uid=501,
+        ))
+        await db.commit()
+
+    response = await client.get("/v1/admin/email/inbox/old-html-message")
+
+    assert response.status_code == 200
+    assert {message["body"] for message in response.json()["data"]["messages"]} == {
+        "Hello & welcome",
+        "We are checking.",
+        "Welcome! 20042026",
+    }
+    async with factory() as db:
+        messages = (await db.scalars(select(EmailInboxMessage).where(
+            EmailInboxMessage.source_key.in_(["old-html-source", "old-html-reply", "old-html-filler"]),
+        ))).all()
+        assert {message.text_body for message in messages} == {
+            "Hello & welcome",
+            "We are checking.",
+            "Welcome! 20042026",
+        }
+
+
 def test_transactional_reply_sets_threading_headers(monkeypatch):
     for name, value in {
         "smtp_host": "smtp.example.test",
@@ -323,3 +415,32 @@ async def test_imap_sync_persists_each_mailbox_and_advances_uid_cursors(test_cli
     assert {message.mailbox_name for message in messages} == set(addresses)
     assert all(message.uid_validity == "42" and message.uid == 9 for message in messages)
     assert set(fetched) == set(addresses.values())
+
+
+@pytest.mark.asyncio
+async def test_imap_sync_persists_safe_error_detail_for_failed_mailbox(test_client, monkeypatch):
+    _, factory = test_client
+    address = "hello@byponyo.com"
+    monkeypatch.setattr(settings, "email_inbox_mailboxes", {
+        "HELLO": EmailInboxMailboxSettings(
+            address=address,
+            username=address,
+            password="test-password",
+            imap_host="imap.example.test",
+        ),
+    })
+    monkeypatch.setattr(settings, "email_inbox_imap_host", None)
+    diagnostic = "IMAP login rejected; check the mailbox username and app password."
+
+    def fail_sync(mailbox, cursor, old_validity):
+        raise MailboxSyncError(diagnostic)
+
+    monkeypatch.setattr("app.mailbox_sync._fetch_messages_sync", fail_sync)
+
+    async with factory() as db:
+        result = await sync_mailbox_once(db)
+    async with factory() as db:
+        state = await db.scalar(select(EmailInboxSyncState))
+
+    assert result["mailboxes"][0]["error"] == diagnostic
+    assert state.last_error == diagnostic

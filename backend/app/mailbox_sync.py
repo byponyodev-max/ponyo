@@ -14,7 +14,7 @@ from email.utils import getaddresses, parsedate_to_datetime
 from html.parser import HTMLParser
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,11 +23,20 @@ from app.config import EmailInboxMailboxSettings, get_settings
 from app.db import SessionLocal
 from app.email_notifications import contact_notification_recipient
 from app.models import ContactRequest, EmailInboxMessage, EmailInboxSyncState, MakerApplication, utc_now
+from app.ssl_context import create_proxy_compatible_ssl_context
 
 logger = logging.getLogger("ponyo.mailbox")
 MAX_MESSAGE_BYTES = 100_000
 MAX_MESSAGE_TEXT = 50_000
 MESSAGE_ID_PATTERN = re.compile(r"<[^<>\s]+>")
+HTML_MARKUP_PATTERN = re.compile(r"</?[A-Za-z][A-Za-z0-9:-]*(?:\s+[^<>]*)?\s*/?>")
+HTML_BLOCK_TAGS = {
+    "address", "article", "blockquote", "br", "dd", "div", "dl", "dt", "fieldset", "figcaption",
+    "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
+    "main", "ol", "p", "pre", "section", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
+}
+HTML_SKIP_TAGS = {"head", "noscript", "script", "style", "title"}
+INVISIBLE_EMAIL_CHARS = ("\u00ad", "\u034f", "\u200b", "\u2060", "\ufeff", "\ufffd")
 
 
 class MailboxSyncError(RuntimeError):
@@ -44,10 +53,29 @@ class _TextFromHtml(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
+        self.skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag in HTML_SKIP_TAGS:
+            self.skip_depth += 1
+            return
+        if self.skip_depth:
+            return
+        if tag == "li":
+            self.parts.append("- ")
+        elif tag in {"br", "ol", "ul"}:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in HTML_SKIP_TAGS and self.skip_depth:
+            self.skip_depth -= 1
+            return
+        if not self.skip_depth and tag in HTML_BLOCK_TAGS:
+            self.parts.append("\n")
 
     def handle_data(self, data: str) -> None:
-        if data.strip():
-            self.parts.append(data.strip())
+        if data.strip() and not self.skip_depth:
+            self.parts.append(data)
 
 
 @dataclass(frozen=True)
@@ -68,11 +96,25 @@ async def _insert_if_new(db: AsyncSession, values: dict) -> bool:
     return result.rowcount == 1
 
 
+def _clean_email_text(value: str) -> str:
+    text = "".join(char for char in value if char not in INVISIBLE_EMAIL_CHARS)
+    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{2,}", "\n", text)
+    return text.strip()
+
+
 def _html_to_text(value: str) -> str:
     parser = _TextFromHtml()
     parser.feed(value)
     parser.close()
-    return "\n".join(parser.parts)
+    return _clean_email_text("".join(parser.parts))
+
+
+def _plain_email_body(value: str) -> str:
+    body = _html_to_text(value) if HTML_MARKUP_PATTERN.search(value) else _clean_email_text(value)
+    return body[:MAX_MESSAGE_TEXT]
 
 
 def _message_body(message) -> str:
@@ -92,8 +134,25 @@ def _message_body(message) -> str:
             plain_text = content
         elif part.get_content_subtype() == "html" and not html_text:
             html_text = content
-    body = plain_text or _html_to_text(html_text)
-    return body.strip()[:MAX_MESSAGE_TEXT]
+    return _plain_email_body(plain_text or html_text)
+
+
+async def _normalize_existing_html_messages(db: AsyncSession) -> int:
+    rows = (await db.scalars(
+        select(EmailInboxMessage)
+        .where(or_(
+            EmailInboxMessage.text_body.ilike("%<%"),
+            *(EmailInboxMessage.text_body.contains(char) for char in INVISIBLE_EMAIL_CHARS),
+        ))
+        .order_by(EmailInboxMessage.received_at.desc())
+    )).all()
+    updated = 0
+    for message in rows:
+        body = _plain_email_body(message.text_body)
+        if body != message.text_body:
+            message.text_body = body
+            updated += 1
+    return updated
 
 
 def _header_text(message, name: str) -> str | None:
@@ -169,7 +228,7 @@ def _fetch_messages_sync(
             client = imaplib.IMAP4_SSL(
                 mailbox.imap_host,
                 mailbox.imap_port,
-                ssl_context=ssl.create_default_context(),
+                ssl_context=create_proxy_compatible_ssl_context(),
                 timeout=settings.smtp_timeout_seconds,
             )
         else:
@@ -178,8 +237,13 @@ def _fetch_messages_sync(
                 mailbox.imap_port,
                 timeout=settings.smtp_timeout_seconds,
             )
-            client.starttls(ssl_context=ssl.create_default_context())
-        client.login(mailbox.username, mailbox.password.get_secret_value())
+            client.starttls(ssl_context=create_proxy_compatible_ssl_context())
+        try:
+            client.login(mailbox.username, mailbox.password.get_secret_value())
+        except imaplib.IMAP4.error as error:
+            raise MailboxSyncError(
+                "IMAP login rejected; check the mailbox username and app password."
+            ) from error
         status, _ = client.select(mailbox.imap_mailbox, readonly=True)
         if status != "OK":
             raise MailboxSyncError("Could not select the configured IMAP mailbox.")
@@ -232,7 +296,8 @@ def _fetch_selected_messages(
 
 
 async def sync_portal_messages(db: AsyncSession) -> int:
-    """Make saved storefront contact and maker requests available in the same inbox."""
+    """Normalize existing inbox bodies and make storefront messages available."""
+    await _normalize_existing_html_messages(db)
     imported = 0
     contacts = await db.scalars(select(ContactRequest).order_by(ContactRequest.created_at).limit(5000))
     for contact in contacts:
@@ -303,16 +368,17 @@ async def sync_mailbox_once(db: AsyncSession) -> dict:
                 _fetch_messages_sync, mailbox, cursor, old_uid_validity,
             )
         except MailboxSyncError as error:
+            safe_error = str(error)[:80]
             if state is None:
                 state = EmailInboxSyncState(mailbox_name=state_key)
                 db.add(state)
-            state.last_error = type(error).__name__
+            state.last_error = safe_error
             await db.commit()
             results.append({
                 "key": account_key,
                 "imported": 0,
                 "lastSyncedAt": state.last_synced_at,
-                "error": type(error).__name__,
+                "error": safe_error,
             })
             continue
 

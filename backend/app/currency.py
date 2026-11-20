@@ -1,11 +1,12 @@
 import asyncio
 import json
-import os
 import ssl
 import time
 from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
+
+from app.ssl_context import create_proxy_compatible_ssl_context
 
 SUPPORTED_CURRENCIES = {"JPY", "USD", "EUR", "GBP", "AUD", "CAD", "IDR"}
 SUPPORTED_DISPLAY_CURRENCIES = {"JPY", "KRW"}
@@ -18,13 +19,7 @@ _cache_lock = asyncio.Lock()
 
 
 def _create_rate_ssl_context() -> ssl.SSLContext:
-    context = ssl.create_default_context()
-    allow_proxy_compatibility = os.getenv("PONYO_ALLOW_NON_STRICT_FX_CERT_EXTENSIONS", "").lower() in {"1", "true", "yes"}
-    if allow_proxy_compatibility:
-        if not os.getenv("SSL_CERT_FILE"):
-            raise RuntimeError("FX proxy compatibility requires an explicit CA bundle.")
-        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
-    return context
+    return create_proxy_compatible_ssl_context()
 
 
 def _fetch_jpy_rates() -> dict[str, Any]:

@@ -59,6 +59,16 @@ test("admin MVP includes overview, orders, product publishing, suppliers and cus
     }
 });
 
+test("admin tables are readable, collapsible and automatically refresh the active section", () => {
+    assert.ok(page.includes("setInterval(refreshWhenActive, 15000)"));
+    assert.ok(page.includes('addEventListener("visibilitychange", refreshWhenActive)'));
+    assert.ok(page.includes('className="ad-live-indicator"'));
+    assert.ok(page.includes("AdminTablePagination"));
+    assert.ok(page.includes("AdminTableCollapseButton"));
+    assert.ok(css.includes(".ad-table tbody tr:nth-child(even) td"));
+    assert.ok(css.includes(".ad-table-wrap"));
+});
+
 test("product workspace explains current database intake and supplier limitations", () => {
     assert.ok(page.includes("catalog_intake_title"));
     assert.ok(page.includes("catalog_intake_note"));

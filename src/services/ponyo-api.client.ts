@@ -222,6 +222,13 @@ export type AdminReservationPage = {
 	offset: number;
 };
 
+export type AdminListPage<T> = {
+	items: T[];
+	total: number;
+	limit: number;
+	offset: number;
+};
+
 export type AdminEmailInboxStatus = {
 	imapConfigured: boolean;
 	smtpConfigured: boolean;
@@ -1031,8 +1038,9 @@ export const ponyoApi = {
 		query = "",
 		limit = 50,
 		filters: { paymentStatus?: string; fulfillmentStatus?: string } = {},
+		offset = 0,
 	) => {
-		const params = new URLSearchParams({ q: query, limit: String(limit) });
+		const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
 		if (filters.paymentStatus)
 			params.set("payment_status", filters.paymentStatus);
 		if (filters.fulfillmentStatus)
@@ -1046,8 +1054,8 @@ export const ponyoApi = {
 	},
 	getAdminOrder: (id: string) =>
 		apiRequest<AdminOrderDetail>(`/admin/orders/${encodeURIComponent(id)}`),
-	listAdminProducts: (query = "", published?: boolean, limit = 100) => {
-		const params = new URLSearchParams({ q: query, limit: String(limit) });
+	listAdminProducts: (query = "", published?: boolean, limit = 100, offset = 0) => {
+		const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
 		if (published !== undefined) params.set("published", String(published));
 		return apiRequest<{
 			items: AdminProduct[];
@@ -1157,10 +1165,10 @@ export const ponyoApi = {
 			method: "PATCH",
 			body: JSON.stringify({ active }),
 		}),
-	listAdminCustomers: (query = "") =>
-		apiRequest<AdminCustomer[]>(
-			`/admin/customers?${new URLSearchParams({ q: query }).toString()}`,
-		),
+	listAdminCustomers: (query = "", limit = 10, offset = 0) => {
+		const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+		return apiRequest<AdminListPage<AdminCustomer>>(`/admin/customers?${params.toString()}`);
+	},
 	listAdminAccounts: () =>
 		apiRequest<AdminAccount[]>("/admin/admins"),
 	createAdminAccount: (input: {

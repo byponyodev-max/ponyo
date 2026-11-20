@@ -1070,16 +1070,25 @@ async def set_supplier_status(supplier_id: UUID, payload: AdminSupplierStatusReq
 @router.get("/customers", response_model=dict)
 async def list_customers(
     _admin: Customer = Depends(require_roles("admin")), db: AsyncSession = Depends(get_db),
-    q: str | None = Query(default=None, max_length=120), limit: int = Query(default=100, ge=1, le=200),
+    q: str | None = Query(default=None, max_length=120),
+    limit: int = Query(default=10, ge=1, le=100), offset: int = Query(default=0, ge=0),
 ):
     query = select(Customer).where(Customer.role == "customer")
     if q:
         term = f"%{q.strip()}%"
         query = query.where(or_(Customer.email.ilike(term), Customer.first_name.ilike(term), Customer.last_name.ilike(term)))
-    rows = (await db.scalars(query.order_by(Customer.created_at.desc(), Customer.id).limit(limit))).all()
-    return {"data": [{"id": str(customer.id), "firstName": customer.first_name, "lastName": customer.last_name,
-                       "email": customer.email, "emailVerified": customer.email_verified,
-                       "createdAt": customer.created_at.isoformat()} for customer in rows]}
+    total = await db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
+    rows = (await db.scalars(
+        query.order_by(Customer.created_at.desc(), Customer.id).offset(offset).limit(limit)
+    )).all()
+    return {"data": {
+        "items": [{"id": str(customer.id), "firstName": customer.first_name, "lastName": customer.last_name,
+                   "email": customer.email, "emailVerified": customer.email_verified,
+                   "createdAt": customer.created_at.isoformat()} for customer in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }}
 
 
 @router.get("/admins", response_model=dict)
