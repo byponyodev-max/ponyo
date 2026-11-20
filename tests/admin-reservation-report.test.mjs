@@ -77,3 +77,14 @@ test("available destinations reserve while other destinations register separate 
   assert.match(productCommunity, /product\.reservation\.title", "Reserve a spot"/);
   assert.match(productCommunity, /product\.interest\.body",[\s\S]*separate from reserving an available item/);
 });
+
+test("storefront keeps reservation progress without showing the target status message", () => {
+  assert.match(productCommunity, /<strong>\{reservationCount\}\{target \? <span> \/ \{target\}<\/span> : ""\}<\/strong>/);
+  assert.match(productCommunity, /className="product-reservation-progress"/);
+  assert.match(productCommunity, /product\.reservation\.progress", "\{\{progress\}\}% of the reservation target reached"/);
+  assert.doesNotMatch(productCommunity, /status\.target_not_reached|Reservation target not reached/);
+  assert.match(apiClient, /getProductReservations: \(productId: string\) =>\s*apiRequest<\{ reservationCount: number; target: number \| null; open: boolean \}>/);
+  assert.match(apiClient, /submitProductReservation: \(productId: string, input: \{ email: string; country: string \}\) =>\s*apiRequest<\{ accepted: boolean; reservationCount: number; target: number \| null \}>/);
+  const productTypes = readFileSync(new URL("../src/types/product.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(productTypes, /reservationTarget/);
+});

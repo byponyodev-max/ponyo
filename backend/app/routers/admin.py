@@ -1,6 +1,7 @@
 """Admin-only marketplace operations and read models for the Ponyo dashboard."""
 
 import csv
+import hashlib
 import re
 from datetime import datetime, timedelta, timezone
 from io import BytesIO, StringIO
@@ -10,12 +11,13 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import EmailStr, TypeAdapter, ValidationError
-from sqlalchemy import case, func, or_, select, update
+from sqlalchemy import String, case, cast, func, literal, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
+from app.catalog_stock import sellable_variant
 from app.db import get_db
 from app.email_queue import enqueue_email_notification
 from app.mailbox_sync import (
@@ -24,12 +26,15 @@ from app.mailbox_sync import (
     sync_mailbox_once,
     sync_portal_messages,
 )
+from app.newsletter import unsubscribe_url
 from app.models import (
     Brand,
     Customer,
+    EmailNotification,
     EmailInboxMessage,
     EmailInboxSyncState,
     MakerApplication,
+    NewsletterSubscription,
     Order,
     OrderItem,
     OutboxEvent,
@@ -38,6 +43,7 @@ from app.models import (
     ProductInterest,
     ProductReservation,
     ProductVariant,
+    ProductWaitlistEntry,
     Shipment,
     Supplier,
     SupplierAccount,
@@ -53,6 +59,7 @@ from app.schemas import (
     AdminBrandProfileRequest,
     AdminEmailReplyRequest,
     AdminMakerApplicationStatusRequest,
+    AdminNewsletterCampaignRequest,
     AdminProductProofRequest,
     AdminProductPublicationRequest,
     AdminProductReservationSettings,
@@ -777,6 +784,199 @@ async def list_product_interests(_admin: Customer = Depends(require_roles("admin
     ]}
 
 
+@router.get("/waitlist", response_model=dict)
+async def list_waitlist_products(
+    response: Response,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+    q: str | None = Query(default=None, max_length=120),
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    response.headers["Cache-Control"] = "no-store"
+    notification_key = literal("waitlist_availability:") + cast(ProductWaitlistEntry.id, String)
+    waitlist_counts = (
+        select(
+            ProductWaitlistEntry.product_id.label("product_id"),
+            func.count(ProductWaitlistEntry.id).label("entry_count"),
+            func.sum(case((EmailNotification.id.is_(None), 1), else_=0)).label("waiting_count"),
+            func.sum(case((EmailNotification.status.in_(("pending", "processing")), 1), else_=0)).label("queued_count"),
+            func.sum(case((EmailNotification.status == "sent", 1), else_=0)).label("sent_count"),
+            func.sum(case((EmailNotification.status == "failed", 1), else_=0)).label("failed_count"),
+            func.max(ProductWaitlistEntry.created_at).label("latest_joined_at"),
+        )
+        .outerjoin(EmailNotification, EmailNotification.notification_key == notification_key)
+        .group_by(ProductWaitlistEntry.product_id)
+        .subquery()
+    )
+    available_products = (
+        select(ProductVariant.product_id.label("product_id"))
+        .where(sellable_variant())
+        .group_by(ProductVariant.product_id)
+        .subquery()
+    )
+    query = (
+        select(
+            Product,
+            waitlist_counts.c.entry_count,
+            waitlist_counts.c.waiting_count,
+            waitlist_counts.c.queued_count,
+            waitlist_counts.c.sent_count,
+            waitlist_counts.c.failed_count,
+            waitlist_counts.c.latest_joined_at,
+            available_products.c.product_id.is_not(None).label("available"),
+        )
+        .join(waitlist_counts, waitlist_counts.c.product_id == Product.id)
+        .outerjoin(available_products, available_products.c.product_id == Product.id)
+        .where(Product.published.is_(True))
+    )
+    if q and q.strip():
+        escaped = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        term = f"%{escaped}%"
+        query = query.where(or_(Product.name.ilike(term, escape="\\"), Product.sku.ilike(term, escape="\\")))
+    total = await db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
+    rows = (await db.execute(
+        query.options(selectinload(Product.images))
+        .order_by(waitlist_counts.c.entry_count.desc(), Product.name, Product.id)
+        .offset(offset)
+        .limit(limit)
+    )).all()
+    return {"data": {
+        "items": [{
+            "productId": str(product.id),
+            "productName": product.name,
+            "sku": product.sku,
+            "image": product_summary(product)["image"],
+            "available": bool(available),
+            "entryCount": entry_count,
+            "waitingCount": waiting_count,
+            "queuedCount": queued_count,
+            "sentCount": sent_count,
+            "failedCount": failed_count,
+            "latestJoinedAt": latest_joined_at.isoformat(),
+        } for product, entry_count, waiting_count, queued_count, sent_count, failed_count, latest_joined_at, available in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }}
+
+
+@router.get("/waitlist/{product_id}", response_model=dict)
+async def list_waitlist_entries(
+    product_id: UUID,
+    response: Response,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    response.headers["Cache-Control"] = "no-store"
+    product = await db.scalar(select(Product).where(Product.id == product_id, Product.published.is_(True)))
+    if product is None:
+        raise HTTPException(404, "Waitlist product not found.")
+    notification_key = literal("waitlist_availability:") + cast(ProductWaitlistEntry.id, String)
+    query = (
+        select(ProductWaitlistEntry, EmailNotification.status, EmailNotification.sent_at)
+        .outerjoin(EmailNotification, EmailNotification.notification_key == notification_key)
+        .where(ProductWaitlistEntry.product_id == product_id)
+    )
+    total = await db.scalar(
+        select(func.count()).select_from(ProductWaitlistEntry).where(ProductWaitlistEntry.product_id == product_id)
+    ) or 0
+    rows = (await db.execute(
+        query.order_by(ProductWaitlistEntry.created_at, ProductWaitlistEntry.id).offset(offset).limit(limit)
+    )).all()
+    return {"data": {
+        "productId": str(product.id),
+        "productName": product.name,
+        "items": [{
+            "id": str(entry.id),
+            "email": entry.email,
+            "firstName": entry.first_name,
+            "createdAt": entry.created_at.isoformat(),
+            "notificationStatus": status or "not_sent",
+            "notifiedAt": sent_at.isoformat() if sent_at else None,
+        } for entry, status, sent_at in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }}
+
+
+@router.post("/waitlist/{product_id}/notify", response_model=dict, status_code=202)
+async def notify_product_waitlist(
+    product_id: UUID,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-waitlist-notify", 10, 3600)
+    product = await db.scalar(
+        select(Product).where(Product.id == product_id, Product.published.is_(True)).with_for_update()
+    )
+    if product is None:
+        raise HTTPException(404, "Waitlist product not found.")
+    available_variant = await db.scalar(
+        select(ProductVariant.id).where(ProductVariant.product_id == product_id, sellable_variant()).limit(1)
+    )
+    if available_variant is None:
+        raise HTTPException(409, "This product has no available stock for a waitlist notification.")
+    entries = list((await db.scalars(
+        select(ProductWaitlistEntry)
+        .where(ProductWaitlistEntry.product_id == product_id)
+        .order_by(ProductWaitlistEntry.created_at, ProductWaitlistEntry.id)
+        .with_for_update()
+    )).all())
+    if not entries:
+        return {"data": {"productId": str(product.id), "queued": 0, "alreadyQueued": 0, "total": 0}}
+
+    mail_settings = get_settings()
+    mailbox_key = None
+    if not mail_settings.contact_email_configured:
+        mailbox_key = next(
+            (key for key, mailbox in mail_settings.email_inbox_accounts.items() if mailbox.smtp_configured),
+            None,
+        )
+        if mailbox_key is None:
+            raise HTTPException(503, "Transactional email is not configured.")
+
+    keys = [f"waitlist_availability:{entry.id}" for entry in entries]
+    existing_keys = set((await db.scalars(
+        select(EmailNotification.notification_key).where(EmailNotification.notification_key.in_(keys))
+    )).all())
+    new_entries = [
+        entry for entry in entries
+        if f"waitlist_availability:{entry.id}" not in existing_keys
+    ]
+    product_url = f"{mail_settings.storefront_base_url.rstrip('/')}/products/{product.slug}"
+    for entry in new_entries:
+        event = OutboxEvent(
+            event_type="product.waitlist_availability_notification_requested",
+            payload={"productId": str(product.id), "waitlistEntryId": str(entry.id)},
+        )
+        enqueue_email_notification(
+            db,
+            event,
+            template="product_availability",
+            recipient=entry.email,
+            payload={
+                "productName": product.name,
+                "productUrl": product_url,
+                "firstName": entry.first_name,
+                "mailboxKey": mailbox_key,
+            },
+            notification_key=f"waitlist_availability:{entry.id}",
+        )
+    await db.commit()
+    return {"data": {
+        "productId": str(product.id),
+        "queued": len(new_entries),
+        "alreadyQueued": len(existing_keys),
+        "total": len(entries),
+    }}
+
+
 @router.get("/reservations/entries", response_model=dict)
 async def list_reservation_entries(
     response: Response,
@@ -1088,6 +1288,106 @@ async def list_customers(
         "total": total,
         "limit": limit,
         "offset": offset,
+    }}
+
+
+@router.get("/newsletter/subscriptions", response_model=dict)
+async def list_newsletter_subscriptions(
+    response: Response,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+    q: str | None = Query(default=None, max_length=120),
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    response.headers["Cache-Control"] = "no-store"
+    query = select(NewsletterSubscription)
+    if q and q.strip():
+        term = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.where(NewsletterSubscription.email.ilike(f"%{term}%", escape="\\"))
+    total = await db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
+    subscribed_count = await db.scalar(
+        select(func.count()).select_from(NewsletterSubscription).where(NewsletterSubscription.status == "subscribed")
+    ) or 0
+    rows = (await db.scalars(
+        query.order_by(NewsletterSubscription.created_at.desc(), NewsletterSubscription.id)
+        .offset(offset).limit(limit)
+    )).all()
+    return {"data": {
+        "items": [{
+            "id": str(subscription.id),
+            "email": subscription.email,
+            "status": subscription.status,
+            "createdAt": subscription.created_at.isoformat(),
+        } for subscription in rows],
+        "total": total,
+        "subscribedCount": subscribed_count,
+        "limit": limit,
+        "offset": offset,
+    }}
+
+
+@router.post("/newsletter/campaigns", response_model=dict, status_code=202)
+async def queue_newsletter_campaign(
+    payload: AdminNewsletterCampaignRequest,
+    request: Request,
+    response: Response,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-newsletter-campaign", 3, 3600)
+    if not get_settings().contact_email_configured:
+        raise HTTPException(503, "Configure the marketplace email sender before queueing a newsletter.")
+
+    subscribers = (await db.scalars(
+        select(NewsletterSubscription)
+        .where(NewsletterSubscription.status == "subscribed")
+        .order_by(NewsletterSubscription.id)
+        .with_for_update()
+    )).all()
+    if not subscribers:
+        raise HTTPException(409, "There are no subscribed newsletter addresses.")
+
+    content_hash = hashlib.sha256(f"{payload.subject}\0{payload.body}".encode()).hexdigest()[:16]
+    key_prefix = f"newsletter:{payload.idempotencyKey}:{content_hash}:"
+    existing_keys = set((await db.scalars(
+        select(EmailNotification.notification_key).where(
+            EmailNotification.notification_key.like(f"{key_prefix}%")
+        )
+    )).all())
+    queued_count = 0
+    for subscription in subscribers:
+        notification_key = f"{key_prefix}{subscription.id}"
+        if notification_key in existing_keys:
+            continue
+        enqueue_email_notification(
+            db,
+            OutboxEvent(
+                event_type="newsletter.campaign_queued",
+                payload={"campaignId": str(payload.idempotencyKey), "subscriptionId": str(subscription.id)},
+            ),
+            template="newsletter_campaign",
+            recipient=subscription.email,
+            payload={
+                "subject": payload.subject,
+                "body": payload.body,
+                "unsubscribeUrl": unsubscribe_url(subscription),
+            },
+            notification_key=notification_key,
+        )
+        queued_count += 1
+
+    try:
+        await db.commit()
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(409, "This newsletter campaign is already being queued. Please refresh the subscriber list.") from error
+    response.headers["Cache-Control"] = "no-store"
+    return {"data": {
+        "queued": queued_count,
+        "recipientCount": len(subscribers),
+        "alreadyQueued": queued_count == 0,
     }}
 
 

@@ -44,8 +44,9 @@ def _smtp_ssl_context() -> ssl.SSLContext:
 def ponyo_branded_email_html(
     *, eyebrow: str, title: str, intro: str, content_html: str = "",
     action_label: str | None = None, action_url: str | None = None, footnote: str | None = None,
+    footer_note: str = "This message is about your Ponyo account or order.",
 ) -> str:
-    """Shared, email-client-safe Ponyo layout for account and order messages."""
+    """Shared, email-client-safe Ponyo layout for transactional and newsletter messages."""
     storefront = urlsplit(settings.storefront_base_url)
     logo_url = (
         f"{storefront.scheme}://{storefront.netloc}/profile.png"
@@ -96,7 +97,7 @@ def ponyo_branded_email_html(
 {content_html}{action}{safe_footnote}
 <p style="margin:25px 0 0;border-top:1px solid #eee4dc;padding-top:18px;color:#6b5950;font-size:14px;line-height:22px">With care,<br><strong style="color:#3f302b">The Ponyo team</strong></p>
 </td></tr></table></td></tr>
-<tr><td align="center" style="padding:15px 12px 0;color:#8b776c;font-size:11px;line-height:18px">Thoughtfully found. Ready to be loved.<br>This message is about your Ponyo account or order.</td></tr>
+<tr><td align="center" style="padding:15px 12px 0;color:#8b776c;font-size:11px;line-height:18px">Thoughtfully found. Ready to be loved.<br>{escape(footer_note)}</td></tr>
 </table></td></tr></table></body></html>'''
 
 

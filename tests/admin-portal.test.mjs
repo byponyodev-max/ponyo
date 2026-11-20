@@ -14,6 +14,9 @@ const localeRequest = read("../src/i18n/request.ts");
 const localizationProvider = read("../src/components/layout/localization-provider.tsx");
 const preferencesRoute = read("../src/app/api/preferences/route.ts");
 const adminTranslations = read("../src/locales/admin-ui-translations.ts");
+const newsletterUnsubscribePage = read("../src/app/newsletter/unsubscribe/page.tsx");
+const newsletterUnsubscribeForm = read("../src/app/newsletter/unsubscribe/newsletter-unsubscribe-form.tsx");
+const emailQueue = read("../backend/app/email_queue.py");
 
 test("admin portal exposes separate login, role-gated operations and its Ponyo subdomain", () => {
     assert.ok(api.includes("/admin-auth/login"));
@@ -116,4 +119,35 @@ test("admin language can be changed in both login and dashboard and defaults to 
     assert.ok(localizationProvider.includes('adminPortal ? { adminLanguage: next } : { language: next }'));
     assert.ok(preferencesRoute.includes('cookieStore.set("ponyo-admin-language", adminLanguage, options)'));
     assert.ok(adminTranslations.includes('"admin.ui.language", "Language", "言語", "언어"'));
+});
+
+test("admin dates and dashboard greetings use Japan time", () => {
+    assert.ok(page.includes('const adminTimeZone = "Asia/Tokyo"'));
+    assert.ok(page.includes('dateStyle: "medium", timeZone: adminTimeZone'));
+    assert.ok(page.includes('month: "short", day: "numeric", timeZone: adminTimeZone'));
+    assert.ok(page.includes('hourCycle: "h23"'));
+    assert.ok(page.includes('hour < 12 ? "good_morning" : hour < 18 ? "good_afternoon" : "good_evening"'));
+    assert.ok(adminTranslations.includes('"admin.ui.good_afternoon"'));
+    assert.ok(adminTranslations.includes('"admin.ui.good_evening"'));
+});
+
+test("admin portal exposes a searchable, paginated newsletter subscriber list", () => {
+    assert.ok(page.includes('label: "Newsletter"'));
+    assert.ok(page.includes('section === "newsletter"'));
+    assert.ok(page.includes("listAdminNewsletterSubscriptions"));
+    assert.ok(api.includes("/admin/newsletter/subscriptions"));
+    assert.ok(backend.includes('"/newsletter/subscriptions"'));
+    assert.ok(adminTranslations.includes('"admin.ui.newsletter_title"'));
+});
+
+test("admin can queue newsletter campaigns with opt-out links", () => {
+    assert.ok(page.includes("newsletter_campaign_confirm_count"));
+    assert.ok(page.includes("sendAdminNewsletterCampaign"));
+    assert.ok(api.includes('"/admin/newsletter/campaigns"'));
+    assert.ok(backend.includes('"/newsletter/campaigns"'));
+    assert.ok(emailQueue.includes('if template == "newsletter_campaign"'));
+    assert.ok(emailQueue.includes("unsubscribeUrl"));
+    assert.ok(newsletterUnsubscribePage.includes("searchParams: Promise"));
+    assert.ok(newsletterUnsubscribeForm.includes("ponyoApi.unsubscribeNewsletter(token)"));
+    assert.ok(newsletterUnsubscribeForm.includes("<form onSubmit="));
 });

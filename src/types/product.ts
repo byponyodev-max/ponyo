@@ -68,7 +68,6 @@ export type Product = {
 	estimatedDeliveryDate?: string | null;
 	onlyAtPonyo?: boolean;
 	reservationsOpen?: boolean;
-	reservationTarget?: number | null;
 	shippingCountries?: string[] | null;
 	isExampleData?: boolean;
 	badge?: string;

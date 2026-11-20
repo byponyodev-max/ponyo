@@ -21,7 +21,11 @@ export function NewsletterPanel() {
     setErrorMessage("");
     const formData = new FormData(event.currentTarget);
     try {
-      if (PONYO_API_BASE_URL) await ponyoApi.subscribeNewsletter(String(formData.get("email") ?? ""));
+      if (!PONYO_API_BASE_URL) {
+        setErrorMessage(t("home.newsletter.unavailable", "Newsletter signup is unavailable right now. Please try again later."));
+        return;
+      }
+      await ponyoApi.subscribeNewsletter(String(formData.get("email") ?? ""));
       setSubscribed(true);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to subscribe right now.");

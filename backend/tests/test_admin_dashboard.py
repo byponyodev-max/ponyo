@@ -1,9 +1,10 @@
 import pytest
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from uuid import uuid4
 from sqlalchemy import select
 
-from app.models import Brand, Customer, Order, OrderItem, Product, ProductInterest, ProductReservation, Supplier
+from app.models import Brand, Customer, EmailNotification, NewsletterSubscription, Order, OrderItem, Product, ProductInterest, ProductReservation, ProductVariant, ProductWaitlistEntry, Supplier
 from app.security import hash_password, verify_password
 from test_api import (
 	add_product,
@@ -27,6 +28,127 @@ async def admin_session(client, factory, *, role="admin", email="ops@example.com
 
 async def post(client, path, body):
 	return await client.post(path, json=body, headers={"X-CSRF-Token": await csrf_token(client)})
+
+
+async def test_admin_can_search_and_page_newsletter_subscribers(test_client):
+	client, factory = test_client
+	unauthorized = await client.get("/v1/admin/newsletter/subscriptions")
+	assert unauthorized.status_code == 401
+	await admin_session(client, factory)
+	async with factory() as db:
+		db.add_all([
+			NewsletterSubscription(
+				email="first-friend@example.com",
+				status="subscribed",
+				created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+			),
+			NewsletterSubscription(
+				email="second-friend@example.com",
+				status="subscribed",
+				created_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+			),
+		])
+		await db.commit()
+
+	response = await client.get("/v1/admin/newsletter/subscriptions?limit=1&offset=0")
+	assert response.status_code == 200
+	assert response.headers["cache-control"] == "no-store"
+	assert response.json()["data"]["total"] == 2
+	assert response.json()["data"]["items"][0]["email"] == "second-friend@example.com"
+
+	search = await client.get("/v1/admin/newsletter/subscriptions?q=first-friend")
+	assert search.json()["data"]["total"] == 1
+	assert search.json()["data"]["items"][0]["status"] == "subscribed"
+
+
+async def test_admin_queues_campaign_only_for_subscribed_addresses_and_is_idempotent(test_client, monkeypatch):
+	client, factory = test_client
+	await admin_session(client, factory, email="newsletter-admin@example.com")
+	monkeypatch.setattr(
+		"app.routers.admin.get_settings",
+		lambda: SimpleNamespace(contact_email_configured=True),
+	)
+	monkeypatch.setattr(
+		"app.newsletter.get_settings",
+		lambda: SimpleNamespace(
+			jwt_secret="test-newsletter-secret",
+			jwt_issuer="ponyo-test",
+			storefront_base_url="https://shop.example.test",
+		),
+	)
+	async with factory() as db:
+		db.add_all([
+			NewsletterSubscription(email="first-friend@example.com", status="subscribed"),
+			NewsletterSubscription(email="second-friend@example.com", status="subscribed"),
+			NewsletterSubscription(email="former-friend@example.com", status="unsubscribed"),
+		])
+		await db.commit()
+
+	payload = {
+		"idempotencyKey": str(uuid4()),
+		"subject": "A little Ponyo update",
+		"body": "Hello from Ponyo.",
+	}
+	first = await post(client, "/v1/admin/newsletter/campaigns", payload)
+	assert first.status_code == 202
+	assert first.json()["data"] == {
+		"queued": 2,
+		"recipientCount": 2,
+		"alreadyQueued": False,
+	}
+	retry = await post(client, "/v1/admin/newsletter/campaigns", payload)
+	assert retry.status_code == 202
+	assert retry.json()["data"] == {
+		"queued": 0,
+		"recipientCount": 2,
+		"alreadyQueued": True,
+	}
+	async with factory() as db:
+		notifications = list((await db.scalars(select(EmailNotification))).all())
+		assert {row.recipient for row in notifications} == {
+			"first-friend@example.com",
+			"second-friend@example.com",
+		}
+		assert all(row.template == "newsletter_campaign" for row in notifications)
+		assert all("/newsletter/unsubscribe?token=" in row.payload["unsubscribeUrl"] for row in notifications)
+
+
+async def test_newsletter_unsubscribe_and_resubscribe_invalidate_old_link(test_client, monkeypatch):
+	client, factory = test_client
+	from app.newsletter import unsubscribe_token
+
+	now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+	monkeypatch.setattr(
+		"app.newsletter.get_settings",
+		lambda: SimpleNamespace(
+			jwt_secret="test-newsletter-secret",
+			jwt_issuer="ponyo-test",
+			storefront_base_url="https://shop.example.test",
+		),
+	)
+	monkeypatch.setattr("app.routers.content.utc_now", lambda: now + timedelta(microseconds=1))
+	async with factory() as db:
+		subscription = NewsletterSubscription(
+			email="friend@example.com",
+			status="subscribed",
+			created_at=now,
+		)
+		db.add(subscription)
+		await db.commit()
+		await db.refresh(subscription)
+		token = unsubscribe_token(subscription)
+
+	unsubscribed = await client.post("/v1/newsletter/unsubscribe", json={"token": token})
+	assert unsubscribed.status_code == 200
+	resubscribed = await post(client, "/v1/newsletter/subscriptions", {"email": "friend@example.com"})
+	assert resubscribed.status_code == 200
+	stale_link = await client.post("/v1/newsletter/unsubscribe", json={"token": token})
+	assert stale_link.status_code == 400
+	async with factory() as db:
+		subscription = await db.scalar(select(NewsletterSubscription).where(
+			NewsletterSubscription.email == "friend@example.com"
+		))
+		assert subscription.status == "subscribed"
 
 
 async def test_admin_dashboard_orders_products_customers_and_supplier_controls(test_client, monkeypatch):
@@ -77,6 +199,77 @@ async def test_admin_dashboard_orders_products_customers_and_supplier_controls(t
 	customers = await client.get("/v1/admin/customers?q=buyer@example.com")
 	assert customers.status_code == 200
 	assert any(row["email"] == "buyer@example.com" for row in customers.json()["data"]["items"])
+
+
+async def test_admin_waitlist_is_visible_and_availability_notifications_are_idempotent(test_client, monkeypatch):
+	client, factory = test_client
+	await admin_session(client, factory, email="waitlist-admin@example.com")
+	product_id, _variant_id = await add_product(factory, slug="admin-waitlist-plush", stock=4)
+	async with factory() as db:
+		db.add_all([
+			ProductWaitlistEntry(product_id=product_id, email="first@example.com", first_name="First"),
+			ProductWaitlistEntry(product_id=product_id, email="second@example.com", first_name="Second"),
+		])
+		await db.commit()
+	monkeypatch.setattr(
+		"app.routers.admin.get_settings",
+		lambda: SimpleNamespace(
+			contact_email_configured=True,
+			email_inbox_accounts={},
+			storefront_base_url="https://shop.example.test",
+		),
+	)
+
+	waitlist = await client.get("/v1/admin/waitlist?limit=10&offset=0")
+	assert waitlist.status_code == 200
+	product_row = waitlist.json()["data"]["items"][0]
+	assert product_row["productId"] == str(product_id)
+	assert product_row["entryCount"] == product_row["waitingCount"] == 2
+	assert product_row["available"] is True
+	assert "email" not in product_row
+
+	entries = await client.get(f"/v1/admin/waitlist/{product_id}")
+	assert entries.status_code == 200
+	assert {entry["email"] for entry in entries.json()["data"]["items"]} == {
+		"first@example.com", "second@example.com",
+	}
+	assert all(entry["notificationStatus"] == "not_sent" for entry in entries.json()["data"]["items"])
+
+	first_send = await client.post(
+		f"/v1/admin/waitlist/{product_id}/notify",
+		headers={"X-CSRF-Token": await csrf_token(client)},
+		json={},
+	)
+	assert first_send.status_code == 202
+	assert first_send.json()["data"]["queued"] == 2
+	second_send = await client.post(
+		f"/v1/admin/waitlist/{product_id}/notify",
+		headers={"X-CSRF-Token": await csrf_token(client)},
+		json={},
+	)
+	assert second_send.status_code == 202
+	assert second_send.json()["data"]["queued"] == 0
+	assert second_send.json()["data"]["alreadyQueued"] == 2
+
+	async with factory() as db:
+		notifications = list((await db.scalars(select(EmailNotification))).all())
+		assert len(notifications) == 2
+		assert {notification.template for notification in notifications} == {"product_availability"}
+		assert {notification.notification_key for notification in notifications} == {
+			f"waitlist_availability:{entry.id}"
+			for entry in (await db.scalars(select(ProductWaitlistEntry))).all()
+		}
+
+	async with factory() as db:
+		variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product_id))
+		variant.stock_quantity = 0
+		await db.commit()
+		blocked = await client.post(
+			f"/v1/admin/waitlist/{product_id}/notify",
+			headers={"X-CSRF-Token": await csrf_token(client)},
+			json={},
+		)
+	assert blocked.status_code == 409
 
 
 async def test_admin_analytics_filters_period_and_keeps_currency_totals_separate(test_client):

@@ -3894,6 +3894,154 @@
     border-left-color: #bf896e;
 }
 
+.ad-waitlist-counts {
+    min-width: 190px !important;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ad-waitlist-counts span {
+    padding: 4px 8px;
+    border: 1px solid #ecdfd6;
+    border-radius: 999px;
+    background: #fff;
+    color: #746257;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.ad-waitlist-counts .is-failed {
+    border-color: #e8c9bc;
+    color: #9c523b;
+}
+
+.ad-waitlist-actions {
+    min-width: 220px !important;
+}
+
+.ad-waitlist-actions button {
+    min-height: 36px;
+    margin: 3px 4px 3px 0;
+    padding: 7px 10px;
+    border: 1px solid #e6d8cf;
+    border-radius: 9px;
+    background: #fff;
+    color: #765641;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.ad-waitlist-actions button:hover:not(:disabled) {
+    border-color: #c99d85;
+    background: #fff8f3;
+}
+
+.ad-waitlist-actions button:disabled {
+    cursor: wait;
+    opacity: .65;
+}
+
+.ad-waitlist-confirm {
+    min-width: 200px;
+    display: grid;
+    gap: 5px;
+    padding: 8px;
+    border: 1px solid #ead8cc;
+    border-radius: 10px;
+    background: #fff9f5;
+}
+
+.ad-waitlist-confirm span {
+    color: #604d43;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.ad-newsletter-campaign {
+    display: grid;
+    gap: 14px;
+    margin: 24px 0 4px;
+    padding: 20px;
+    border: 1px solid #e8d9cf;
+    border-radius: 16px;
+    background: #fffaf6;
+}
+
+.ad-newsletter-campaign h3 {
+    margin: 5px 0;
+    color: #40312b;
+    font-family: var(--font-heading);
+    font-size: 20px;
+}
+
+.ad-newsletter-campaign p {
+    max-width: 720px;
+    margin: 0;
+    color: #79675d;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.ad-newsletter-campaign label {
+    display: grid;
+    gap: 6px;
+    color: #5a4940;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.ad-newsletter-campaign input,
+.ad-newsletter-campaign textarea {
+    width: 100%;
+    min-height: 44px;
+    padding: 11px 12px;
+    border: 1px solid #e2d5cc;
+    border-radius: 10px;
+    background: #fff;
+    color: #40312b;
+    font: inherit;
+}
+
+.ad-newsletter-campaign textarea {
+    min-height: 150px;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.ad-newsletter-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #ecd7c9;
+    border-radius: 12px;
+    background: #fff4ec;
+    color: #594338;
+}
+
+.ad-newsletter-confirm > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ad-newsletter-confirm > div > button:not(.ad-primary-button) {
+    min-height: 40px;
+    padding: 8px 13px;
+    border: 1px solid #e1d3c9;
+    border-radius: 9px;
+    background: #fff;
+    color: #604d43;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
 @media (max-width: 900px) {
     .ad-demand-filters {
         grid-template-columns: repeat(2, minmax(0, 1fr));

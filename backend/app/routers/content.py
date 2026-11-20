@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Request
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,9 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.email_notifications import contact_notification_recipient, send_contact_notification
 from app.models import ContactRequest as ContactRequestModel
-from app.models import NewsletterSubscription, OutboxEvent
+from app.models import NewsletterSubscription, OutboxEvent, utc_now
+from app.newsletter import consent_timestamp, subscription_from_unsubscribe_token
 from app.rate_limit import enforce_rate_limit
-from app.schemas import AcceptedOut, ContactRequest as ContactRequestIn, NewsletterRequest
+from app.schemas import AcceptedOut, ContactRequest as ContactRequestIn, NewsletterRequest, NewsletterUnsubscribeRequest
 from app.security import require_csrf
 
 router = APIRouter(tags=["storefront forms"])
@@ -21,6 +23,11 @@ async def subscribe_newsletter(payload: NewsletterRequest, request: Request, db:
     email = str(payload.email).lower().strip()
     existing = await db.scalar(select(NewsletterSubscription).where(NewsletterSubscription.email == email))
     if existing:
+        if existing.status != "subscribed":
+            existing.status = "subscribed"
+            existing.created_at = utc_now()
+            db.add(OutboxEvent(event_type="newsletter.subscription_created", payload={"email": email}))
+            await db.commit()
         return {"data": AcceptedOut().model_dump()}
     db.add(NewsletterSubscription(email=email))
     db.add(OutboxEvent(event_type="newsletter.subscription_created", payload={"email": email}))
@@ -29,6 +36,29 @@ async def subscribe_newsletter(payload: NewsletterRequest, request: Request, db:
     except IntegrityError:
         await db.rollback()
     # The outbox records consent; an email-marketing consumer/provider still needs configuration.
+    return {"data": AcceptedOut().model_dump()}
+
+
+@router.post("/newsletter/unsubscribe", response_model=dict)
+async def unsubscribe_newsletter(
+    payload: NewsletterUnsubscribeRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    await enforce_rate_limit(request, "newsletter-unsubscribe", 10, 3600)
+    try:
+        subscription_id, consent_at = subscription_from_unsubscribe_token(payload.token)
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="This unsubscribe link is invalid.") from None
+    subscription = await db.get(NewsletterSubscription, subscription_id)
+    if subscription is None or consent_timestamp(subscription) != consent_at:
+        raise HTTPException(status_code=400, detail="This unsubscribe link is invalid.")
+    if subscription.status != "unsubscribed":
+        subscription.status = "unsubscribed"
+        db.add(OutboxEvent(event_type="newsletter.unsubscription_created", payload={
+            "subscriptionId": str(subscription.id),
+        }))
+        await db.commit()
     return {"data": AcceptedOut().model_dump()}
 
 

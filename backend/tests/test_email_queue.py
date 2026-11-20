@@ -60,6 +60,55 @@ def test_notification_content_escapes_customer_and_product_data():
     assert "#ed713d" in html and "Your plush has left the nest." in html
 
 
+def test_product_availability_notification_is_branded_and_uses_safe_product_link():
+    notification = EmailNotification(
+        template="product_availability",
+        payload={
+            "productName": "Plush <Bunny>",
+            "firstName": "Mika",
+            "productUrl": "https://shop.example.test/products/bunny",
+        },
+    )
+    subject, text, html = _content(notification)
+    assert subject == "Plush <Bunny> is available now"
+    assert "Hi Mika" in text and "https://shop.example.test/products/bunny" in text
+    assert "Plush &lt;Bunny&gt;" in html
+    assert 'href="https://shop.example.test/products/bunny"' in html
+    assert "availability waitlist" in html
+
+
+def test_newsletter_campaign_email_escapes_body_and_includes_unsubscribe_link():
+    notification = EmailNotification(
+        template="newsletter_campaign",
+        payload={
+            "subject": "A Ponyo update",
+            "body": "Hello <script>alert(1)</script>\nNew arrivals soon.",
+            "unsubscribeUrl": "https://shop.example.test/newsletter/unsubscribe?token=signed-token",
+        },
+    )
+    subject, text, html = _content(notification)
+    assert subject == "A Ponyo update"
+    assert "Hello <script>alert(1)</script>\nNew arrivals soon." in text
+    assert "Unsubscribe: https://shop.example.test/newsletter/unsubscribe?token=signed-token" in text
+    assert "Hello &lt;script&gt;alert(1)&lt;/script&gt;<br>New arrivals soon." in html
+    assert 'href="https://shop.example.test/newsletter/unsubscribe?token=signed-token"' in html
+    assert "newsletter updates" in html
+    assert "account or order" not in html
+
+
+def test_newsletter_campaign_rejects_non_https_unsubscribe_links():
+    notification = EmailNotification(
+        template="newsletter_campaign",
+        payload={
+            "subject": "A Ponyo update",
+            "body": "New arrivals soon.",
+            "unsubscribeUrl": "https://example.test@attacker.test/unsubscribe",
+        },
+    )
+    with pytest.raises(ValueError, match="Newsletter email content is invalid"):
+        _content(notification)
+
+
 @pytest.mark.asyncio
 async def test_transactional_sender_uses_tls_and_deterministic_message_id(monkeypatch):
     from app.config import settings

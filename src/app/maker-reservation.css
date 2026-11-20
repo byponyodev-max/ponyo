@@ -696,25 +696,6 @@
     line-height: 1.6;
 }
 
-.product-reservation-stage {
-    width: fit-content;
-    margin-top: 6px;
-    padding: 4px 9px;
-    border: 1px solid #e8dcc8;
-    border-radius: 999px;
-    background: #fffaf0;
-    color: #735d35 !important;
-    font-size: 10px !important;
-    font-weight: 900;
-    letter-spacing: .04em;
-}
-
-.product-reservation-stage.is-reached {
-    border-color: #c6d9c1;
-    background: #f0f7ed;
-    color: #456b44 !important;
-}
-
 .product-reservation-progress {
     height: 7px;
     margin-top: 7px;

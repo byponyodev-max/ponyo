@@ -295,12 +295,6 @@ function ProductReservationPanel({
   const progress = target && reservationCount !== null
     ? Math.min(100, Math.round((reservationCount / target) * 100))
     : null;
-  const targetReached = target !== null && reservationCount !== null && reservationCount >= target;
-  const stage = targetReached
-    ? t("product.reservation.status.target_reached", "Reservation target reached")
-    : target !== null && reservationCount !== null
-      ? t("product.reservation.status.target_not_reached", "Reservation target not reached · accepting reservations")
-      : t("product.reservation.status.collecting", "Reservations open");
 
   return <section className="product-reservation" id="product-reservation" aria-labelledby="product-reservation-title">
     <div className="product-reservation-heading">
@@ -313,9 +307,7 @@ function ProductReservationPanel({
         <span>{reservationCount === 1
           ? t("product.reservation.people_one", "{{count}} person has reserved a spot", { count: reservationCount })
           : t("product.reservation.people_other", "{{count}} people have reserved a spot", { count: reservationCount })}</span>
-        <span className={`product-reservation-stage${targetReached ? " is-reached" : ""}`}>{stage}</span>
         {progress !== null && <><div className="product-reservation-progress" role="progressbar" aria-label={t("product.reservation.progress_label", "Reservation target progress")} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div><small>{t("product.reservation.progress", "{{progress}}% of the reservation target reached", { progress })}</small></>}
-        {target === null && <small>{t("product.reservation.target_not_set", "No reservation target is set for this product yet.")}</small>}
       </div>}
     {!open ? <p className="product-reservation-status">{t("product.reservation.closed", "Reservations are closed for this product.")}</p>
       : !PONYO_API_BASE_URL ? <p className="product-reservation-status" role="status">{t("product.reservation.service_unavailable", "The reservation service is not configured right now.")}</p>

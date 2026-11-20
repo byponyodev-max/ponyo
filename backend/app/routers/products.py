@@ -90,7 +90,6 @@ def product_response(product: Product, translation: ProductTranslation | None = 
         estimatedDeliveryDate=product.estimated_delivery_date,
         onlyAtPonyo=product.only_at_ponyo,
         reservationsOpen=product.reservations_open,
-        reservationTarget=product.reservation_target,
         shippingCountries=product.shipping_countries,
         images=[{"url": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],
         galleryImages=[{"src": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],

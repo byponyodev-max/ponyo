@@ -38,7 +38,7 @@ async def test_product_reservations_are_idempotent_non_binding_and_counted(test_
     duplicate = await client.post(f"/v1/products/{product_id}/reservations", headers={"X-CSRF-Token": csrf}, json=payload)
     assert first.status_code == duplicate.status_code == 200
     assert first.json()["data"]["reservationCount"] == duplicate.json()["data"]["reservationCount"] == 1
-    assert first.json()["data"]["target"] == 2
+    assert first.json()["data"] == {"accepted": True, "reservationCount": 1, "target": 2}
 
     counter = await client.get(f"/v1/products/{product_id}/reservations")
     assert counter.json()["data"] == {"reservationCount": 1, "target": 2, "open": True}
@@ -66,8 +66,7 @@ async def test_reservations_keep_target_unset_when_product_has_no_custom_target(
         json={"email": "plush-friend@example.com", "country": "JP"},
     )
     assert response.status_code == 200
-    assert response.json()["data"]["reservationCount"] == 1
-    assert response.json()["data"]["target"] is None
+    assert response.json()["data"] == {"accepted": True, "reservationCount": 1, "target": None}
 
 
 async def test_interest_registration_accepts_free_text_unserved_country(test_client):

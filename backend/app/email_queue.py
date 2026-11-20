@@ -6,6 +6,7 @@ import html
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from sqlalchemy import or_, select
@@ -23,6 +24,7 @@ LEASE_SECONDS = 300
 
 def enqueue_email_notification(
     db: AsyncSession, event: OutboxEvent, *, template: str, recipient: str, payload: dict,
+    notification_key: str | None = None,
 ) -> None:
     """Store a notification in the same DB transaction as its business event."""
     from uuid import uuid4
@@ -32,7 +34,7 @@ def enqueue_email_notification(
     db.add(event)
     db.add(EmailNotification(
         outbox_event_id=event.id,
-        notification_key=f"{event.id}:{template}",
+        notification_key=notification_key or f"{event.id}:{template}",
         recipient=recipient,
         template=template,
         payload=payload,
@@ -77,6 +79,66 @@ def _content(notification: EmailNotification) -> tuple[str, str, str]:
                 '<div style="margin-top:22px;padding:18px;border:1px solid #eedfd5;'
                 f'border-radius:15px;background:#fffaf6;color:#3f302b;line-height:24px">{safe_body}</div>'
             ),
+        )
+        return subject, text, html_body
+    if template == "product_availability":
+        product_name = str(payload["productName"]).strip()[:240]
+        first_name = str(payload.get("firstName", "")).strip()[:120]
+        product_url = str(payload.get("productUrl", "")).strip()
+        parsed_url = urlsplit(product_url)
+        if parsed_url.scheme != "https" and not (
+            parsed_url.scheme == "http" and parsed_url.hostname in {"localhost", "127.0.0.1"}
+        ):
+            product_url = ""
+        subject = f"{product_name} is available now"
+        greeting = f"Hi {first_name}," if first_name else "Hello,"
+        intro = f"The product you asked us about, {product_name}, is now available."
+        lines = [greeting, intro]
+        if product_url:
+            lines.append(f"View the product: {product_url}")
+        lines.extend([
+            "You received this because you asked for an availability alert for this product.",
+            "With care, The Ponyo team",
+        ])
+        html_body = ponyo_branded_email_html(
+            eyebrow="A little Ponyo update",
+            title=f"{product_name} is ready",
+            intro=intro,
+            content_html=_detail_panel([("Product", product_name)]),
+            action_label="View product" if product_url else None,
+            action_url=product_url or None,
+            footnote="You received this one-time alert because you joined this product’s availability waitlist.",
+        )
+        return subject, "\n\n".join(lines), html_body
+    if template == "newsletter_campaign":
+        subject = str(payload["subject"]).strip()[:200]
+        body = str(payload["body"]).strip()[:10000].replace("\r\n", "\n").replace("\r", "\n")
+        unsubscribe_url = str(payload["unsubscribeUrl"]).strip()
+        parsed_url = urlsplit(unsubscribe_url)
+        safe_url = bool(
+            (parsed_url.scheme == "https" and parsed_url.netloc and not parsed_url.username and not parsed_url.password)
+            or (parsed_url.scheme == "http" and parsed_url.hostname in {"localhost", "127.0.0.1"})
+        )
+        if not subject or not body or not safe_url:
+            raise ValueError("Newsletter email content is invalid.")
+        safe_body = html.escape(body).replace("\n", "<br>")
+        safe_unsubscribe_url = html.escape(unsubscribe_url, quote=True)
+        text = (
+            f"{body}\n\nYou received this because you subscribed to Ponyo newsletter updates.\n"
+            f"Unsubscribe: {unsubscribe_url}\n\nWith care, The Ponyo team"
+        )
+        html_body = ponyo_branded_email_html(
+            eyebrow="PONYO NEWSLETTER",
+            title=subject,
+            intro="A little update from Ponyo.",
+            content_html=(
+                '<div style="margin-top:22px;padding:18px;border:1px solid #eedfd5;'
+                f'border-radius:15px;background:#fffaf6;color:#3f302b;line-height:24px">{safe_body}</div>'
+                '<p style="margin:22px 0 0;color:#75645a;font-size:12px;line-height:19px">'
+                'You received this because you subscribed to Ponyo newsletter updates. '
+                f'<a href="{safe_unsubscribe_url}" style="color:#a2502f">Unsubscribe</a></p>'
+            ),
+            footer_note="This newsletter was sent because you subscribed to Ponyo updates.",
         )
         return subject, text, html_body
     order_number = str(payload.get("orderNumber", "your order"))
@@ -206,7 +268,7 @@ async def send_one(db: AsyncSession) -> bool:
         subject, text_body, html_body = _content(notification)
         message_digest = hashlib.sha256(notification.notification_key.encode()).hexdigest()
         message_id = f"<{message_digest}@mail.byponyo.com>"
-        threading_headers = {}
+        threading_headers = {"mailbox_key": notification.payload.get("mailboxKey")}
         if notification.template == "admin_email_reply":
             threading_headers = {
                 "in_reply_to": notification.payload.get("inReplyTo"),

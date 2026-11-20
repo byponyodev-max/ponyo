@@ -6,18 +6,26 @@ import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 import { aggregateReservationsByCountry, filterAndSortDemandProducts, type DemandSortOrder } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminListPage, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier } from "@/services/ponyo-api.client";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminListPage, type AdminNewsletterPage, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier, type AdminWaitlistEntryPage, type AdminWaitlistProduct } from "@/services/ponyo-api.client";
 import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
-type AdminSection = "dashboard" | "analytics" | "orders" | "products" | "reservations" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
+type AdminSection = "dashboard" | "analytics" | "orders" | "products" | "reservations" | "waitlist" | "newsletter" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
 type EmailStatusFilter = "all" | "unread" | "needs_reply" | "replied" | "pending" | "failed";
-type AdminTableId = "orders" | "products" | "reservations" | "interests" | "reservation-entries" | "maker-applications" | "suppliers" | "customers" | "admin-accounts" | "fulfillment" | "brands";
+type AdminTableId = "orders" | "products" | "reservations" | "interests" | "reservation-entries" | "waitlist" | "waitlist-entries" | "newsletter" | "maker-applications" | "suppliers" | "customers" | "admin-accounts" | "fulfillment" | "brands";
 type OrderPage = AdminListPage<AdminOrder>;
 type ProductPage = AdminListPage<AdminProduct>;
 type TablePaging = { page: number; pageSize: number };
 type DemandReportFilters = { query: string; country: string; sort: DemandSortOrder };
 type AdminAccountEditDraft = Pick<AdminAccount, "id" | "firstName" | "lastName" | "email"> & { password: string };
+type AdminGreetingKey = "good_morning" | "good_afternoon" | "good_evening";
+
+const adminTimeZone = "Asia/Tokyo";
+const greetingFallbacks: Record<AdminGreetingKey, string> = {
+	good_morning: "Good morning, {{name}}",
+	good_afternoon: "Good afternoon, {{name}}",
+	good_evening: "Good evening, {{name}}",
+};
 
 const navigation: Array<{ id: AdminSection; label: string; labelKey: string; icon: string; hint: string; hintKey: string }> = [
 	{ id: "dashboard", label: "Dashboard", labelKey: "dashboard", icon: "⌂", hint: "Marketplace overview", hintKey: "dashboard_hint" },
@@ -25,6 +33,8 @@ const navigation: Array<{ id: AdminSection; label: string; labelKey: string; ico
 	{ id: "orders", label: "Orders", labelKey: "orders", icon: "▤", hint: "Customer orders", hintKey: "orders_hint" },
 	{ id: "products", label: "Products", labelKey: "products", icon: "♡", hint: "Catalog & approval", hintKey: "products_hint" },
 	{ id: "reservations", label: "Reservations & interests", labelKey: "reservations_interest", icon: "✦", hint: "Reservation targets and unshipped demand", hintKey: "reservations_hint" },
+	{ id: "waitlist", label: "Waitlist", labelKey: "waitlist", icon: "✉", hint: "Product availability alerts", hintKey: "waitlist_hint" },
+	{ id: "newsletter", label: "Newsletter", labelKey: "newsletter", icon: "✉", hint: "Opted-in newsletter subscribers", hintKey: "newsletter_hint" },
 	{ id: "email-inbox", label: "Email inbox", labelKey: "email_inbox", icon: "✉", hint: "Customer messages & replies", hintKey: "email_inbox_hint" },
 	{ id: "maker-applications", label: "Maker applications", labelKey: "maker_applications", icon: "✿", hint: "Review maker submissions", hintKey: "maker_applications_hint" },
 	{ id: "suppliers", label: "Suppliers", labelKey: "suppliers", icon: "✿", hint: "Stock, offers & supplier purchase orders", hintKey: "suppliers_hint" },
@@ -38,6 +48,8 @@ const tableIdBySection: Partial<Record<AdminSection, AdminTableId>> = {
 	orders: "orders",
 	products: "products",
 	reservations: "reservations",
+	waitlist: "waitlist",
+	newsletter: "newsletter",
 	"maker-applications": "maker-applications",
 	suppliers: "suppliers",
 	brands: "brands",
@@ -126,7 +138,16 @@ function amount(value: number, currency: string, formatPrice: (amount: number, c
 
 function date(value: string) {
 	const parsed = new Date(value);
-	return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(parsed);
+	return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: adminTimeZone }).format(parsed);
+}
+
+function adminGreetingKey(now = new Date()): AdminGreetingKey {
+	const hour = Number(new Intl.DateTimeFormat("en-US", {
+		hour: "numeric",
+		hourCycle: "h23",
+		timeZone: adminTimeZone,
+	}).format(now));
+	return hour < 12 ? "good_morning" : hour < 18 ? "good_afternoon" : "good_evening";
 }
 
 function AdminLanguageSelect({ language, setLanguage, label, showLiveStatus = false }: {
@@ -153,7 +174,7 @@ function periodLabel(value: string) {
 	const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`);
 	return Number.isNaN(parsed.getTime())
 		? value
-		: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(parsed);
+		: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: adminTimeZone }).format(parsed);
 }
 
 function AnalyticsTrendChart({ series, labels }: {
@@ -270,6 +291,11 @@ export default function AdminPortalPage() {
 	const [analyticsRange, setAnalyticsRange] = useState<AdminAnalytics["period"]["range"]>("30d");
 	const [orders, setOrders] = useState<OrderPage>({ items: [], total: 0, limit: 10, offset: 0 });
 	const [products, setProducts] = useState<ProductPage>({ items: [], total: 0, limit: 10, offset: 0 });
+	const [waitlistProducts, setWaitlistProducts] = useState<AdminListPage<AdminWaitlistProduct>>({ items: [], total: 0, limit: 10, offset: 0 });
+	const [waitlistEntries, setWaitlistEntries] = useState<AdminWaitlistEntryPage | null>(null);
+	const [selectedWaitlistProductId, setSelectedWaitlistProductId] = useState("");
+	const [waitlistConfirmProductId, setWaitlistConfirmProductId] = useState("");
+	const [waitlistEntriesLoading, setWaitlistEntriesLoading] = useState(false);
 	const [suppliers, setSuppliers] = useState<AdminSupplier[]>([]);
 	const [brands, setBrands] = useState<AdminBrand[]>([]);
 	const [reservationProducts, setReservationProducts] = useState<AdminProduct[]>([]);
@@ -298,6 +324,11 @@ export default function AdminPortalPage() {
 	const [emailReplyIdempotencyScope, setEmailReplyIdempotencyScope] = useState("");
 	const [makerApplications, setMakerApplications] = useState<AdminMakerApplication[]>([]);
 	const [customers, setCustomers] = useState<AdminListPage<AdminCustomer>>({ items: [], total: 0, limit: 10, offset: 0 });
+	const [newsletterSubscribers, setNewsletterSubscribers] = useState<AdminNewsletterPage>({ items: [], total: 0, subscribedCount: 0, limit: 10, offset: 0 });
+	const [newsletterCampaignSubject, setNewsletterCampaignSubject] = useState("");
+	const [newsletterCampaignBody, setNewsletterCampaignBody] = useState("");
+	const [newsletterCampaignConfirmOpen, setNewsletterCampaignConfirmOpen] = useState(false);
+	const [newsletterCampaignRequestId, setNewsletterCampaignRequestId] = useState("");
 	const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
 	const [newAdmin, setNewAdmin] = useState({ firstName: "", lastName: "", email: "", password: "" });
 	const [editingAdmin, setEditingAdmin] = useState<AdminAccountEditDraft | null>(null);
@@ -320,9 +351,12 @@ export default function AdminPortalPage() {
 		reservations: { page: 0, pageSize: 10 },
 		interests: { page: 0, pageSize: 10 },
 		"reservation-entries": { page: 0, pageSize: 10 },
+		waitlist: { page: 0, pageSize: 10 },
+		"waitlist-entries": { page: 0, pageSize: 10 },
 		"maker-applications": { page: 0, pageSize: 10 },
 		suppliers: { page: 0, pageSize: 10 },
 		customers: { page: 0, pageSize: 10 },
+		newsletter: { page: 0, pageSize: 10 },
 		"admin-accounts": { page: 0, pageSize: 10 },
 		fulfillment: { page: 0, pageSize: 10 },
 		brands: { page: 0, pageSize: 10 },
@@ -338,9 +372,12 @@ export default function AdminPortalPage() {
 		reservations: false,
 		interests: false,
 		"reservation-entries": false,
+		waitlist: false,
+		"waitlist-entries": false,
 		"maker-applications": false,
 		suppliers: false,
 		customers: false,
+		newsletter: false,
 		"admin-accounts": false,
 		fulfillment: false,
 		brands: false,
@@ -370,6 +407,19 @@ export default function AdminPortalPage() {
 			setReservationEntriesLoading(false);
 		}
 	}, [appliedReservationFilters, reservationEntryPageSize, t]);
+
+	const loadWaitlistEntries = useCallback(async (productId: string, offset: number, limit: number) => {
+		setWaitlistEntriesLoading(true);
+		setError("");
+		try {
+			setWaitlistEntries(await ponyoApi.listAdminWaitlistEntries(productId, limit, offset));
+			setTablePaging((current) => ({ ...current, "waitlist-entries": { page: Math.floor(offset / limit), pageSize: limit } }));
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setWaitlistEntriesLoading(false);
+		}
+	}, [t]);
 
 	const loadSection = useCallback(async (target: AdminSection, search = query, page = 0, pageSize?: number) => {
 		setError("");
@@ -418,6 +468,21 @@ export default function AdminPortalPage() {
 						tablePaging["reservation-entries"].pageSize,
 					);
 					break;
+				case "waitlist":
+					{
+						const size = pageSize ?? tablePaging.waitlist.pageSize;
+						setWaitlistProducts(await ponyoApi.listAdminWaitlist(search, size, page * size));
+						setTablePaging((current) => ({ ...current, waitlist: { page, pageSize: size } }));
+					}
+					if (selectedWaitlistProductId) {
+						const entriesPaging = tablePaging["waitlist-entries"];
+						await loadWaitlistEntries(
+							selectedWaitlistProductId,
+							entriesPaging.page * entriesPaging.pageSize,
+							entriesPaging.pageSize,
+						);
+					}
+					break;
 				case "maker-applications":
 					setMakerApplications(await ponyoApi.listAdminMakerApplications());
 					break;
@@ -432,6 +497,13 @@ export default function AdminPortalPage() {
 						const size = pageSize ?? tablePaging.customers.pageSize;
 						setCustomers(await ponyoApi.listAdminCustomers(search, size, page * size));
 						setTablePaging((current) => ({ ...current, customers: { page, pageSize: size } }));
+					}
+					break;
+				case "newsletter":
+					{
+						const size = pageSize ?? tablePaging.newsletter.pageSize;
+						setNewsletterSubscribers(await ponyoApi.listAdminNewsletterSubscriptions(search, size, page * size));
+						setTablePaging((current) => ({ ...current, newsletter: { page, pageSize: size } }));
 					}
 					break;
 				case "admin-accounts":
@@ -457,7 +529,7 @@ export default function AdminPortalPage() {
 		} catch (requestError) {
 			setError(messageFor(requestError, t));
 		}
-	}, [analyticsRange, appliedReservationFilters, emailMailboxKey, emailQuery, emailStatusFilter, publishedFilter, query, loadReservationEntries, tablePaging, t]);
+	}, [analyticsRange, appliedReservationFilters, emailMailboxKey, emailQuery, emailStatusFilter, loadReservationEntries, loadWaitlistEntries, publishedFilter, query, selectedWaitlistProductId, tablePaging, t]);
 
 	const loadAnalytics = useCallback(async (range = analyticsRange) => {
 		setError("");
@@ -571,18 +643,22 @@ export default function AdminPortalPage() {
 	};
 	const changeTablePage = (id: AdminTableId, page: number) => {
 		setTablePaging((current) => ({ ...current, [id]: { ...current[id], page } }));
-		if (id === "orders" || id === "fulfillment" || id === "products" || id === "customers") {
+		if (id === "orders" || id === "fulfillment" || id === "products" || id === "customers" || id === "newsletter" || id === "waitlist") {
 			void loadSection(id === "fulfillment" ? "fulfillment" : id, query, page);
 		} else if (id === "reservation-entries") {
 			void loadReservationEntries(page * tablePaging[id].pageSize);
+		} else if (id === "waitlist-entries" && selectedWaitlistProductId) {
+			void loadWaitlistEntries(selectedWaitlistProductId, page * tablePaging[id].pageSize, tablePaging[id].pageSize);
 		}
 	};
 	const changeTablePageSize = (id: AdminTableId, pageSize: number) => {
 		setTablePaging((current) => ({ ...current, [id]: { page: 0, pageSize } }));
-		if (id === "orders" || id === "fulfillment" || id === "products" || id === "customers") {
+		if (id === "orders" || id === "fulfillment" || id === "products" || id === "customers" || id === "newsletter" || id === "waitlist") {
 			void loadSection(id === "fulfillment" ? "fulfillment" : id, query, 0, pageSize);
 		} else if (id === "reservation-entries") {
 			void loadReservationEntries(0, appliedReservationFilters, pageSize);
+		} else if (id === "waitlist-entries" && selectedWaitlistProductId) {
+			void loadWaitlistEntries(selectedWaitlistProductId, 0, pageSize);
 		}
 	};
 	const toggleTableCollapsed = (id: AdminTableId) => {
@@ -629,6 +705,10 @@ export default function AdminPortalPage() {
 		setQuery("");
 		setSelectedOrderId("");
 		setOrderDetail(null);
+		if (target !== "waitlist") {
+			setSelectedWaitlistProductId("");
+			setWaitlistEntries(null);
+		}
 		setError("");
 		if (target !== "dashboard") void loadSection(target, "");
 	}
@@ -769,6 +849,73 @@ export default function AdminPortalPage() {
 			setError(messageFor(requestError, t));
 		} finally {
 			setEmailThreadLoading(false);
+		}
+	}
+
+	async function toggleWaitlistProduct(productId: string) {
+		if (selectedWaitlistProductId === productId) {
+			setSelectedWaitlistProductId("");
+			setWaitlistEntries(null);
+			setWaitlistConfirmProductId("");
+			return;
+		}
+		setSelectedWaitlistProductId(productId);
+		setWaitlistEntries(null);
+		setWaitlistConfirmProductId("");
+		await loadWaitlistEntries(productId, 0, tablePaging["waitlist-entries"].pageSize);
+	}
+
+	async function sendWaitlistAvailability(product: AdminWaitlistProduct) {
+		setBusyId(`waitlist:${product.productId}`);
+		setError("");
+		try {
+			const result = await ponyoApi.notifyAdminWaitlist(product.productId);
+			setNotice(result.queued
+				? ui("waitlist_queued_notice", "Availability emails queued for {{count}} people.", { count: result.queued })
+				: ui("waitlist_already_queued", "There are no new alerts to send; this waitlist was already notified or queued."));
+			setWaitlistConfirmProductId("");
+			await loadSection("waitlist", query, tablePaging.waitlist.page, tablePaging.waitlist.pageSize);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
+	}
+
+	function reviewNewsletterCampaign(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (!newsletterCampaignSubject.trim() || !newsletterCampaignBody.trim() || newsletterSubscribers.subscribedCount === 0) return;
+		setNewsletterCampaignRequestId(crypto.randomUUID());
+		setNewsletterCampaignConfirmOpen(true);
+	}
+
+	async function sendNewsletterCampaign() {
+		const subject = newsletterCampaignSubject.trim();
+		const body = newsletterCampaignBody.trim();
+		if (!subject || !body || !newsletterCampaignRequestId) return;
+		setBusyId("newsletter-campaign");
+		setError("");
+		try {
+			const result = await ponyoApi.sendAdminNewsletterCampaign({
+				idempotencyKey: newsletterCampaignRequestId,
+				subject,
+				body,
+			});
+			setNotice(result.alreadyQueued
+				? ui("newsletter_campaign_already_queued", "This newsletter campaign was already queued.")
+				: ui("newsletter_campaign_queued", "Newsletter queued for {{queued}} of {{count}} subscribed addresses.", {
+					queued: result.queued,
+					count: result.recipientCount,
+				}));
+			setNewsletterCampaignSubject("");
+			setNewsletterCampaignBody("");
+			setNewsletterCampaignRequestId("");
+			setNewsletterCampaignConfirmOpen(false);
+			await loadSection("newsletter", query, tablePaging.newsletter.page, tablePaging.newsletter.pageSize);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
 		}
 	}
 
@@ -956,6 +1103,7 @@ export default function AdminPortalPage() {
 		{ key: "pending", label: ui("email_filter_pending", "Pending"), count: emailStatusCounts?.pending ?? 0 },
 		{ key: "failed", label: ui("email_filter_failed", "Failed"), count: emailStatusCounts?.failed ?? 0 },
 	];
+	const dashboardGreeting = adminGreetingKey();
 
 	return <main className={`ad-layout ${sidebarCollapsed ? "ad-layout--collapsed" : ""}`}>
 		<aside className="ad-sidebar">
@@ -969,7 +1117,7 @@ export default function AdminPortalPage() {
 			<div className="ad-sidebar-note"><span>✦</span><strong>{ui("sidebar_tagline", "Thoughtfully found. Ready to be loved.")}</strong><small>{ui("sidebar_note", "The little details make the whole marketplace.")}</small></div>
 			<div className="ad-account"><span className="ad-avatar">{admin.firstName.slice(0, 1).toUpperCase() || "A"}</span><div><strong>{admin.firstName} {admin.lastName}</strong><small>{admin.email}</small></div><button type="button" onClick={() => void logout()} disabled={busyId === "logout"} aria-label={ui("sign_out", "Sign out")}>↗</button></div>
 		</aside>
-		<section className="ad-main"><header className="ad-topbar"><div><span className="ad-eyebrow">{ui("management", "PONYO MARKETPLACE MANAGEMENT")}</span><h1>{section === "dashboard" ? ui("good_morning", "Good morning, {{name}}", { name: admin.firstName || ui("admin_fallback", "Admin") }) : ui(navigation.find((item) => item.id === section)?.labelKey ?? "dashboard", navigation.find((item) => item.id === section)?.label ?? "Dashboard")}<span> ✦</span></h1><p>{ui(navigation.find((item) => item.id === section)?.hintKey ?? "dashboard_hint", navigation.find((item) => item.id === section)?.hint ?? "Marketplace overview")} · {ui("dashboard_subtitle", "One calm view of the moving parts.")}</p></div><div className="ad-topbar-actions"><AdminLanguageSelect language={language} setLanguage={setLanguage} label={ui("language", "Language")} showLiveStatus /><button className="ad-refresh" type="button" onClick={() => void refreshAll()} disabled={refreshing}>{refreshing ? ui("refreshing", "Refreshing…") : `↻ ${ui("refresh", "Refresh")}`}</button></div></header>
+		<section className="ad-main"><header className="ad-topbar"><div><span className="ad-eyebrow">{ui("management", "PONYO MARKETPLACE MANAGEMENT")}</span><h1>{section === "dashboard" ? ui(dashboardGreeting, greetingFallbacks[dashboardGreeting], { name: admin.firstName || ui("admin_fallback", "Admin") }) : ui(navigation.find((item) => item.id === section)?.labelKey ?? "dashboard", navigation.find((item) => item.id === section)?.label ?? "Dashboard")}<span> ✦</span></h1><p>{ui(navigation.find((item) => item.id === section)?.hintKey ?? "dashboard_hint", navigation.find((item) => item.id === section)?.hint ?? "Marketplace overview")} · {ui("dashboard_subtitle", "One calm view of the moving parts.")}</p></div><div className="ad-topbar-actions"><AdminLanguageSelect language={language} setLanguage={setLanguage} label={ui("language", "Language")} showLiveStatus /><button className="ad-refresh" type="button" onClick={() => void refreshAll()} disabled={refreshing}>{refreshing ? ui("refreshing", "Refreshing…") : `↻ ${ui("refresh", "Refresh")}`}</button></div></header>
 			{notice && <div className="ad-alert ad-alert--success" role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label={ui("dismiss", "Dismiss")}>×</button></div>}{error && <div className="ad-alert ad-alert--error" role="alert">{error}<button type="button" onClick={() => setError("")} aria-label={ui("dismiss", "Dismiss")}>×</button></div>}
 			{section === "dashboard" && <>
 				<div className="ad-metrics">{cards.map(([label, value, note, tone]) => <article className={`ad-metric ad-metric--${tone}`} key={label}><small>{label}</small><strong>{value}</strong><span>{note}</span></article>)}</div>
@@ -1155,6 +1303,72 @@ export default function AdminPortalPage() {
 					</div>}
 				</>
 			)}
+			{section === "waitlist" && <>
+				<div className="ad-toolbar">
+					<label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadSection("waitlist", query, 0); }} placeholder={ui("waitlist_search", "Search product or SKU")} /></label>
+					<button type="button" onClick={() => void loadSection("waitlist", query, 0)}>{ui("waitlist_search_button", "Search")}</button>
+					<span>{waitlistProducts.total} {ui("waitlist_products", "products")}</span>
+				</div>
+				<section className={`ad-panel ad-collapsible-table ${collapsedTables.waitlist ? "is-collapsed" : ""}`}>
+					<div className="ad-panel-heading">
+						<div><span className="ad-eyebrow">PRODUCT AVAILABILITY ALERTS</span><h2>{ui("waitlist", "Waitlist")}</h2><p>{ui("waitlist_note", "Only people who joined that product’s waitlist receive its availability email.")}</p></div>
+						<span className="ad-count-pill">{waitlistProducts.total} {ui("waitlist_products", "products")}</span>
+						<AdminTableCollapseButton collapsed={collapsedTables.waitlist} onClick={() => toggleTableCollapsed("waitlist")} t={ui} />
+					</div>
+					<div className="ad-table-wrap">
+						<table className="ad-table">
+							<thead><tr><th>PRODUCT</th><th>AVAILABILITY</th><th>WAITLIST STATUS</th><th>LATEST SIGN-UP</th><th>ACTIONS</th></tr></thead>
+							<tbody>{waitlistProducts.items.map((product) => <tr key={product.productId}>
+								<td><div className="ad-product-cell"><Image src={product.image} alt="" width={44} height={44} /><span><strong>{product.productName}</strong><small>{product.sku} · {product.entryCount} {ui("waitlist_entries", "waitlist entries")}</small></span></div></td>
+								<td><span className={`ad-status ${product.available ? "ad-status--published" : "ad-status--pending"}`}>{product.available ? ui("waitlist_available", "Available") : ui("waitlist_unavailable", "Not available")}</span></td>
+								<td className="ad-waitlist-counts">
+									<span>{product.waitingCount} {ui("waitlist_waiting", "Waiting")}</span>
+									<span>{product.queuedCount} {ui("waitlist_queued", "Queued")}</span>
+									<span>{product.sentCount} {ui("waitlist_sent", "Sent")}</span>
+									{product.failedCount > 0 && <span className="is-failed">{product.failedCount} {ui("waitlist_failed", "Failed")}</span>}
+								</td>
+								<td>{date(product.latestJoinedAt)}</td>
+								<td className="ad-waitlist-actions">
+									<button type="button" onClick={() => void toggleWaitlistProduct(product.productId)}>{selectedWaitlistProductId === product.productId ? ui("waitlist_hide_entries", "Hide list") : ui("waitlist_view_entries", "View list")}</button>
+									{product.available && product.waitingCount > 0 && (waitlistConfirmProductId === product.productId
+										? <div className="ad-waitlist-confirm">
+											<span>{ui("waitlist_confirm_count", "Send to {{count}} people?", { count: product.waitingCount })}</span>
+											<button type="button" onClick={() => void sendWaitlistAvailability(product)} disabled={busyId === `waitlist:${product.productId}`}>{busyId === `waitlist:${product.productId}` ? ui("waitlist_sending", "Sending…") : ui("waitlist_confirm_send", "Confirm send")}</button>
+											<button type="button" onClick={() => setWaitlistConfirmProductId("")}>{ui("waitlist_cancel", "Cancel")}</button>
+										</div>
+										: <button type="button" onClick={() => setWaitlistConfirmProductId(product.productId)}>{ui("waitlist_send_alert", "Send availability alert")} · {product.waitingCount}</button>)}
+								</td>
+							</tr>)}</tbody>
+						</table>
+						{!waitlistProducts.items.length && <div className="ad-empty">{ui("waitlist_no_products", "No products have waitlist entries.")}</div>}
+					</div>
+					<AdminTablePagination page={tablePaging.waitlist.page} pageSize={tablePaging.waitlist.pageSize} total={waitlistProducts.total} onPageChange={(page) => changeTablePage("waitlist", page)} onPageSizeChange={(pageSize) => changeTablePageSize("waitlist", pageSize)} t={ui} />
+				</section>
+				{selectedWaitlistProductId && <section className={`ad-panel ad-collapsible-table ${collapsedTables["waitlist-entries"] ? "is-collapsed" : ""}`}>
+					<div className="ad-panel-heading">
+						<div><span className="ad-eyebrow">{ui("waitlist_entries", "WAITLIST ENTRIES")}</span><h2>{waitlistEntries?.productName ?? waitlistProducts.items.find((product) => product.productId === selectedWaitlistProductId)?.productName}</h2><p>{ui("waitlist_entry_note", "Email addresses are used only for this product’s availability alert.")}</p></div>
+						<span className="ad-count-pill">{waitlistEntries?.total ?? 0} {ui("waitlist_entries", "entries")}</span>
+						<AdminTableCollapseButton collapsed={collapsedTables["waitlist-entries"]} onClick={() => toggleTableCollapsed("waitlist-entries")} t={ui} />
+					</div>
+					<div className="ad-table-wrap">
+						<table className="ad-table">
+							<thead><tr><th>NAME</th><th>EMAIL</th><th>JOINED</th><th>NOTIFICATION STATUS</th></tr></thead>
+							<tbody>{waitlistEntries?.items.map((entry) => <tr key={entry.id}>
+								<td>{entry.firstName || "—"}</td><td>{entry.email}</td><td>{date(entry.createdAt)}</td>
+								<td><span className={`ad-status ${entry.notificationStatus === "sent" ? "ad-status--published" : entry.notificationStatus === "failed" ? "ad-status--pending" : "ad-status--pending"}`}>
+									{entry.notificationStatus === "sent" ? ui("waitlist_sent", "Sent")
+										: entry.notificationStatus === "failed" ? ui("waitlist_failed", "Failed")
+											: entry.notificationStatus === "not_sent" ? ui("waitlist_waiting", "Waiting")
+												: ui("waitlist_queued", "Queued")}
+								</span>{entry.notifiedAt && <small>{date(entry.notifiedAt)}</small>}</td>
+							</tr>)}</tbody>
+						</table>
+						{waitlistEntriesLoading && <div className="ad-empty" role="status">{ui("waitlist_loading", "Loading entries…")}</div>}
+						{!waitlistEntriesLoading && !waitlistEntries?.items.length && <div className="ad-empty">{ui("waitlist_no_entries", "No one has joined this product’s waitlist.")}</div>}
+					</div>
+					<AdminTablePagination page={tablePaging["waitlist-entries"].page} pageSize={tablePaging["waitlist-entries"].pageSize} total={waitlistEntries?.total ?? 0} onPageChange={(page) => changeTablePage("waitlist-entries", page)} onPageSizeChange={(pageSize) => changeTablePageSize("waitlist-entries", pageSize)} t={ui} />
+				</section>}
+			</>}
 			{section === "email-inbox" && <section className="ad-panel ad-email-inbox">
 				<div className="ad-panel-heading">
 					<div><span className="ad-eyebrow">{ui("email_center_eyebrow", "CUSTOMER CARE")}</span><h2>{ui("email_center_title", "Email & messages")}</h2><p>{ui("email_center_note", "Storefront contact and maker messages, plus mail synced from your IMAP inbox.")}</p></div>
@@ -1252,6 +1466,26 @@ export default function AdminPortalPage() {
 			</section>}
 			{section === "maker-applications" && <section className={`ad-panel ad-collapsible-table ${collapsedTables["maker-applications"] ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span><AdminTableCollapseButton collapsed={collapsedTables["maker-applications"]} onClick={() => toggleTableCollapsed("maker-applications")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{visibleRows(makerApplications, "maker-applications").map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td><td><select aria-label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} onChange={(event) => void updateMakerApplication(application, event.target.value as MakerApplicationStatus)}><option value="pending">Pending</option><option value="reviewing">Reviewing</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div><AdminTablePagination page={tablePaging["maker-applications"].page} pageSize={tablePaging["maker-applications"].pageSize} total={makerApplications.length} onPageChange={(page) => changeTablePage("maker-applications", page)} onPageSizeChange={(pageSize) => changeTablePageSize("maker-applications", pageSize)} t={ui} /></section>}
 			{section === "suppliers" && <section className={`ad-panel ad-collapsible-table ${collapsedTables.suppliers ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2><p className="ad-partner-difference">{ui("supplier_brand_difference", "A supplier is a sourcing and stock partner for Ponyo. A brand is the customer-facing maker name and story shown with products.")}</p></div><span className="ad-count-pill">{suppliers.length} suppliers</span><AdminTableCollapseButton collapsed={collapsedTables.suppliers} onClick={() => toggleTableCollapsed("suppliers")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{visibleRows(suppliers, "suppliers").map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.suppliers.page} pageSize={tablePaging.suppliers.pageSize} total={suppliers.length} onPageChange={(page) => changeTablePage("suppliers", page)} onPageSizeChange={(pageSize) => changeTablePageSize("suppliers", pageSize)} t={ui} /></section>}
+			{section === "newsletter" && <>
+				<div className="ad-toolbar">
+					<label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, newsletter: { ...current.newsletter, page: 0 } })); void loadSection("newsletter", query, 0); } }} placeholder={ui("newsletter_search", "Search email")} /></label>
+					<button type="button" onClick={() => { setTablePaging((current) => ({ ...current, newsletter: { ...current.newsletter, page: 0 } })); void loadSection("newsletter", query, 0); }}>{ui("newsletter_search_button", "Search subscribers")}</button>
+					<span>{newsletterSubscribers.total} {ui("newsletter_subscriber_count", "subscribers")}</span>
+				</div>
+				<section className={`ad-panel ad-collapsible-table ${collapsedTables.newsletter ? "is-collapsed" : ""}`}>
+					<div className="ad-panel-heading"><div><span className="ad-eyebrow">{ui("newsletter_eyebrow", "NEWSLETTER")}</span><h2>{ui("newsletter_title", "Newsletter subscribers")}</h2><p>{ui("newsletter_note", "Only customers who subscribed to general Ponyo updates appear here. Product waitlists are separate.")}</p></div><span className="ad-count-pill">{newsletterSubscribers.total} {ui("newsletter_subscriber_count", "subscribers")}</span><AdminTableCollapseButton collapsed={collapsedTables.newsletter} onClick={() => toggleTableCollapsed("newsletter")} t={ui} /></div>
+					<div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>{ui("newsletter_email", "EMAIL")}</th><th>{ui("newsletter_status", "STATUS")}</th><th>{ui("newsletter_subscribed_at", "SUBSCRIBED")}</th></tr></thead><tbody>{newsletterSubscribers.items.map((subscriber) => <tr key={subscriber.id}><td><a href={`mailto:${subscriber.email}`}>{subscriber.email}</a></td><td><span className={`ad-status ${subscriber.status === "subscribed" ? "ad-status--published" : "ad-status--pending"}`}>{subscriber.status.replaceAll("_", " ")}</span></td><td>{date(subscriber.createdAt)}</td></tr>)}</tbody></table>{!newsletterSubscribers.items.length && <div className="ad-empty">{ui("newsletter_empty", "No newsletter subscribers yet.")}</div>}</div>
+					<AdminTablePagination page={tablePaging.newsletter.page} pageSize={tablePaging.newsletter.pageSize} total={newsletterSubscribers.total} onPageChange={(page) => changeTablePage("newsletter", page)} onPageSizeChange={(pageSize) => changeTablePageSize("newsletter", pageSize)} t={ui} />
+					<form className="ad-newsletter-campaign" onSubmit={(event) => reviewNewsletterCampaign(event)}>
+						<div><span className="ad-eyebrow">{ui("newsletter_campaign_eyebrow", "SEND AN UPDATE")}</span><h3>{ui("newsletter_campaign_title", "Compose a newsletter")}</h3><p>{ui("newsletter_campaign_note", "This email goes to every subscribed address, not just the current search results. Each message includes an unsubscribe link.")}</p></div>
+						<label>{ui("newsletter_campaign_subject", "Subject")}<input value={newsletterCampaignSubject} onChange={(event) => setNewsletterCampaignSubject(event.target.value)} maxLength={200} required disabled={newsletterCampaignConfirmOpen || busyId === "newsletter-campaign"} /></label>
+						<label>{ui("newsletter_campaign_body", "Message")}<textarea value={newsletterCampaignBody} onChange={(event) => setNewsletterCampaignBody(event.target.value)} maxLength={10000} rows={7} required disabled={newsletterCampaignConfirmOpen || busyId === "newsletter-campaign"} /></label>
+						{newsletterCampaignConfirmOpen
+							? <div className="ad-newsletter-confirm" role="group" aria-label={ui("newsletter_campaign_confirm", "Confirm newsletter send")}><strong>{ui("newsletter_campaign_confirm_count", "Send this newsletter to {{count}} subscribed addresses?", { count: newsletterSubscribers.subscribedCount })}</strong><div><button className="ad-primary-button" type="button" onClick={() => void sendNewsletterCampaign()} disabled={busyId === "newsletter-campaign"}>{busyId === "newsletter-campaign" ? ui("newsletter_campaign_sending", "Queueing…") : ui("newsletter_campaign_send", "Confirm and queue")}<span>↗</span></button><button type="button" onClick={() => { setNewsletterCampaignConfirmOpen(false); setNewsletterCampaignRequestId(""); }} disabled={busyId === "newsletter-campaign"}>{ui("newsletter_campaign_cancel", "Cancel")}</button></div></div>
+							: <button className="ad-primary-button" type="submit" disabled={!newsletterSubscribers.subscribedCount || !newsletterCampaignSubject.trim() || !newsletterCampaignBody.trim()}>{ui("newsletter_campaign_review", "Review recipients")}<span>→</span></button>}
+					</form>
+				</section>
+			</>}
 			{section === "customers" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, customers: { ...current.customers, page: 0 } })); void loadSection("customers", query, 0); } }} placeholder="Customer name or email" /></label><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, customers: { ...current.customers, page: 0 } })); void loadSection("customers", query, 0); }}>Search customers</button></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.customers ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CUSTOMER DIRECTORY</span><h2>Customers</h2></div><span className="ad-count-pill">{customers.total} customers</span><AdminTableCollapseButton collapsed={collapsedTables.customers} onClick={() => toggleTableCollapsed("customers")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>CUSTOMER</th><th>EMAIL</th><th>VERIFICATION</th><th>JOINED</th></tr></thead><tbody>{customers.items.map((customer) => <tr key={customer.id}><td><strong>{customer.firstName} {customer.lastName}</strong></td><td>{customer.email}</td><td><span className={`ad-status ${customer.emailVerified ? "ad-status--published" : "ad-status--pending"}`}>{customer.emailVerified ? "Verified" : "Pending"}</span></td><td>{date(customer.createdAt)}</td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.customers.page} pageSize={tablePaging.customers.pageSize} total={customers.total} onPageChange={(page) => changeTablePage("customers", page)} onPageSizeChange={(pageSize) => changeTablePageSize("customers", pageSize)} t={ui} /></section></>}
 			{section === "admin-accounts" && <>
 				<section className="ad-panel ad-admin-account-panel">

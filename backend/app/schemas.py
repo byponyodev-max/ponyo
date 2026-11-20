@@ -51,7 +51,6 @@ class ProductOut(BaseModel):
     estimatedDeliveryDate: date | None = None
     onlyAtPonyo: bool = False
     reservationsOpen: bool = False
-    reservationTarget: int | None = None
     shippingCountries: list[str] | None = None
     images: list[dict[str, str]] = Field(default_factory=list)
     galleryImages: list[dict[str, str]] = Field(default_factory=list)
@@ -134,6 +133,28 @@ class AdminEmailReplyRequest(BaseModel):
 
     idempotencyKey: UUID
     body: str = Field(min_length=1, max_length=5000)
+
+
+class AdminNewsletterCampaignRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    idempotencyKey: UUID
+    subject: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("subject")
+    @classmethod
+    def normalize_subject(cls, subject: str) -> str:
+        normalized = " ".join(subject.split())
+        if not normalized:
+            raise ValueError("Newsletter subject is required.")
+        return normalized
+
+
+class NewsletterUnsubscribeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    token: str = Field(min_length=20, max_length=4096)
 
 
 class RegisterRequest(AuthCredentials):

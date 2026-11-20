@@ -222,6 +222,34 @@ export type AdminReservationPage = {
 	offset: number;
 };
 
+export type AdminWaitlistProduct = {
+	productId: string;
+	productName: string;
+	sku: string;
+	image: string;
+	available: boolean;
+	entryCount: number;
+	waitingCount: number;
+	queuedCount: number;
+	sentCount: number;
+	failedCount: number;
+	latestJoinedAt: string;
+};
+
+export type AdminWaitlistEntry = {
+	id: string;
+	email: string;
+	firstName: string;
+	createdAt: string;
+	notificationStatus: "not_sent" | "pending" | "processing" | "sent" | "failed";
+	notifiedAt: string | null;
+};
+
+export type AdminWaitlistEntryPage = AdminListPage<AdminWaitlistEntry> & {
+	productId: string;
+	productName: string;
+};
+
 export type AdminListPage<T> = {
 	items: T[];
 	total: number;
@@ -425,6 +453,17 @@ export type AdminCustomer = {
 	email: string;
 	emailVerified: boolean;
 	createdAt: string;
+};
+
+export type AdminNewsletterSubscriber = {
+	id: string;
+	email: string;
+	status: string;
+	createdAt: string;
+};
+
+export type AdminNewsletterPage = AdminListPage<AdminNewsletterSubscriber> & {
+	subscribedCount: number;
 };
 
 export type AdminAccount = Omit<AdminCustomer, "emailVerified"> & {
@@ -837,11 +876,11 @@ export const ponyoApi = {
 			{ method: "POST", body: JSON.stringify(input) },
 		),
 	getProductReservations: (productId: string) =>
-		apiRequest<{ reservationCount: number; target: number | null; open: boolean }>(
+			apiRequest<{ reservationCount: number; target: number | null; open: boolean }>(
 			`/products/${encodeURIComponent(productId)}/reservations`,
 		),
 	submitProductReservation: (productId: string, input: { email: string; country: string }) =>
-		apiRequest<{ accepted: boolean; reservationCount: number; target: number | null }>(
+			apiRequest<{ accepted: boolean; reservationCount: number; target: number | null }>(
 			`/products/${encodeURIComponent(productId)}/reservations`,
 			{ method: "POST", body: JSON.stringify(input) },
 		),
@@ -1068,6 +1107,19 @@ export const ponyoApi = {
 		apiRequest<AdminProduct[]>("/admin/reservations"),
 	listAdminInterests: () =>
 		apiRequest<AdminProduct[]>("/admin/interests"),
+	listAdminWaitlist: (query = "", limit = 10, offset = 0) => {
+		const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+		return apiRequest<AdminListPage<AdminWaitlistProduct>>(`/admin/waitlist?${params.toString()}`);
+	},
+	listAdminWaitlistEntries: (productId: string, limit = 10, offset = 0) => {
+		const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+		return apiRequest<AdminWaitlistEntryPage>(`/admin/waitlist/${encodeURIComponent(productId)}?${params.toString()}`);
+	},
+	notifyAdminWaitlist: (productId: string) =>
+		apiRequest<{ productId: string; queued: number; alreadyQueued: number; total: number }>(
+			`/admin/waitlist/${encodeURIComponent(productId)}/notify`,
+			{ method: "POST", body: JSON.stringify({}) },
+		),
 	listAdminReservationEntries: (filters: {
 		productId?: string;
 		country?: string;
@@ -1169,6 +1221,15 @@ export const ponyoApi = {
 		const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
 		return apiRequest<AdminListPage<AdminCustomer>>(`/admin/customers?${params.toString()}`);
 	},
+	listAdminNewsletterSubscriptions: (query = "", limit = 10, offset = 0) => {
+		const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+		return apiRequest<AdminNewsletterPage>(`/admin/newsletter/subscriptions?${params.toString()}`);
+	},
+	sendAdminNewsletterCampaign: (input: { idempotencyKey: string; subject: string; body: string }) =>
+		apiRequest<{ queued: number; recipientCount: number; alreadyQueued: boolean }>("/admin/newsletter/campaigns", {
+			method: "POST",
+			body: JSON.stringify(input),
+		}),
 	listAdminAccounts: () =>
 		apiRequest<AdminAccount[]>("/admin/admins"),
 	createAdminAccount: (input: {
@@ -1322,6 +1383,11 @@ export const ponyoApi = {
 		apiRequest<{ accepted: boolean }>("/newsletter/subscriptions", {
 			method: "POST",
 			body: JSON.stringify({ email }),
+		}),
+	unsubscribeNewsletter: (token: string) =>
+		apiRequest<{ accepted: boolean }>("/newsletter/unsubscribe", {
+			method: "POST",
+			body: JSON.stringify({ token }),
 		}),
 	submitContactRequest: (input: {
 		name: string;
