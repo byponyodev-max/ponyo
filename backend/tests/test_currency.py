@@ -1,6 +1,9 @@
+import ssl
+
 import pytest
 from fastapi import HTTPException
 
+from app import currency
 from app.currency import convert_minor_amount
 from app.routers import localization
 
@@ -25,6 +28,39 @@ def test_convert_minor_amount_preserves_amount_when_currency_matches():
 def test_convert_minor_amount_rejects_unsupported_currency():
     with pytest.raises(ValueError, match="Unsupported currency"):
         convert_minor_amount(100, "JPY", "CHF", {"JPY": 1})
+
+
+def test_rate_ssl_context_uses_default_strictness_without_local_opt_in(monkeypatch):
+    monkeypatch.delenv("PONYO_ALLOW_NON_STRICT_FX_CERT_EXTENSIONS", raising=False)
+    expected_flags = ssl.create_default_context().verify_flags
+
+    context = currency._create_rate_ssl_context()
+
+    assert context.verify_flags == expected_flags
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname
+
+
+def test_rate_ssl_context_proxy_compatibility_keeps_ca_and_hostname_checks(monkeypatch):
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.verify_flags |= ssl.VERIFY_X509_STRICT
+    monkeypatch.setattr(currency.ssl, "create_default_context", lambda: context)
+    monkeypatch.setenv("PONYO_ALLOW_NON_STRICT_FX_CERT_EXTENSIONS", "true")
+    monkeypatch.setenv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")
+
+    result = currency._create_rate_ssl_context()
+
+    assert not result.verify_flags & ssl.VERIFY_X509_STRICT
+    assert result.verify_mode == ssl.CERT_REQUIRED
+    assert result.check_hostname
+
+
+def test_rate_ssl_context_proxy_compatibility_requires_explicit_ca_bundle(monkeypatch):
+    monkeypatch.setenv("PONYO_ALLOW_NON_STRICT_FX_CERT_EXTENSIONS", "true")
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+
+    with pytest.raises(RuntimeError, match="requires an explicit CA bundle"):
+        currency._create_rate_ssl_context()
 
 
 @pytest.mark.asyncio
