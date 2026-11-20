@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import quote_plus, urlparse
 
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, EmailStr, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -72,6 +72,9 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "development-only-change-me-32-characters"
     jwt_issuer: str = "ponyo-api"
+    initial_admin_email: EmailStr = "hello@byponyo.com"
+    initial_admin_password: SecretStr = SecretStr("")
+    initial_admin_first_name: str = "Admin"
     session_cookie_name: str = "ponyo_session"
     csrf_cookie_name: str = "ponyo_csrf"
     cookie_domain: str | None = None

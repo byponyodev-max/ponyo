@@ -3,13 +3,15 @@ import re
 from datetime import date
 from uuid import uuid5, NAMESPACE_URL
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.db import SessionLocal
-from app.models import Product, ProductTranslation, ProductVariant
+from app.models import Customer, Product, ProductTranslation, ProductVariant
 from app.config import settings
 from app.demo_translations import DEMO_FIELD_TRANSLATIONS, DEMO_MAKER_TRANSLATIONS, DEMO_PRODUCT_TRANSLATIONS
+from app.security import hash_password
 from app.storefront_data import link_demo_catalog
 from app.translations import _product_translation_entries, _set_nested, source_hash
 
@@ -167,6 +169,46 @@ def stable_id(value: str):
     return uuid5(NAMESPACE_URL, f"https://ponyo.example/products/{value}")
 
 
+async def seed_initial_admin() -> bool:
+    email = str(settings.initial_admin_email).strip().lower()
+    async with SessionLocal() as db:
+        existing = await db.scalar(select(Customer).where(func.lower(Customer.email) == email))
+        if existing is not None:
+            if existing.role != "admin":
+                raise RuntimeError("INITIAL_ADMIN_EMAIL is already assigned to a non-admin account.")
+            return False
+
+        password = settings.initial_admin_password.get_secret_value()
+        if not password:
+            raise RuntimeError("Set INITIAL_ADMIN_PASSWORD before starting with a new database.")
+        first_name = settings.initial_admin_first_name.strip()
+        if not 1 <= len(first_name) <= 120:
+            raise RuntimeError("INITIAL_ADMIN_FIRST_NAME must contain 1 to 120 characters.")
+        if (
+            not 8 <= len(password) <= 128
+            or not any(character.isdigit() for character in password)
+            or not any(not character.isalnum() for character in password)
+        ):
+            raise RuntimeError("INITIAL_ADMIN_PASSWORD must be 8 to 128 characters and include a number and a special character.")
+
+        db.add(Customer(
+            email=email,
+            first_name=first_name,
+            password_hash=hash_password(password),
+            email_verified=True,
+            role="admin",
+        ))
+        try:
+            await db.commit()
+        except IntegrityError as error:
+            await db.rollback()
+            existing = await db.scalar(select(Customer).where(func.lower(Customer.email) == email))
+            if existing is not None and existing.role == "admin":
+                return False
+            raise RuntimeError("Could not safely create the initial admin account.") from error
+        return True
+
+
 async def seed_products() -> None:
     if settings.environment == "production":
         raise RuntimeError("Demo catalog and supplier seeds must not run in production.")
@@ -257,5 +299,11 @@ async def seed_products() -> None:
         await db.commit()
 
 
+async def seed_startup_data() -> None:
+    await seed_initial_admin()
+    if settings.environment != "production":
+        await seed_products()
+
+
 if __name__ == "__main__":
-    asyncio.run(seed_products())
+    asyncio.run(seed_startup_data())

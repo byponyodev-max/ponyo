@@ -4,12 +4,14 @@ from app.seed import PRODUCT_COLORS, PRODUCTS, PRODUCT_STATUSES
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
 from app import seed
-from app.models import Base, Product, ProductImage, ProductTranslation, ProductVariant, SupplierInventory, SupplierOffer
+from app.models import Base, Customer, Product, ProductImage, ProductTranslation, ProductVariant, SupplierInventory, SupplierOffer
+from app.security import verify_password
 from app.translations import get_product_translation, source_hash
 
 
@@ -28,6 +30,34 @@ def test_catalog_has_twenty_unique_products_and_ten_lineup_images():
         assert product["alt"]
         assert (public / product["image"].lstrip("/")).is_file()
         assert PRODUCT_STATUSES[product["slug"]] == "Available"
+
+
+@pytest.mark.asyncio
+async def test_seed_initial_admin_is_verified_and_does_not_reset_existing_password(monkeypatch, tmp_path):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'admin-seed.db'}")
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    monkeypatch.setattr(seed, "SessionLocal", sessions)
+    monkeypatch.setattr(seed.settings, "initial_admin_email", "hello@byponyo.com")
+    monkeypatch.setattr(seed.settings, "initial_admin_password", SecretStr("InitialPass123!"))
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+
+        assert await seed.seed_initial_admin() is True
+        async with sessions() as db:
+            account = await db.scalar(select(Customer).where(Customer.email == "hello@byponyo.com"))
+            assert account.role == "admin"
+            assert account.email_verified is True
+            assert verify_password("InitialPass123!", account.password_hash)
+            original_hash = account.password_hash
+
+        monkeypatch.setattr(seed.settings, "initial_admin_password", SecretStr("DifferentPass456!"))
+        assert await seed.seed_initial_admin() is False
+        async with sessions() as db:
+            account = await db.scalar(select(Customer).where(Customer.email == "hello@byponyo.com"))
+            assert account.password_hash == original_hash
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.asyncio
