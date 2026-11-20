@@ -546,6 +546,7 @@ class Supplier(Base):
     contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=True, index=True)
 
 
 class ProductImage(Base):

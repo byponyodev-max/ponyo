@@ -105,6 +105,7 @@ def test_per_mailbox_email_settings_load_nested_env_without_exposing_password(is
 
 def test_smtp_context_keeps_chain_and_hostname_verification(monkeypatch):
     strict_flag = getattr(ssl, "VERIFY_X509_STRICT", 0)
+    monkeypatch.delenv("PONYO_ALLOW_NON_STRICT_FX_CERT_EXTENSIONS", raising=False)
     monkeypatch.setattr(settings, "smtp_x509_strict", False)
     context = _smtp_ssl_context()
     assert context.verify_mode == ssl.CERT_REQUIRED
@@ -117,6 +118,20 @@ def test_smtp_context_keeps_chain_and_hostname_verification(monkeypatch):
     assert strict_context.check_hostname is True
     if strict_flag:
         assert strict_context.verify_flags & strict_flag
+
+
+def test_smtp_context_allows_configured_proxy_compatibility(monkeypatch):
+    strict_flag = getattr(ssl, "VERIFY_X509_STRICT", 0)
+    monkeypatch.setattr(settings, "smtp_x509_strict", True)
+    monkeypatch.setenv("PONYO_ALLOW_NON_STRICT_FX_CERT_EXTENSIONS", "true")
+    monkeypatch.setenv("SSL_CERT_FILE", "/configured/ca-bundle.pem")
+
+    context = _smtp_ssl_context()
+
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+    if strict_flag:
+        assert not context.verify_flags & strict_flag
 
 
 @pytest.mark.asyncio

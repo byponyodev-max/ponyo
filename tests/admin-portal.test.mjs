@@ -17,6 +17,7 @@ const adminTranslations = read("../src/locales/admin-ui-translations.ts");
 const newsletterUnsubscribePage = read("../src/app/newsletter/unsubscribe/page.tsx");
 const newsletterUnsubscribeForm = read("../src/app/newsletter/unsubscribe/newsletter-unsubscribe-form.tsx");
 const emailQueue = read("../backend/app/email_queue.py");
+const supplierNotificationMigration = read("../backend/migrations/versions/20261120_0031_supplier_created_at.py");
 
 test("admin portal exposes separate login, role-gated operations and its Ponyo subdomain", () => {
     assert.ok(api.includes("/admin-auth/login"));
@@ -150,4 +151,15 @@ test("admin can queue newsletter campaigns with opt-out links", () => {
     assert.ok(newsletterUnsubscribePage.includes("searchParams: Promise"));
     assert.ok(newsletterUnsubscribeForm.includes("ponyoApi.unsubscribeNewsletter(token)"));
     assert.ok(newsletterUnsubscribeForm.includes("<form onSubmit="));
+});
+
+test("dashboard shows live operational notifications with links to relevant sections", () => {
+    assert.ok(page.includes('className="ad-panel ad-notification-panel"'));
+    assert.ok(page.includes("notification_unread_emails"));
+    assert.ok(page.includes("notification_products"));
+    assert.ok(page.includes("notification_suppliers"));
+    assert.ok(page.includes("notification_waitlist"));
+    assert.ok(api.includes("unreadEmailThreads: number"));
+    assert.ok(backend.includes('"notifications": {'));
+    assert.ok(supplierNotificationMigration.includes('revision = "20261120_0031"'));
 });

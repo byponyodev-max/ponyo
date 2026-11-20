@@ -649,6 +649,99 @@
     white-space: nowrap;
 }
 
+.ad-notification-panel .ad-panel-heading p {
+    max-width: 720px;
+    margin: 6px 0 0;
+    color: #88766d;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.ad-notification-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 16px 16px;
+}
+
+.ad-notification-item {
+    min-width: 0;
+    min-height: 70px;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto 18px;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border: 1px solid #f0e5de;
+    border-radius: 12px;
+    background: #fffaf7;
+    color: #4a3931;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+
+.ad-notification-item:hover {
+    border-color: #e6bca7;
+    background: #fff5ee;
+    transform: translateY(-1px);
+}
+
+.ad-notification-item:focus-visible {
+    outline: 3px solid rgb(237 113 61 / 32%);
+    outline-offset: 2px;
+}
+
+.ad-notification-mark {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: #fff0e7;
+    color: #b96545;
+    font-size: 15px;
+}
+
+.ad-notification-copy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.ad-notification-copy strong {
+    color: #49382f;
+    font-size: 14px;
+    line-height: 1.35;
+}
+
+.ad-notification-copy small {
+    color: #88766d;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.ad-notification-item>b {
+    min-width: 30px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: #f8e6dc;
+    color: #9c5035;
+    font-size: 14px;
+    text-align: center;
+}
+
+.ad-notification-arrow {
+    color: #a58270;
+    font-size: 14px;
+}
+
+@media (max-width: 760px) {
+    .ad-notification-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .ad-table-wrap {
     width: 100%;
     overflow-x: auto;

@@ -482,6 +482,17 @@ export type AdminDashboard = {
 		customers: number;
 		brands: number;
 	};
+	notifications: {
+		unreadEmailThreads: number;
+		openContactRequests: number;
+		productsToReview: number;
+		applicationsToReview: number;
+		newSuppliers: number;
+		newCustomers: number;
+		newReservations: number;
+		newInterests: number;
+		newWaitlistSignups: number;
+	};
 	revenueByCurrency: Array<{ currency: string; amount: number }>;
 	ordersByStatus: Array<{ status: string; count: number }>;
 	recentOrders: AdminOrder[];

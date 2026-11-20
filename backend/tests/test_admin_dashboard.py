@@ -169,6 +169,10 @@ async def test_admin_dashboard_orders_products_customers_and_supplier_controls(t
 	assert overview.status_code == 200
 	assert overview.json()["data"]["metrics"]["unpublishedProducts"] == 1
 	assert overview.json()["data"]["metrics"]["activeSuppliers"] == 1
+	notifications = overview.json()["data"]["notifications"]
+	assert notifications["productsToReview"] == 1
+	assert notifications["newSuppliers"] == 1
+	assert notifications["newCustomers"] == 1
 
 	orders = await client.get("/v1/admin/orders?q=buyer@example.com")
 	assert orders.status_code == 200

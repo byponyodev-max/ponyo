@@ -2,6 +2,7 @@
 
 import csv
 import hashlib
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from io import BytesIO, StringIO
@@ -29,6 +30,7 @@ from app.mailbox_sync import (
 from app.newsletter import unsubscribe_url
 from app.models import (
     Brand,
+    ContactRequest,
     Customer,
     EmailNotification,
     EmailInboxMessage,
@@ -72,6 +74,7 @@ router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
 
 MAX_RESERVATION_EXPORT_ROWS = 10_000
 MESSAGE_ID_PATTERN = re.compile(r"<[^<>\s]+>")
+logger = logging.getLogger("ponyo.admin")
 
 
 def reservation_filters(product_id: UUID | None, country: str | None, q: str | None):
@@ -292,6 +295,7 @@ async def order_query(db: AsyncSession, order_id: UUID) -> Order | None:
 
 @router.get("/dashboard", response_model=dict)
 async def dashboard(_admin: Customer = Depends(require_roles("admin")), db: AsyncSession = Depends(get_db)):
+    recent_since = utc_now() - timedelta(days=7)
     order_count = await db.scalar(select(func.count()).select_from(Order)) or 0
     paid_count = await db.scalar(select(func.count()).select_from(Order).where(Order.payment_status == "paid")) or 0
     active_suppliers = await db.scalar(select(func.count()).select_from(Supplier).where(Supplier.active.is_(True))) or 0
@@ -306,6 +310,41 @@ async def dashboard(_admin: Customer = Depends(require_roles("admin")), db: Asyn
     )) or 0
     customer_count = await db.scalar(select(func.count()).select_from(Customer).where(Customer.role == "customer")) or 0
     brand_count = await db.scalar(select(func.count()).select_from(Brand)) or 0
+    unread_email_threads = await db.scalar(
+        select(func.count(func.distinct(EmailInboxMessage.thread_key))).where(
+            EmailInboxMessage.direction == "inbound",
+            EmailInboxMessage.is_read.is_(False),
+        )
+    ) or 0
+    open_contact_requests = await db.scalar(
+        select(func.count()).select_from(ContactRequest).where(ContactRequest.status == "received")
+    ) or 0
+    applications_to_review = await db.scalar(
+        select(func.count()).select_from(MakerApplication).where(MakerApplication.status.in_(("pending", "reviewing")))
+    ) or 0
+    new_suppliers = await db.scalar(
+        select(func.count()).select_from(Supplier).where(
+            Supplier.is_demo.is_(False),
+            Supplier.created_at >= recent_since,
+        )
+    ) or 0
+    new_customers = await db.scalar(
+        select(func.count()).select_from(Customer).where(
+            Customer.role == "customer",
+            Customer.created_at >= recent_since,
+        )
+    ) or 0
+    new_reservations = await db.scalar(
+        select(func.count()).select_from(ProductReservation).where(ProductReservation.created_at >= recent_since)
+    ) or 0
+    new_interests = await db.scalar(
+        select(func.count()).select_from(ProductInterest).where(ProductInterest.created_at >= recent_since)
+    ) or 0
+    new_waitlist_signups = await db.scalar(
+        select(func.count()).select_from(ProductWaitlistEntry).where(
+            ProductWaitlistEntry.created_at >= recent_since
+        )
+    ) or 0
     order_statuses = (await db.execute(select(Order.status, func.count()).group_by(Order.status))).all()
     revenue_rows = (await db.execute(select(Order.currency, func.sum(Order.captured_amount - Order.refunded_amount))
                                     .where(Order.payment_status == "paid")
@@ -334,6 +373,17 @@ async def dashboard(_admin: Customer = Depends(require_roles("admin")), db: Asyn
             "lowAvailabilityVariants": low_stock,
             "customers": customer_count,
             "brands": brand_count,
+        },
+        "notifications": {
+            "unreadEmailThreads": unread_email_threads,
+            "openContactRequests": open_contact_requests,
+            "productsToReview": pending_products,
+            "applicationsToReview": applications_to_review,
+            "newSuppliers": new_suppliers,
+            "newCustomers": new_customers,
+            "newReservations": new_reservations,
+            "newInterests": new_interests,
+            "newWaitlistSignups": new_waitlist_signups,
         },
         "revenueByCurrency": [{"currency": currency, "amount": amount or 0} for currency, amount in revenue_rows],
         "ordersByStatus": [{"status": status, "count": count} for status, count in order_statuses],
@@ -1828,21 +1878,23 @@ async def reply_to_admin_email_thread(
         event_type="admin.email_reply_queued",
         payload={"inboxMessageId": str(reply_id)},
     )
-    enqueue_email_notification(
-        db,
-        event,
-        template="admin_email_reply",
-        recipient=recipient,
-        payload={
-            "idempotencyKey": str(payload.idempotencyKey),
-            "subject": subject[:998],
-            "body": payload.body,
-            "mailboxKey": mailbox_key,
-            "inReplyTo": in_reply_to,
-            "references": references,
-        },
-    )
     try:
+        db.add(event)
+        await db.flush()
+        enqueue_email_notification(
+            db,
+            event,
+            template="admin_email_reply",
+            recipient=recipient,
+            payload={
+                "idempotencyKey": str(payload.idempotencyKey),
+                "subject": subject[:998],
+                "body": payload.body,
+                "mailboxKey": mailbox_key,
+                "inReplyTo": in_reply_to,
+                "references": references,
+            },
+        )
         await db.commit()
     except IntegrityError as error:
         await db.rollback()
@@ -1851,6 +1903,14 @@ async def reply_to_admin_email_thread(
             EmailInboxMessage.source_key == str(payload.idempotencyKey),
         ))
         if existing is None:
+            original_error = error.orig
+            logger.warning(
+                "Admin email reply queue transaction failed error_type=%s sqlstate=%s constraint=%s",
+                type(original_error).__name__,
+                getattr(original_error, "sqlstate", getattr(original_error, "pgcode", None)),
+                getattr(original_error, "constraint_name", None)
+                or getattr(getattr(original_error, "diag", None), "constraint_name", None),
+            )
             raise HTTPException(409, "The reply could not be queued. Please try again.") from error
         reply = existing
     return {"data": {
