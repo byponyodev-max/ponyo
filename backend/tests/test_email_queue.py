@@ -28,7 +28,7 @@ async def test_notification_is_enqueued_and_sent_once(test_client, monkeypatch):
 
     sent = []
 
-    async def accept(*args):
+    async def accept(*args, **_kwargs):
         sent.append(args)
         return True
 
@@ -170,7 +170,7 @@ async def test_email_failure_is_retried_without_exposing_recipient_in_state(test
                                    payload={"orderNumber": "PNY-2"})
         await db.commit()
 
-    async def fail(*_args):
+    async def fail(*_args, **_kwargs):
         return False
 
     monkeypatch.setattr("app.email_queue.send_transactional_email", fail)

@@ -222,7 +222,7 @@ async def test_inbox_filters_by_mailbox_and_reply_delivery_state(test_client, mo
     assert [row["threadKey"] for row in unread_data["items"]] == ["support-failed"]
     assert unread_data["items"][0]["replyStatus"] == "failed"
     assert unread_data["summary"]["byMailbox"]["SUPPORT"] == {
-        "total": 3, "unread": 1, "needsReply": 3, "replied": 0, "pending": 0, "failed": 1,
+        "total": 3, "unread": 1, "needsReply": 3, "replied": 0, "pending": 0, "failed": 1, "archived": 0, "archived": 0,
     }
 
     needs_reply = await client.get("/v1/admin/email/inbox?mailboxKey=SUPPORT&status=needs_reply")
@@ -231,6 +231,69 @@ async def test_inbox_filters_by_mailbox_and_reply_delivery_state(test_client, mo
     }
     replied = await client.get("/v1/admin/email/inbox?mailboxKey=HELLO&status=replied")
     assert [row["threadKey"] for row in replied.json()["data"]["items"]] == ["hello-replied"]
+
+
+@pytest.mark.asyncio
+async def test_admin_can_archive_and_restore_email_thread_without_deleting_messages(test_client):
+    client, factory = test_client
+    await admin_session(client, factory, email="email-archive-admin@example.com")
+    async with factory() as db:
+        db.add(EmailInboxMessage(
+            thread_key="archive-test-thread",
+            source_type="imap",
+            source_key="archive-test-message",
+            direction="inbound",
+            from_email="customer@example.test",
+            to_email="hello@byponyo.com",
+            subject="An old question",
+            text_body="A question to archive.",
+            mailbox_name="HELLO",
+            is_read=False,
+        ))
+        await db.commit()
+
+    csrf = await csrf_token(client)
+    archived = await client.patch(
+        "/v1/admin/email/inbox/archive-test-thread/archive",
+        json={"archived": True},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert archived.status_code == 200
+    assert archived.json()["data"]["isArchived"] is True
+
+    active = await client.get("/v1/admin/email/inbox?status=all")
+    assert "archive-test-thread" not in {
+        row["threadKey"] for row in active.json()["data"]["items"]
+    }
+    assert active.json()["data"]["summary"]["archived"] == 1
+
+    archived_list = await client.get("/v1/admin/email/inbox?status=archived")
+    archived_thread = next(
+        row for row in archived_list.json()["data"]["items"]
+        if row["threadKey"] == "archive-test-thread"
+    )
+    assert archived_thread["isArchived"] is True
+    details = await client.get("/v1/admin/email/inbox/archive-test-thread")
+    assert details.json()["data"]["isArchived"] is True
+    assert len(details.json()["data"]["messages"]) == 1
+
+    restored = await client.patch(
+        "/v1/admin/email/inbox/archive-test-thread/archive",
+        json={"archived": False},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert restored.status_code == 200
+    restored_list = await client.get("/v1/admin/email/inbox?status=all")
+    restored_thread = next(
+        row for row in restored_list.json()["data"]["items"]
+        if row["threadKey"] == "archive-test-thread"
+    )
+    assert restored_thread["isArchived"] is False
+    async with factory() as db:
+        stored_message = await db.scalar(select(EmailInboxMessage).where(
+            EmailInboxMessage.thread_key == "archive-test-thread",
+        ))
+        assert stored_message.archived_at is None
 
 
 def test_imap_message_parser_extracts_plain_body_and_thread_headers():

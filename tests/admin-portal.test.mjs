@@ -85,12 +85,17 @@ test("admin email inbox supports mailbox sync, queued replies and editable templ
     assert.ok(page.includes("aria-pressed={emailThreadKey === thread.threadKey}"));
     assert.ok(page.includes("syncEmailInbox"));
     assert.ok(page.includes("sendEmailReply"));
+    assert.ok(page.includes("setEmailThreadArchived"));
+    assert.ok(page.includes('key: "archived"'));
     assert.ok(api.includes('"/admin/email/inbox/status"'));
     assert.ok(api.includes('"/admin/email/inbox/sync"'));
     assert.ok(api.includes("/admin/email/inbox/${encodeURIComponent(threadKey)}/reply"));
+    assert.ok(api.includes("/admin/email/inbox/${encodeURIComponent(threadKey)}/archive"));
     assert.ok(backend.includes('"/email/inbox/{thread_key}/reply"'));
+    assert.ok(backend.includes('"/email/inbox/{thread_key}/archive"'));
     assert.ok(backend.includes('require_roles("admin")'));
     assert.ok(adminTranslations.includes('"admin.ui.email_imap_setup"'));
+    assert.ok(adminTranslations.includes('"admin.ui.email_archive_note"'));
 });
 
 test("dashboard UI uses Ponyo palette and responsive compact navigation", () => {

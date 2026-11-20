@@ -135,6 +135,12 @@ class AdminEmailReplyRequest(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
 
 
+class AdminEmailThreadArchiveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    archived: bool
+
+
 class AdminNewsletterCampaignRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

@@ -11,7 +11,7 @@ import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } fro
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
 type AdminSection = "dashboard" | "analytics" | "orders" | "products" | "reservations" | "waitlist" | "newsletter" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
-type EmailStatusFilter = "all" | "unread" | "needs_reply" | "replied" | "pending" | "failed";
+type EmailStatusFilter = "all" | "unread" | "needs_reply" | "replied" | "pending" | "failed" | "archived";
 type AdminTableId = "orders" | "products" | "reservations" | "interests" | "reservation-entries" | "waitlist" | "waitlist-entries" | "newsletter" | "maker-applications" | "suppliers" | "customers" | "admin-accounts" | "fulfillment" | "brands";
 type OrderPage = AdminListPage<AdminOrder>;
 type ProductPage = AdminListPage<AdminProduct>;
@@ -949,6 +949,25 @@ export default function AdminPortalPage() {
 		}
 	}
 
+	async function setEmailThreadArchived(archived: boolean) {
+		if (!emailThread) return;
+		setBusyId("email-archive");
+		setError("");
+		try {
+			await ponyoApi.setAdminEmailThreadArchived(emailThread.threadKey, archived);
+			setEmailThreadKey("");
+			setEmailThread(null);
+			await loadEmailThreads();
+			setNotice(archived
+				? ui("email_archived_notice", "Conversation archived. You can find it in Archived.")
+				: ui("email_restored_notice", "Conversation moved back to the inbox."));
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
+	}
+
 	async function sendEmailReply(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		if (!emailThread || !emailReplyBody.trim()) return;
@@ -1102,6 +1121,7 @@ export default function AdminPortalPage() {
 		{ key: "replied", label: ui("email_filter_replied", "Replied"), count: emailStatusCounts?.replied ?? 0 },
 		{ key: "pending", label: ui("email_filter_pending", "Pending"), count: emailStatusCounts?.pending ?? 0 },
 		{ key: "failed", label: ui("email_filter_failed", "Failed"), count: emailStatusCounts?.failed ?? 0 },
+		{ key: "archived", label: ui("email_filter_archived", "Archived"), count: emailStatusCounts?.archived ?? 0 },
 	];
 	const dashboardGreeting = adminGreetingKey();
 	const notificationCounts = dashboard?.notifications;
@@ -1411,6 +1431,7 @@ export default function AdminPortalPage() {
 						</article>;
 					})}
 				</div>
+				<p className="ad-email-archive-note">{ui("email_archive_note", "Archiving hides conversations from this inbox without deleting them from the connected mailbox.")}</p>
 				<div className="ad-email-mailbox-tabs" role="tablist" aria-label={ui("email_mailbox_tabs", "Mailboxes")}>
 					{emailInboxStatus?.mailboxes.map((mailbox) => {
 						const count = emailInboxSummary?.byMailbox[mailbox.key];
@@ -1460,12 +1481,12 @@ export default function AdminPortalPage() {
 							<span className="ad-email-thread-preview">{thread.preview || ui("email_no_preview", "No text preview available.")}</span>
 							<span className="ad-email-thread-meta"><span>{ui(`email_source_${thread.source}`, thread.source.replaceAll("_", " "))}</span><small>{ui(`email_reply_status_${thread.replyStatus}`, thread.replyStatus.replaceAll("_", " "))}</small>{thread.unreadCount > 0 && <b>{ui("email_unread", "{{count}} unread", { count: thread.unreadCount })}</b>}</span>
 						</button>)}
-						{!emailThreads.length && <div className="ad-empty">{ui("email_empty", "No conversations found.")}</div>}
+						{!emailThreads.length && <div className="ad-empty">{emailStatusFilter === "archived" ? ui("email_archived_empty", "No archived conversations.") : ui("email_empty", "No conversations found.")}</div>}
 					</div>
 					<section className="ad-email-conversation" aria-label={ui("email_conversation", "Email conversation")}>
 						{emailThreadLoading && <div className="ad-empty" role="status">{ui("email_loading_thread", "Loading conversation…")}</div>}
 						{!emailThreadLoading && emailThread && <div className="ad-email-conversation-inner">
-							<header className="ad-email-conversation-header"><div><span className="ad-eyebrow">{ui("email_conversation", "CONVERSATION")}</span><h3>{emailThread.subject}</h3><p>{emailThread.messages.find((message) => message.direction === "inbound")?.fromEmail}</p></div><span className="ad-count-pill">{ui("email_messages_count", "{{count}} messages", { count: emailThread.messages.length })}</span></header>
+							<header className="ad-email-conversation-header"><div><span className="ad-eyebrow">{ui("email_conversation", "CONVERSATION")}</span><h3>{emailThread.subject}</h3><p>{emailThread.messages.find((message) => message.direction === "inbound")?.fromEmail}</p></div><div className="ad-email-conversation-actions"><span className="ad-count-pill">{ui("email_messages_count", "{{count}} messages", { count: emailThread.messages.length })}</span><button type="button" className="ad-email-archive-button" onClick={() => void setEmailThreadArchived(!emailThread.isArchived)} disabled={busyId === "email-archive"}>{busyId === "email-archive" ? ui(emailThread.isArchived ? "email_restoring" : "email_archiving", emailThread.isArchived ? "Restoring…" : "Archiving…") : ui(emailThread.isArchived ? "email_restore" : "email_archive", emailThread.isArchived ? "Move to inbox" : "Archive")}</button></div></header>
 							<div className="ad-email-messages">{emailThread.messages.map((message) => <article className={`ad-email-message ${message.direction === "outbound" ? "is-outbound" : ""}`} key={message.id}>
 								<div className="ad-email-message-heading"><strong>{message.direction === "outbound" ? ui("email_from_ponyo", "Ponyo") : message.fromName || message.fromEmail}</strong><time dateTime={message.receivedAt}>{date(message.receivedAt)}</time></div>
 								{message.direction === "outbound" && <small className="ad-email-delivery-status">{ui(`email_delivery_${message.deliveryStatus}`, message.deliveryStatus)}</small>}

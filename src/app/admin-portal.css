@@ -2546,6 +2546,38 @@
     gap: 14px;
 }
 
+.ad-email-conversation-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ad-email-archive-button {
+    border: 1px solid #e6d8cf;
+    border-radius: 999px;
+    padding: 8px 13px;
+    background: #fffaf6;
+    color: #5b473d;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ad-email-archive-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.ad-email-archive-note {
+    margin: 11px 0;
+    color: #826f65;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .ad-email-conversation-header h3 {
     margin: 4px 0;
     color: #4b3b34;

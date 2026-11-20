@@ -495,6 +495,7 @@ class EmailInboxMessage(Base):
     uid: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     delivery_status: Mapped[str] = mapped_column(String(24), default="received", server_default="received")
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 

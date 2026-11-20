@@ -60,6 +60,7 @@ from app.schemas import (
     AdminAccountUpdateRequest,
     AdminBrandProfileRequest,
     AdminEmailReplyRequest,
+    AdminEmailThreadArchiveRequest,
     AdminMakerApplicationStatusRequest,
     AdminNewsletterCampaignRequest,
     AdminProductProofRequest,
@@ -314,6 +315,7 @@ async def dashboard(_admin: Customer = Depends(require_roles("admin")), db: Asyn
         select(func.count(func.distinct(EmailInboxMessage.thread_key))).where(
             EmailInboxMessage.direction == "inbound",
             EmailInboxMessage.is_read.is_(False),
+            EmailInboxMessage.archived_at.is_(None),
         )
     ) or 0
     open_contact_requests = await db.scalar(
@@ -1647,7 +1649,7 @@ async def list_admin_email_threads(
     response: Response,
     q: str | None = Query(default=None, max_length=180),
     mailbox_key: str | None = Query(default=None, alias="mailboxKey", max_length=80),
-    status: str = Query(default="all", pattern="^(all|unread|needs_reply|replied|pending|failed)$"),
+    status: str = Query(default="all", pattern="^(all|unread|needs_reply|replied|pending|failed|archived)$"),
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     _admin: Customer = Depends(require_roles("admin")),
@@ -1689,7 +1691,10 @@ async def list_admin_email_threads(
         inbound = next((message for message in messages if message.direction == "inbound"), None)
         reply_status = "unreplied" if latest.direction == "inbound" else latest.delivery_status
         preview = " ".join(latest.text_body.split())[:220]
-        unread_count = sum(1 for message in messages if message.direction == "inbound" and not message.is_read)
+        unread_count = sum(
+            1 for message in messages
+            if message.direction == "inbound" and not message.is_read and message.archived_at is None
+        )
         threads.append({
             "threadKey": thread_key,
             "subject": latest.subject,
@@ -1703,14 +1708,20 @@ async def list_admin_email_threads(
             "mailboxKey": email_mailbox_key(settings, inbound) if inbound else "other",
             "replyStatus": reply_status,
             "deliveryStatus": latest.delivery_status,
+            "isArchived": all(message.archived_at is not None for message in messages),
         })
     counts_by_mailbox: dict[str, dict[str, int]] = {}
-    summary = {"total": len(threads), "unread": 0, "needsReply": 0, "replied": 0, "pending": 0, "failed": 0}
+    summary = {"total": 0, "unread": 0, "needsReply": 0, "replied": 0, "pending": 0, "failed": 0, "archived": 0}
     for thread in threads:
         reply_status = thread["replyStatus"]
         counts = counts_by_mailbox.setdefault(thread["mailboxKey"], {
-            "total": 0, "unread": 0, "needsReply": 0, "replied": 0, "pending": 0, "failed": 0,
+            "total": 0, "unread": 0, "needsReply": 0, "replied": 0, "pending": 0, "failed": 0, "archived": 0,
         })
+        if thread["isArchived"]:
+            summary["archived"] += 1
+            counts["archived"] += 1
+            continue
+        summary["total"] += 1
         summary["unread"] += int(thread["unreadCount"] > 0)
         summary["needsReply"] += int(reply_status in {"unreplied", "failed"})
         summary["replied"] += int(reply_status == "sent")
@@ -1723,7 +1734,10 @@ async def list_admin_email_threads(
         counts["pending"] += int(reply_status in {"queued", "sending"})
         counts["failed"] += int(reply_status == "failed")
 
-    filtered_threads = threads
+    filtered_threads = [
+        thread for thread in threads
+        if thread["isArchived"] == (status == "archived")
+    ]
     if mailbox_key:
         filtered_threads = [thread for thread in filtered_threads if thread["mailboxKey"] == mailbox_key]
     if status == "unread":
@@ -1779,6 +1793,7 @@ async def get_admin_email_thread(
     return {"data": {
         "threadKey": thread_key,
         "subject": rows[-1].subject,
+        "isArchived": all(message.archived_at is not None for message in rows),
         "replyConfigured": bool(reply_mailbox and reply_mailbox.smtp_configured),
         "replyFrom": reply_mailbox.from_email if reply_mailbox and reply_mailbox.smtp_configured else None,
         "messages": [{
@@ -1794,6 +1809,30 @@ async def get_admin_email_thread(
             "source": message.source_type,
         } for message in rows],
     }}
+
+
+@router.patch("/email/inbox/{thread_key}/archive", response_model=dict)
+async def set_admin_email_thread_archived(
+    thread_key: str,
+    payload: AdminEmailThreadArchiveRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-email-archive", 60, 60)
+    if not thread_key or len(thread_key) > 180:
+        raise HTTPException(404, "Email thread not found.")
+    messages = (await db.scalars(
+        select(EmailInboxMessage).where(EmailInboxMessage.thread_key == thread_key)
+    )).all()
+    if not messages:
+        raise HTTPException(404, "Email thread not found.")
+    archived_at = utc_now() if payload.archived else None
+    for message in messages:
+        message.archived_at = archived_at
+    await db.commit()
+    return {"data": {"threadKey": thread_key, "isArchived": payload.archived}}
 
 
 @router.post("/email/inbox/{thread_key}/reply", response_model=dict)

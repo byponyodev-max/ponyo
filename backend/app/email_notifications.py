@@ -13,6 +13,8 @@ from app.ssl_context import create_proxy_compatible_ssl_context
 
 logger = logging.getLogger(__name__)
 
+PONYO_LOGO_CID = "ponyo-jellyfish@byponyo.com"
+
 SUPPORT_CONTACT_TYPES = frozenset({
     "order question", "delivery question", "plush request", "reservation question",
     "website assistance", "customer support",
@@ -42,15 +44,9 @@ def ponyo_branded_email_html(
     footer_note: str = "This message is about your Ponyo account or order.",
 ) -> str:
     """Shared, email-client-safe Ponyo layout for transactional and newsletter messages."""
-    storefront = urlsplit(settings.storefront_base_url)
-    logo_url = (
-        f"{storefront.scheme}://{storefront.netloc}/profile.png"
-        if storefront.scheme == "https" and storefront.netloc else None
-    )
     logo = (
-        f'<img src="{escape(logo_url, quote=True)}" width="56" height="56" alt="" '
+        f'<img src="cid:{PONYO_LOGO_CID}" width="56" height="56" alt="Ponyo jellyfish" '
         'style="display:block;width:56px;height:56px;border:0;border-radius:12px;">'
-        if logo_url else '<span style="font-size:23px;line-height:56px">🪼</span>'
     )
     parsed_action = urlsplit(action_url or "")
     safe_action = bool(
@@ -94,6 +90,20 @@ def ponyo_branded_email_html(
 </td></tr></table></td></tr>
 <tr><td align="center" style="padding:15px 12px 0;color:#8b776c;font-size:11px;line-height:18px">Thoughtfully found. Ready to be loved.<br>{escape(footer_note)}</td></tr>
 </table></td></tr></table></body></html>'''
+
+
+def _attach_ponyo_logo(html_part: EmailMessage) -> None:
+    root_cid = make_msgid(domain="byponyo.com")
+    html_part["Content-ID"] = root_cid
+    html_part.add_related(
+        Path(__file__).with_name("assets").joinpath("ponyo-jellyfish.png").read_bytes(),
+        maintype="image",
+        subtype="png",
+        cid=f"<{PONYO_LOGO_CID}>",
+        disposition="inline",
+    )
+    html_part.set_param("type", "text/html")
+    html_part.set_param("start", root_cid)
 
 
 def build_verification_message(sender: str, email: str, verification_url: str, *, logo_url: str | None = None) -> EmailMessage:
@@ -319,12 +329,7 @@ def _send_verification_email(email: str, verification_url: str) -> None:
     if not settings.smtp_host or not sender:
         raise RuntimeError("Verification email transport is not configured")
 
-    storefront = urlsplit(settings.storefront_base_url)
-    logo_url = (
-        f"{storefront.scheme}://{storefront.netloc}/profile.png"
-        if storefront.scheme == "https" and storefront.netloc else None
-    )
-    message = build_verification_message(sender, email, verification_url, logo_url=logo_url)
+    message = build_verification_message(sender, email, verification_url)
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
         smtp.ehlo()
@@ -390,6 +395,8 @@ def _send_transactional_email(
         message["References"] = references
     message.set_content(text_body)
     message.add_alternative(html_body, subtype="html")
+    if f"cid:{PONYO_LOGO_CID}" in html_body:
+        _attach_ponyo_logo(message.get_payload()[-1])
     with smtplib.SMTP(smtp_host, smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
         smtp.ehlo()
         if smtp_starttls:

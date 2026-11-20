@@ -2,7 +2,12 @@ from email import policy
 from email.parser import BytesParser
 from html.parser import HTMLParser
 
-from app.email_notifications import build_verification_message
+from app.config import settings
+from app.email_notifications import (
+    _send_transactional_email,
+    build_verification_message,
+    ponyo_branded_email_html,
+)
 
 
 class EmailHTML(HTMLParser):
@@ -68,6 +73,56 @@ def test_public_email_uses_https_png_and_clickable_button():
     assert "display:block" in parsed.links[0]["style"]
     assert not any(part.get_content_type() == "image/png" for part in delivered.walk())
     assert url in delivered.get_body(preferencelist=("plain",)).get_content()
+
+
+def test_transactional_email_embeds_ponyo_jellyfish_logo(monkeypatch):
+    sent_messages = []
+
+    class FakeSMTP:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def ehlo(self):
+            return 250, b"ok"
+
+        def send_message(self, message):
+            sent_messages.append(message)
+
+    monkeypatch.setattr("app.email_notifications.smtplib.SMTP", FakeSMTP)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.test")
+    monkeypatch.setattr(settings, "smtp_username", None)
+    monkeypatch.setattr(settings, "smtp_from_email", "support@example.test")
+    monkeypatch.setattr(settings, "smtp_starttls", False)
+    html = ponyo_branded_email_html(
+        eyebrow="A reply from Ponyo",
+        title="Thanks for your note",
+        intro="Our team has replied.",
+    )
+
+    _send_transactional_email(
+        "buyer@example.test",
+        "Thanks for your note",
+        "Our team has replied.",
+        html,
+        "<reply@example.test>",
+    )
+
+    delivered = BytesParser(policy=policy.default).parsebytes(sent_messages[0].as_bytes())
+    assert delivered["From"].addresses[0].display_name == "Ponyo"
+    html_part = delivered.get_body(preferencelist=("html",))
+    parsed = EmailHTML()
+    parsed.feed(html_part.get_content())
+    image = next(part for part in delivered.walk() if part.get_content_type() == "image/png")
+    assert parsed.images[0]["src"] == "cid:" + image["Content-ID"][1:-1]
+    assert parsed.images[0]["alt"] == "Ponyo jellyfish"
+    assert image.get_content_disposition() == "inline"
+    assert image.get_payload(decode=True).startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_verification_html_escapes_dynamic_content():

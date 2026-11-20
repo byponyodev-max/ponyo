@@ -284,6 +284,7 @@ export type AdminEmailThread = {
 	mailboxKey: string;
 	replyStatus: string;
 	deliveryStatus: string;
+	isArchived: boolean;
 };
 
 export type AdminEmailInboxSummary = {
@@ -293,6 +294,7 @@ export type AdminEmailInboxSummary = {
 	replied: number;
 	pending: number;
 	failed: number;
+	archived: number;
 	byMailbox: Record<string, {
 		total: number;
 		unread: number;
@@ -300,6 +302,7 @@ export type AdminEmailInboxSummary = {
 		replied: number;
 		pending: number;
 		failed: number;
+		archived: number;
 	}>;
 };
 
@@ -372,6 +375,7 @@ export type AdminEmailMessage = {
 export type AdminEmailThreadDetail = {
 	threadKey: string;
 	subject: string;
+	isArchived: boolean;
 	replyConfigured: boolean;
 	replyFrom: string | null;
 	messages: AdminEmailMessage[];
@@ -1284,6 +1288,11 @@ export const ponyoApi = {
 	},
 	getAdminEmailThread: (threadKey: string) =>
 		apiRequest<AdminEmailThreadDetail>(`/admin/email/inbox/${encodeURIComponent(threadKey)}`),
+	setAdminEmailThreadArchived: (threadKey: string, archived: boolean) =>
+		apiRequest<{ threadKey: string; isArchived: boolean }>(
+			`/admin/email/inbox/${encodeURIComponent(threadKey)}/archive`,
+			{ method: "PATCH", body: JSON.stringify({ archived }) },
+		),
 	syncAdminEmailInbox: () =>
 		apiRequest<{
 			imapConfigured: boolean;
