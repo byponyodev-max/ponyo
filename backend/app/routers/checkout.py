@@ -61,7 +61,7 @@ async def checkout_values(payload: CheckoutSessionRequest, customer: Customer, d
     currencies = {variant.currency.upper() for variant in variants.values()}
     if len(currencies) != 1:
         raise HTTPException(422, "All items in one order must use the same currency.")
-    available = await available_quantities(db, variants.values()) if not lock else None
+    available = await available_quantities(db, variants.values(), include_alternates=True) if not lock else None
     for requested in payload.items:
         variant = variants[requested.variantId]
         if not variant.product.published or (available.get(variant.id, 0) if available is not None else variant.stock_quantity) < requested.quantity:

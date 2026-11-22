@@ -122,14 +122,14 @@ async def add_variant(factory, *, stock=1):
 
 
 async def add_offer(factory, variant_id, *, on_hand=1, reserved=0,
-                    lead=0, active=True, supplier_active=True, currency="JPY"):
+                    lead=0, active=True, supplier_active=True, currency="JPY", is_primary=False):
     async with factory() as db:
         supplier = Supplier(code=uuid4().hex, name="Isolated supplier", active=supplier_active)
         db.add(supplier)
         await db.flush()
         offer = SupplierOffer(
             supplier_id=supplier.id, variant_id=variant_id, supplier_sku=uuid4().hex,
-            cost_amount=750, currency=currency, lead_time_days=lead, active=active,
+            cost_amount=750, currency=currency, lead_time_days=lead, active=active, is_primary=is_primary,
         )
         db.add(offer)
         await db.flush()
@@ -340,7 +340,7 @@ async def test_failed_atomic_candidate_update_tries_alternate(inventory_db, monk
 async def test_settlement_after_sync_recomputes_projection_and_preserves_observation(inventory_db, paid):
     variant_id = await add_variant(inventory_db, stock=8)
     held = await add_offer(inventory_db, variant_id, on_hand=10, reserved=2)
-    alternate = await add_offer(inventory_db, variant_id, on_hand=4, lead=1)
+    alternate = await add_offer(inventory_db, variant_id, on_hand=4, lead=1, is_primary=True)
     async with inventory_db() as db:
         snapshot = StockSnapshot.model_validate({
             "offerId": str(held.offer_id), "onHand": 3, "observedAt": OBSERVED.isoformat(),

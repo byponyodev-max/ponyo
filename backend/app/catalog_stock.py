@@ -19,21 +19,23 @@ def sellable_variant():
     return and_(ProductVariant.active.is_(True), ProductVariant.stock_quantity > 0, or_(~has_offer, stocked_offer))
 
 
-async def available_quantities(db: AsyncSession, variants) -> dict:
+async def available_quantities(db: AsyncSession, variants, *, include_alternates: bool = False) -> dict:
     variants = list(variants)
     if not variants:
         return {}
     ids = [variant.id for variant in variants]
     linked = set((await db.scalars(select(SupplierOffer.variant_id).where(SupplierOffer.variant_id.in_(ids)))).all())
-    rows = (await db.execute(
+    stock_query = (
         select(SupplierOffer.variant_id, func.max(SupplierInventory.on_hand - SupplierInventory.reserved))
         .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
         .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
         .join(ProductVariant, ProductVariant.id == SupplierOffer.variant_id)
-        .where(SupplierOffer.variant_id.in_(ids), SupplierOffer.is_primary.is_(True),
-               SupplierOffer.active.is_(True), Supplier.active.is_(True),
+        .where(SupplierOffer.variant_id.in_(ids), SupplierOffer.active.is_(True), Supplier.active.is_(True),
                SupplierOffer.currency == ProductVariant.currency)
         .group_by(SupplierOffer.variant_id)
-    )).all()
+    )
+    if not include_alternates:
+        stock_query = stock_query.where(SupplierOffer.is_primary.is_(True))
+    rows = (await db.execute(stock_query)).all()
     supplied = dict(rows)
     return {variant.id: max(0, min(variant.stock_quantity, supplied.get(variant.id, 0))) if variant.id in linked else max(0, variant.stock_quantity) for variant in variants if variant.active}

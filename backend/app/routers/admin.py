@@ -940,7 +940,7 @@ async def list_waitlist_products(
         query = query.where(or_(Product.name.ilike(term, escape="\\"), Product.sku.ilike(term, escape="\\")))
     total = await db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
     rows = (await db.execute(
-        query.options(selectinload(Product.images))
+        query.options(selectinload(Product.images), selectinload(Product.variants))
         .order_by(waitlist_counts.c.entry_count.desc(), Product.name, Product.id)
         .offset(offset)
         .limit(limit)

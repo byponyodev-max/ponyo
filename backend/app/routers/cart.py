@@ -83,7 +83,7 @@ async def validate_cart(
             ))
         )
     } if payload.items else {}
-    quantities = await available_quantities(db, variants.values())
+    quantities = await available_quantities(db, variants.values(), include_alternates=True)
     currencies = {variant.currency for variant in variants.values()}
     mixed = len(currencies) > 1
     source_currency = next(iter(currencies)) if len(currencies) == 1 else None
@@ -196,7 +196,7 @@ async def _validate_stock(db: AsyncSession, items: list[CartItemUpdate]) -> None
                 .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
                 .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
                 .where(
-                    SupplierOffer.variant_id == variant.id, SupplierOffer.is_primary.is_(True),
+                    SupplierOffer.variant_id == variant.id,
                     SupplierOffer.active.is_(True),
                     Supplier.active.is_(True), SupplierOffer.currency == variant.currency,
                     SupplierInventory.on_hand - SupplierInventory.reserved >= item.quantity,

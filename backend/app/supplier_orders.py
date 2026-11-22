@@ -134,7 +134,7 @@ async def generate_purchase_orders(db: AsyncSession, order: Order) -> list[Suppl
         if previous is None and item.supplier_offer_id:
             # This exact quantity was already deducted during payment settlement.
             offer = await db.scalar(select(SupplierOffer).join(Supplier, Supplier.id == SupplierOffer.supplier_id).where(
-                SupplierOffer.id == item.supplier_offer_id, SupplierOffer.is_primary.is_(True),
+                SupplierOffer.id == item.supplier_offer_id,
                 SupplierOffer.active.is_(True), Supplier.active.is_(True),
                 SupplierOffer.minimum_order_quantity <= item.quantity,
                 SupplierOffer.currency == item.product_snapshot.get("sourceCurrency", item.currency),

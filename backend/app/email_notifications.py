@@ -329,7 +329,13 @@ def _send_verification_email(email: str, verification_url: str) -> None:
     if not settings.smtp_host or not sender:
         raise RuntimeError("Verification email transport is not configured")
 
-    message = build_verification_message(sender, email, verification_url)
+    storefront_url = urlsplit(settings.storefront_base_url)
+    logo_url = (
+        f"{settings.storefront_base_url.rstrip('/')}/profile.png"
+        if storefront_url.scheme == "https" and storefront_url.netloc
+        else None
+    )
+    message = build_verification_message(sender, email, verification_url, logo_url=logo_url)
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
         smtp.ehlo()

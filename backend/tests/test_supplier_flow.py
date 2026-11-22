@@ -18,6 +18,7 @@ from app.models import (
     Product, ProductCategory, ProductImage, ProductVariant, Supplier,
     SupplierInventory, SupplierOffer,
 )
+from app.supplier_orders import generate_purchase_orders, load_order
 from app.storefront_data import link_demo_catalog
 from test_api import (
     add_product, checkout_payload, csrf_token, seed_customer_session,
@@ -453,6 +454,7 @@ async def test_multiple_suppliers_can_offer_same_variant_and_checkout_selects_st
         )
         db.add(supplier)
         await db.flush()
+        preferred_supplier_id = supplier.id
         offer = SupplierOffer(
             supplier_id=supplier.id, variant_id=flow.variant_id,
             supplier_sku="PRIVATE-ALTERNATE-SKU", cost_amount=777, currency="JPY",
@@ -481,3 +483,16 @@ async def test_multiple_suppliers_can_offer_same_variant_and_checkout_selects_st
         variant = await db.get(ProductVariant, flow.variant_id)
         assert variant.stock_quantity == 3
     mocked_services.create.assert_called_once()
+    if preferred_available:
+        order_id = UUID(response.json()["data"]["orderId"])
+        await deliver_event(
+            flow, mocked_services, order_id, "evt_fastest_supplier_paid",
+            "checkout.session.completed", paid=True,
+        )
+        async with flow.session_factory() as db:
+            order = await load_order(db, order_id)
+            purchase_orders = await generate_purchase_orders(db, order)
+            await db.commit()
+        assert len(purchase_orders) == 1
+        assert purchase_orders[0].supplier_id == preferred_supplier_id
+        assert purchase_orders[0].items[0].offer_id == preferred_id

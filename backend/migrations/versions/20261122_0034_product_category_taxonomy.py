@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from alembic import op
+from alembic import context, op
 import sqlalchemy as sa
 
 from app.product_categories import PRODUCT_CATEGORY_DEFINITIONS, product_category_slug
@@ -15,6 +15,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        # This data backfill classifies existing product rows and needs a live connection.
+        return
+
     connection = op.get_bind()
     categories = sa.table(
         "product_categories",

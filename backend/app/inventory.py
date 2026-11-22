@@ -13,8 +13,8 @@ async def refresh_synced_variant(db: AsyncSession, variant_id) -> None:
         .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
         .join(ProductVariant, ProductVariant.id == SupplierOffer.variant_id)
         .where(SupplierOffer.variant_id == variant_id, SupplierOffer.is_primary.is_(True),
-               SupplierOffer.active.is_(True),
-               Supplier.active.is_(True), SupplierOffer.currency == ProductVariant.currency))
+               SupplierOffer.active.is_(True), Supplier.active.is_(True),
+               SupplierOffer.currency == ProductVariant.currency))
     await db.execute(update(ProductVariant).where(ProductVariant.id == variant_id).values(
         stock_quantity=max(0, quantity or 0),
     ).execution_options(synchronize_session=False))
@@ -39,12 +39,25 @@ async def reserve_supplier_stock(db: AsyncSession, variant: ProductVariant, quan
     has_offers = await db.scalar(select(SupplierOffer.id).where(SupplierOffer.variant_id == variant.id).limit(1))
     if not has_offers:
         return None  # Existing imports remain purchasable until their supply is linked.
+    primary_minimum = await db.scalar(
+        select(SupplierOffer.minimum_order_quantity)
+        .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
+        .where(
+            SupplierOffer.variant_id == variant.id,
+            SupplierOffer.is_primary.is_(True),
+            SupplierOffer.active.is_(True),
+            Supplier.active.is_(True),
+            SupplierOffer.currency == variant.currency,
+        )
+    )
+    if primary_minimum is not None and quantity < primary_minimum:
+        raise HTTPException(409, "One or more items no longer have supplier stock available.")
     candidates = (await db.execute(
         select(SupplierOffer, SupplierInventory)
         .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
         .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
         .where(
-            SupplierOffer.variant_id == variant.id, SupplierOffer.is_primary.is_(True),
+            SupplierOffer.variant_id == variant.id,
             SupplierOffer.active.is_(True),
             Supplier.active.is_(True), SupplierOffer.currency == variant.currency,
             SupplierOffer.minimum_order_quantity <= quantity,
