@@ -11,11 +11,15 @@ const catImage = localImage("ponyo-11.png");
 const pandaImage = localImage("ponyo-12.png");
 const dogImage = localImage("maker-dog.jpg");
 const cloudImage = localImage("maker-cloud.jpg");
-const giantBunnyImage = localImage("ponyo-3.png");
+const giantBearImage = localImage("hoshi-cloud-bear-xl.png");
+const giantBunnyRoomImage = localImage("haneul-bunny-xl.png");
 const chickImage = localImage("maker-chick.jpg");
 const pinkBunnyImage = localImage("maker-pink-bunny.jpg");
 const elephantImage = localImage("ponyo-6.png");
 const foxImage = localImage("ponyo-7.png");
+const daisyCushionImage = localImage("daisy-flower-cushion.png");
+const mallowSofaImage = localImage("mallow-floor-sofa.png");
+const moonJellyImage = localImage("moon-jelly-wall-hanging.png");
 
 // Catalog-only wireframe data. Replace these examples with supplier-approved records.
 const sampleProducts: Array<Omit<Product, "sku">> = [
@@ -171,8 +175,8 @@ const sampleProducts: Array<Omit<Product, "sku">> = [
 		availability: "needs_confirmation",
 		categoryName: "Giant plush",
 		supplierName: "Mochi & Co. · Japan",
-		image: bearImage,
-		imageAlt: "Warm cream teddy bear plush with a checkered bow",
+		image: giantBearImage,
+		imageAlt: "Large brown teddy bear plush with a gingham bow",
 		artTone: "peach",
 	},
 	{
@@ -185,7 +189,7 @@ const sampleProducts: Array<Omit<Product, "sku">> = [
 		availability: "needs_confirmation",
 		categoryName: "Giant plush",
 		supplierName: "Studio Haneul · South Korea",
-		image: giantBunnyImage,
+		image: giantBunnyRoomImage,
 		imageAlt: "Oversized cream bunny plush shown at room scale",
 		artTone: "peach",
 	},
@@ -218,6 +222,48 @@ const sampleProducts: Array<Omit<Product, "sku">> = [
 		image: foxImage,
 		imageAlt: "Oversized fox-style plush shown at scale",
 		artTone: "peach",
+	},
+	{
+		id: "sample-daisy-flower-cushion",
+		slug: "daisy-flower-cushion",
+		name: "Daisy Flower Cushion",
+		description: "A soft daisy-shaped cushion in warm cream and sunny yellow.",
+		priceAmount: 19800,
+		currency: "JPY",
+		availability: "available",
+		categoryName: "Cushions",
+		supplierName: "Ponyo demo collection",
+		image: daisyCushionImage,
+		imageAlt: "Cream daisy-shaped cushion with a sunny yellow centre",
+		artTone: "yellow",
+	},
+	{
+		id: "sample-mallow-cloud-sofa",
+		slug: "mallow-cloud-sofa",
+		name: "Mallow Cloud Sofa",
+		description: "A low, cushioned sofa made for cozy reading corners.",
+		priceAmount: 62800,
+		currency: "JPY",
+		availability: "available",
+		categoryName: "Soft Furniture",
+		supplierName: "Ponyo demo collection",
+		image: mallowSofaImage,
+		imageAlt: "A plush-filled cream sofa in a cozy pastel room",
+		artTone: "peach",
+	},
+	{
+		id: "sample-moon-jelly-wall-hanging",
+		slug: "moon-jelly-wall-hanging",
+		name: "Moon Jelly Wall Hanging",
+		description: "A soft pink wall hanging featuring a friendly jellyfish design.",
+		priceAmount: 21800,
+		currency: "JPY",
+		availability: "available",
+		categoryName: "Wall & Decor",
+		supplierName: "Ponyo demo collection",
+		image: moonJellyImage,
+		imageAlt: "Pink wall hanging decorated with a smiling jellyfish",
+		artTone: "lilac",
 	},
 ];
 
@@ -307,7 +353,7 @@ const storefrontPreviewMetadata: Record<
 		dimensions: "100 cm",
 		availabilityStatus: "Available",
 		supplierName: "Domina",
-		image: localImage("maker-bunny.jpg"),
+		image: giantBunnyRoomImage,
 	},
 	"hoshi-cloud-bear-xl": {
 		productType: "XL Plush",
@@ -316,7 +362,7 @@ const storefrontPreviewMetadata: Record<
 		sizeTier: "XL",
 		dimensions: "90 cm",
 		supplierName: "Domina",
-		image: localImage("maker-bear.jpg"),
+		image: giantBearImage,
 	},
 	"bluebell-penguin": {
 		productType: "Plush",
@@ -354,6 +400,33 @@ const storefrontPreviewMetadata: Record<
 		supplierName: "Ponyo",
 		image: localImage("maker-bear.jpg"),
 	},
+	"daisy-flower-cushion": {
+		productType: "Character Cushion",
+		tags: ["cushion", "character"],
+		size: "Medium",
+		sizeTier: "Medium",
+		dimensions: "38 cm",
+		supplierName: "Ponyo",
+		image: daisyCushionImage,
+	},
+	"mallow-cloud-sofa": {
+		productType: "Seating",
+		tags: ["seating", "furniture"],
+		size: "Medium",
+		sizeTier: "Medium",
+		dimensions: "110 cm",
+		supplierName: "Ponyo",
+		image: mallowSofaImage,
+	},
+	"moon-jelly-wall-hanging": {
+		productType: "Wall Hanging",
+		tags: ["wall-decor", "decor"],
+		size: "Medium",
+		sizeTier: "Medium",
+		dimensions: "45 cm",
+		supplierName: "Ponyo",
+		image: moonJellyImage,
+	},
 };
 
 const storefrontPreviewColors: Record<string, string> = {
@@ -371,6 +444,9 @@ const storefrontPreviewColors: Record<string, string> = {
 	"haneul-bunny-xl": "Cream",
 	"baluran-elephant-xl": "Grey",
 	"clement-the-fox-xl": "Orange and cream",
+	"daisy-flower-cushion": "Cream and yellow",
+	"mallow-cloud-sofa": "Cream",
+	"moon-jelly-wall-hanging": "Pink",
 };
 
 const storefrontPreviewStatuses: Record<
@@ -391,6 +467,9 @@ const storefrontPreviewStatuses: Record<
 	"haneul-bunny-xl": "Waitlist",
 	"baluran-elephant-xl": "Unavailable",
 	"clement-the-fox-xl": "Coming Soon",
+	"daisy-flower-cushion": "Available",
+	"mallow-cloud-sofa": "Available",
+	"moon-jelly-wall-hanging": "Available",
 };
 
 export const storefrontPreviewProducts = sampleProducts.map((product) => {

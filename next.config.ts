@@ -9,6 +9,9 @@ const useLocalPreviewProxy = process.env.PONYO_LOCAL_PREVIEW === "true";
 const nextConfig: NextConfig = {
 	devIndicators: false,
 	output: "standalone",
+	images: {
+		qualities: [75, 90],
+	},
 	// Keep the temporary mobile-preview dev cache separate from the local production build.
 	...(useQuickTunnel ? { distDir: ".next-mobile-preview" } : {}),
 	...(useQuickTunnel

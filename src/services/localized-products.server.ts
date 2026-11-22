@@ -11,11 +11,22 @@ import { PRODUCT_CATEGORY_DEFINITIONS } from "@/lib/product-categories";
 function categorizePreviewProduct(product: Product): Product {
 	const tags = product.tags ?? [];
 	const text = `${product.name} ${product.categoryName} ${product.productType ?? ""}`.toLowerCase();
-	const categorySlug = product.sizeTier?.toLowerCase() === "xl" || tags.includes("domina-xl")
-		? "giant-plush"
-		: tags.includes("character") || text.includes("character")
+	let categorySlug: string;
+	if (text.includes("wall") || text.includes("decor") || tags.includes("wall-decor")) {
+		categorySlug = "wall-decor";
+	} else if (text.includes("cushion") || text.includes("pillow") || tags.includes("cushion")) {
+		categorySlug = text.includes("character") || tags.includes("character")
+			? "character-pillows"
+			: "designer-cushions";
+	} else if (text.includes("chair") || text.includes("bed") || text.includes("seating") || text.includes("furniture")) {
+		categorySlug = text.includes("chair") ? "chairs" : text.includes("bed") ? "beds" : "seating";
+	} else if (product.sizeTier?.toLowerCase() === "xl" || tags.includes("domina-xl")) {
+		categorySlug = "giant-plush";
+	} else {
+		categorySlug = tags.includes("character") || text.includes("character")
 			? "character-plush"
 			: "collectible-plush";
+	}
 	return { ...product, categoryId: categorySlug, categorySlug };
 }
 

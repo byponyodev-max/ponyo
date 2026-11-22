@@ -100,6 +100,21 @@ DEMO_PRODUCT_TRANSLATIONS = {
             "description": "小さな金色の星を抱えた、ポケットサイズのグレーのカワウソ。デモ商品です。サイズ、価格、在庫は参考情報です。",
             "image_alt": "小さな金色の星を抱えた、グレーのカワウソのぬいぐるみ",
         },
+        "daisy-flower-cushion": {
+            "name": "デイジー・フラワークッション",
+            "description": "クリーム色と明るい黄色の、やわらかなデイジー型クッション。デモ商品です。サイズ、価格、在庫は参考情報です。",
+            "image_alt": "明るい黄色の中心がある、クリーム色のデイジー型クッション",
+        },
+        "mallow-cloud-sofa": {
+            "name": "マロウ・クラウドソファ",
+            "description": "読書コーナーにぴったりの、低めでクッション性のあるソファ。デモ商品です。サイズ、価格、在庫は参考情報です。",
+            "image_alt": "パステルカラーの心地よい部屋に置かれた、ぬいぐるみでいっぱいのクリーム色のソファ",
+        },
+        "moon-jelly-wall-hanging": {
+            "name": "ムーンジェリーの壁飾り",
+            "description": "親しみやすいクラゲのデザインをあしらった、やわらかなピンクの壁飾り。デモ商品です。サイズ、価格、在庫は参考情報です。",
+            "image_alt": "笑顔のクラゲを描いたピンク色の壁飾り",
+        },
     },
     "ko": {
         "hoshi-cloud-bear": {
@@ -202,6 +217,21 @@ DEMO_PRODUCT_TRANSLATIONS = {
             "description": "작은 금빛 별을 안고 있는 주머니 크기의 회색 수달 인형입니다. 데모 상품이며 크기, 가격, 재고는 예시 정보입니다.",
             "image_alt": "작은 금빛 별을 안고 있는 회색 수달 인형",
         },
+        "daisy-flower-cushion": {
+            "name": "데이지 플라워 쿠션",
+            "description": "크림색과 선명한 노란색이 어우러진 부드러운 데이지 모양 쿠션입니다. 데모 상품이며 크기, 가격, 재고는 예시 정보입니다.",
+            "image_alt": "선명한 노란색 중심이 있는 크림색 데이지 모양 쿠션",
+        },
+        "mallow-cloud-sofa": {
+            "name": "말로 클라우드 소파",
+            "description": "아늑한 독서 공간에 어울리는 낮고 푹신한 소파입니다. 데모 상품이며 크기, 가격, 재고는 예시 정보입니다.",
+            "image_alt": "파스텔톤의 아늑한 방에 놓인 크림색 소파와 인형들",
+        },
+        "moon-jelly-wall-hanging": {
+            "name": "문 젤리 벽걸이",
+            "description": "친근한 해파리 디자인이 담긴 부드러운 분홍색 벽 장식입니다. 데모 상품이며 크기, 가격, 재고는 예시 정보입니다.",
+            "image_alt": "웃는 해파리 그림이 있는 분홍색 벽 장식",
+        },
     },
 }
 
@@ -224,7 +254,11 @@ DEMO_FIELD_TRANSLATIONS = {
             "Chairs": "チェア", "Beds": "ベッド", "Seating": "シーティング",
             "Wall & Decor": "壁・インテリア",
         },
-        "types": {"Plush": "ぬいぐるみ", "XL Plush": "大型ぬいぐるみ"},
+        "types": {
+            "Plush": "ぬいぐるみ", "XL Plush": "大型ぬいぐるみ",
+            "Character Cushion": "キャラクタークッション", "Seating": "ソファ・シーティング",
+            "Wall Hanging": "ウォールハンギング",
+        },
         "sizes": {"Small": "小さめ", "Medium": "ふつう", "XL": "特大"},
         "colors": {
             "Cream": "クリーム色", "Mint green": "ミントグリーン", "Pink": "ピンク",
@@ -232,6 +266,7 @@ DEMO_FIELD_TRANSLATIONS = {
             "Cream and caramel": "クリーム色とキャラメル色",
             "Blue and white": "青と白", "Grey": "グレー", "Lavender": "ラベンダー色",
             "Black and gold": "黒と金色", "Green": "緑", "Caramel and cream": "キャラメル色とクリーム色",
+            "Cream and yellow": "クリーム色と黄色",
         },
         "option_keys": {"Color": "色", "Size": "サイズ"},
         "variant_title": "通常版",
@@ -256,7 +291,11 @@ DEMO_FIELD_TRANSLATIONS = {
             "Chairs": "의자", "Beds": "침대", "Seating": "좌석",
             "Wall & Decor": "벽 장식",
         },
-        "types": {"Plush": "봉제 인형", "XL Plush": "대형 봉제 인형"},
+        "types": {
+            "Plush": "봉제 인형", "XL Plush": "대형 봉제 인형",
+            "Character Cushion": "캐릭터 쿠션", "Seating": "소파·좌석",
+            "Wall Hanging": "벽걸이 장식",
+        },
         "sizes": {"Small": "소형", "Medium": "중형", "XL": "특대형"},
         "colors": {
             "Cream": "크림색", "Mint green": "민트색", "Pink": "분홍색",
@@ -264,6 +303,7 @@ DEMO_FIELD_TRANSLATIONS = {
             "Cream and caramel": "크림색과 캐러멜색",
             "Blue and white": "파란색과 흰색", "Grey": "회색", "Lavender": "라벤더색",
             "Black and gold": "검정색과 금색", "Green": "초록색", "Caramel and cream": "캐러멜색과 크림색",
+            "Cream and yellow": "크림색과 노란색",
         },
         "option_keys": {"Color": "색상", "Size": "사이즈"},
         "variant_title": "기본형",

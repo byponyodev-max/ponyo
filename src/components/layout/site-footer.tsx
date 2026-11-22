@@ -4,6 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { storefrontFeatures } from "@/lib/storefront-features";
+import { PRODUCT_CATEGORY_DEFINITIONS, productCategoryTranslationKey } from "@/lib/product-categories";
+
+const productCategoryLinks = PRODUCT_CATEGORY_DEFINITIONS
+  .filter((category) => !category.parentSlug)
+  .map(({ slug, name }) => [productCategoryTranslationKey(slug), name, `/collections/${slug}`] as const);
 
 const footerGroups = [
   {
@@ -11,10 +16,8 @@ const footerGroups = [
     title: "Shop",
     links: [
       ["home.footer.shop_all", "Shop All", "/collections/all"],
-      ["home.footer.premium", "Premium Plushies", "/collections/premium"],
-      ["home.footer.domina", "XL Goodies", "/collections/domina-xl"],
+      ...productCategoryLinks,
       ["home.footer.new", "New Arrivals", "/collections/new-arrivals"],
-      ["home.footer.characters", "Cute Characters", "/collections/characters"],
     ],
   },
   {

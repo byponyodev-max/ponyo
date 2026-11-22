@@ -254,7 +254,7 @@ export const appTranslations: AppTranslations = {
 		"home.aisles.eyebrow": "ADA YANG COCOK UNTUK SEMUA",
 		"home.aisles.title": "Jelajahi semua jenis plush",
 		"home.aisles.sub":
-			"Temuan langka, plush premium, dan teman jumbo dalam satu tempat.",
+			"Plush, bantal, furnitur lembut, dan dekorasi playful untuk rumah dalam satu tempat.",
 		"home.aisles.view_all": "Jelajahi semua plush",
 		"home.aisles.empty_title": "Koleksi pilihan sedang disiapkan",
 		"home.aisles.empty": "Kami sedang memilih temuan pertama untuk kategori ini.",
@@ -670,7 +670,7 @@ export const appTranslations: AppTranslations = {
 		"home.aisles.eyebrow": "みんなにぴったりの一品",
 		"home.aisles.title": "ぬいぐるみを探す",
 		"home.aisles.sub":
-			"レアな一品、プレミアムなぬいぐるみ、大きな相棒がここに。",
+			"ぬいぐるみ、特大サイズ、クッション、ソフトファニチャー、遊び心あるインテリアを一か所で。",
 		"home.aisles.view_all": "すべてのぬいぐるみを見る",
 		"home.aisles.empty_title": "心を込めたコレクションを準備中",
 		"home.aisles.empty": "このカテゴリーの最初のアイテムを丁寧に選んでいます。",
@@ -1507,7 +1507,7 @@ export const appTranslations: AppTranslations = {
 		"home.aisles.eyebrow": "누구에게나 어울리는 인형",
 		"home.aisles.title": "다양한 인형을 둘러보세요",
 		"home.aisles.sub":
-			"희귀 아이템, 프리미엄 인형, 커다란 친구를 한곳에서 만나 보세요.",
+			"인형, 대형 플러시, 쿠션, 패브릭 가구와 감각적인 장식을 한곳에서 만나 보세요.",
 		"home.aisles.view_all": "모든 인형 둘러보기",
 		"home.aisles.empty_title": "새 컬렉션을 정성껏 준비하고 있어요",
 		"home.aisles.empty": "이 카테고리의 첫 상품을 정성껏 고르고 있어요.",
@@ -2304,7 +2304,7 @@ export const appTranslations: AppTranslations = {
 		"home.categories.more": "更多毛绒玩具",
 		"home.aisles.eyebrow": "总有一款适合你",
 		"home.aisles.title": "探索各类毛绒玩具",
-		"home.aisles.sub": "稀有好物、优质玩偶和巨型伙伴，一站尽享。",
+		"home.aisles.sub": "毛绒玩具、大号舒适单品、靠垫、软体家具和趣味装饰，一站选购。",
 		"home.aisles.view_all": "浏览所有毛绒玩具",
 		"home.aisles.rare_title": "稀有好物",
 		"home.aisles.rare_sub": "难以寻觅的限量毛绒玩具。",
@@ -2654,7 +2654,7 @@ export const appTranslations: AppTranslations = {
 		"home.aisles.eyebrow": "HAY ALGO PARA CADA PERSONA",
 		"home.aisles.title": "Explora todos los tipos de peluche",
 		"home.aisles.sub":
-			"Hallazgos raros, peluches premium y compañeros gigantes, todo en un mismo lugar.",
+			"Peluches, cojines, muebles acolchados y decoración con encanto, todo en un mismo lugar.",
 		"home.aisles.view_all": "Explorar todos los peluches",
 		"home.aisles.empty_title": "Estamos preparando una selección especial",
 		"home.aisles.empty": "Estamos seleccionando con cuidado los primeros productos de esta categoría.",

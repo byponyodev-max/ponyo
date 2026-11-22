@@ -25,9 +25,9 @@ const legacyCollections = [
   { title: "Bears", key: "bears", slug: "bears" }, { title: "Bunnies", key: "bunnies", slug: "bunnies" },
   { title: "Cats", key: "cats", slug: "cats" }, { title: "Cute Characters", key: "characters", slug: "characters" },
   { title: "New Arrivals", key: "new_arrivals", slug: "new-arrivals" }, { title: "Pandas", key: "pandas", slug: "pandas" },
-  { title: "Penguins", key: "penguins", slug: "penguins" }, { title: "Premium Plushies", key: "premium", slug: "premium" },
+  { title: "Penguins", key: "penguins", slug: "penguins" },
   { title: "Puppies", key: "puppies", slug: "puppies" },
-  { title: "Trending", key: "trending", slug: "trending" }, { title: "XL Goodies", key: "xl", slug: "domina-xl" },
+  { title: "Trending", key: "trending", slug: "trending" },
 ];
 const categoryKeys: Record<string, string> = {
   premium: "premium", "domina-xl": "xl", "giant-plush": "xl",

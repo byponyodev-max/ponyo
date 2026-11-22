@@ -15,31 +15,20 @@ import { orderProductCategories, PRODUCT_CATEGORY_ROOT_SLUGS, productCategoryTra
 import type { ProductCategory } from "@/services/ponyo-api.client";
 import locale from "@/locales/en.default.json";
 
-const images = {
-  bunny: "/images/catalog/maker-bunny.jpg",
-  bear: "/images/catalog/maker-bear.jpg",
-  cat: "/images/catalog/maker-cat.jpg",
-  dinosaur: "/images/catalog/maker-dinosaur.jpg",
-  dog: "/images/catalog/maker-dog.jpg",
-  penguin: "/images/catalog/maker-penguin.jpg",
-  chick: "/images/catalog/maker-chick.jpg",
-  panda: "/images/catalog/ponyo-12.png",
-  premium: "/images/catalog/ponyo-5.png",
-  xlCat: "/images/catalog/ponyo-11.png",
+const categoryImages: Record<string, { card: string; hero: string }> = {
+  "plush-toys": { card: "/images/categories/plush-toys.png", hero: "/images/home-hero/plush-room-hd.png" },
+  oversized: { card: "/images/categories/oversized.png", hero: "/images/home-hero/oversized-room-hd.png" },
+  cushions: { card: "/images/categories/cushions.png", hero: "/images/home-hero/decor-room-hd.png" },
+  "soft-furniture": { card: "/images/categories/soft-furniture.png", hero: "/images/home-hero/plush-room-hd.png" },
+  "wall-decor": { card: "/images/categories/wall-decor.png", hero: "/images/home-hero/decor-room-hd.png" },
 };
 
-const categories = [
-  { title: "Giant plush", href: "/pages/domina-xl", image: "/images/catalog/ponyo-3.png" },
-  { title: "Bears", href: "/collections/bears", image: images.bear },
-  { title: "Bunnies", href: "/collections/bunnies", image: images.bunny },
-  { title: "Cats", href: "/collections/cats", image: images.cat },
-  { title: "Cute Characters", href: "/collections/characters", image: images.dinosaur },
-  { title: "Premium", href: "/collections/premium", image: images.premium },
-  { title: "Pandas", href: "/collections/pandas", image: images.panda },
-  { title: "Puppies", href: "/collections/puppies", image: images.dog },
-  { title: "Penguins", href: "/collections/penguins", image: images.penguin },
-  { title: "More plush", href: "/collections/all", image: images.chick },
-];
+const images = {
+  chick: "/images/catalog/maker-chick.jpg",
+  bear: "/images/catalog/maker-bear.jpg",
+  dog: "/images/catalog/maker-dog.jpg",
+  xlCat: "/images/catalog/ponyo-11.png",
+};
 
 const sizeGuideJellyfish = [
   { className: "size-guide-hero-jellyfish--left", tone: "blue", direction: 1, delay: "-1.2s", duration: "7.2s" },
@@ -107,10 +96,14 @@ export default async function Home() {
       ? children.map(categoryLabel).join(" · ")
       : t.has("home.aisles.wall_decor_sub") ? t("home.aisles.wall_decor_sub") : "Wall art and decor";
     return {
+      slug: category.slug,
       title: categoryLabel(category),
       description,
       href: `/collections/${category.slug}`,
       products: categoryProducts,
+      image: categoryImages[category.slug]?.card ?? categoryProducts[0]?.image ?? "/images/catalog/ponyo-5.png",
+      imageAlt: "",
+      heroImage: categoryImages[category.slug]?.hero ?? categoryProducts[0]?.image ?? "/images/catalog/ponyo-6.png",
     };
   });
   const faq = locale.pg.faq;
@@ -119,7 +112,7 @@ export default async function Home() {
   return (
     <SiteFrame className="store-home">
       <HomeSparkleRain />
-      <HomeCarousel hasCollectibles={products.some((product) => product.tags?.includes("collectibles"))} />
+      <HomeCarousel categories={aisles} />
 
       <section className="home-marketplace-intro" aria-labelledby="home-hero-heading">
         <span className="home-marketplace-eyebrow"><LocalizedText translationKey="home.marketplace.hero_eyebrow" fallback={locale.mp.hero_eyebrow} /></span>
@@ -133,9 +126,10 @@ export default async function Home() {
 
       <nav className="home-category-rail" aria-label={t("home.category_rail.aria_label")}>
         <div className="home-category-rail-card"><strong><LocalizedText translationKey="home.category_rail.title" fallback="Find your kind of plush" /></strong>
-          <ul>{categories.map((category) => <li key={category.title}><Link href={category.href}><Image src={category.image} alt="" width={56} height={56} /><span><LocalizedText translationKey={`home.categories.${category.title === "Giant plush" ? "giant" : category.title === "Cute Characters" ? "characters" : category.title === "Premium" ? "premium" : category.title === "More plush" ? "more" : category.title.toLowerCase()}`} fallback={category.title} /></span></Link></li>)}</ul>
+          <ul>{aisles.map((category) => <li key={category.slug}><Link href={category.href}><Image src={category.image} alt="" width={56} height={56} /><span>{category.title}</span></Link></li>)}</ul>
         </div>
       </nav>
+      <AnimalTabs products={products} />
 
       <section className="marketplace-aisles store-container" aria-labelledby="aisles-heading">
         <header><div><span className="marketplace-aisles-eyebrow"><LocalizedText translationKey="home.aisles.eyebrow" fallback="A little something for everyone" /></span><h2 id="aisles-heading"><LocalizedText as="span" translationKey="home.aisles.title" fallback="Shop every kind of plush" /></h2><p><LocalizedText translationKey="home.aisles.sub" fallback="Rare finds, premium plushies and XL goodies, all in one place." /></p></div><Link href="/collections/all" className="marketplace-aisles-view-all"><LocalizedText translationKey="home.aisles.view_all" fallback="Explore all plush" /> <span aria-hidden="true">→</span></Link></header>
@@ -149,7 +143,6 @@ export default async function Home() {
 
       <ProductShelf className="home-live-shelf" id="new-arrivals" eyebrow="Just landed" title="Just landed" description="The newest plush on Ponyo. Swipe to see them all." products={arrivals} href="/collections/new-arrivals" linkLabel="See all →" rail compact />
       <ProductShelf className="home-live-shelf" id="more-plush" eyebrow="Trending now" title="More plush to discover" description="A fresh mix from across the Ponyo catalog." products={allTrending} href="/collections/all" linkLabel="See all →" />
-      <AnimalTabs products={products} />
 
       <section className="lifestyle-break">
         <Image src="/images/catalog/ponyo-6.png" alt={t("home.image_alt.lifestyle")} fill sizes="100vw" />

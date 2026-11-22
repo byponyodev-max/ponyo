@@ -1,6 +1,7 @@
-"""Development seed catalog keeps a varied five-item Rare Finds collection."""
+"""Development seed catalog keeps categories populated and sample photos distinct."""
 
 from app.seed import PRODUCT_COLORS, PRODUCTS, PRODUCT_STATUSES
+from app.product_categories import PRODUCT_CATEGORY_DEFINITIONS, product_category_slug
 from pathlib import Path
 
 import pytest
@@ -15,10 +16,10 @@ from app.security import verify_password
 from app.translations import get_product_translation, source_hash
 
 
-def test_catalog_has_twenty_unique_products_and_ten_lineup_images():
-    assert len(PRODUCTS) == 20
+def test_catalog_has_twenty_three_unique_products_and_ten_lineup_images():
+    assert len(PRODUCTS) == 23
     slugs = {product["slug"] for product in PRODUCTS}
-    assert len(slugs) == 20
+    assert len(slugs) == 23
     assert set(PRODUCT_COLORS) == slugs
     assert set(PRODUCT_STATUSES) == slugs
     lineup = [product for product in PRODUCTS if "/catalog/lineup/" in product["image"]]
@@ -30,6 +31,24 @@ def test_catalog_has_twenty_unique_products_and_ten_lineup_images():
         assert product["alt"]
         assert (public / product["image"].lstrip("/")).is_file()
         assert PRODUCT_STATUSES[product["slug"]] == "Available"
+    assert len({product["image"] for product in PRODUCTS}) == len(PRODUCTS)
+    assert all((public / product["image"].lstrip("/")).is_file() for product in PRODUCTS)
+
+
+def test_demo_products_cover_all_root_categories():
+    definitions = {category.slug: category for category in PRODUCT_CATEGORY_DEFINITIONS}
+    roots = set()
+    for product in PRODUCTS:
+        category_slug = product_category_slug(
+            name=product["name"],
+            category_name=product["category"],
+            product_type=product["type"],
+            tags=product["tags"],
+            size_tier=product["size"],
+        )
+        category = definitions[category_slug]
+        roots.add(category.parent_slug or category.slug)
+    assert roots == {"plush-toys", "oversized", "cushions", "soft-furniture", "wall-decor"}
 
 
 @pytest.mark.asyncio
@@ -61,7 +80,7 @@ async def test_seed_initial_admin_is_verified_and_does_not_reset_existing_passwo
 
 
 @pytest.mark.asyncio
-async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(monkeypatch, tmp_path):
+async def test_seed_products_is_idempotent_without_replenishing_stock(monkeypatch, tmp_path):
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'seed.db'}")
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     monkeypatch.setattr(seed, "SessionLocal", sessions)
@@ -86,12 +105,18 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
             bad_translation.provider = "libretranslate"
             product.reservations_open = False
             product.reservation_target = 40
+            xl_product = await db.scalar(select(Product).where(Product.slug == "hoshi-cloud-bear-xl"))
+            xl_image = await db.scalar(select(ProductImage).where(
+                ProductImage.product_id == xl_product.id,
+                ProductImage.sort_order == 0,
+            ))
+            xl_image.url = "/images/catalog/maker-bear.jpg"
             await db.commit()
         await seed.seed_products()
         async with sessions() as db:
             for model in (Product, ProductVariant, ProductImage, SupplierOffer, SupplierInventory):
-                assert await db.scalar(select(func.count()).select_from(model)) == 20
-            assert await db.scalar(select(func.count()).select_from(ProductTranslation)) == 40
+                assert await db.scalar(select(func.count()).select_from(model)) == 23
+            assert await db.scalar(select(func.count()).select_from(ProductTranslation)) == 46
             product = await db.scalar(select(Product).where(Product.slug == "mochi-cloud").options(
                 selectinload(Product.variants), selectinload(Product.category),
                 selectinload(Product.brand), selectinload(Product.images),
@@ -99,6 +124,12 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
             assert product.reservations_open is False
             assert product.reservation_target == 40
             assert product.materials == "Polyester plush; polyester fiber fill; embroidered details."
+            xl_product = await db.scalar(select(Product).where(Product.slug == "hoshi-cloud-bear-xl"))
+            xl_image = await db.scalar(select(ProductImage).where(
+                ProductImage.product_id == xl_product.id,
+                ProductImage.sort_order == 0,
+            ))
+            assert xl_image.url == xl_product.image_url == "/images/catalog/hoshi-cloud-bear-xl.png"
             assert product.weight_grams == 240
             assert product.edition_count == 240
             assert product.estimated_delivery_date.isoformat() == "2027-01-15"

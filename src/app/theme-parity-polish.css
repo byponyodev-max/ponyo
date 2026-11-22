@@ -6848,7 +6848,13 @@ body {
 
 .store-home .store-hero-carousel {
     min-height: 0;
-    height: min(40vw, 520px);
+    height: 520px;
+}
+
+@media (min-width: 1024px) {
+    .store-home .store-hero-carousel {
+        height: clamp(620px, 52vw, 760px);
+    }
 }
 
 .store-home .store-hero-copy h2,

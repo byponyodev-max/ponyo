@@ -113,8 +113,15 @@ async def link_demo_catalog(db: AsyncSession) -> None:
         if brand.is_demo and profile:
             for field, value in profile.items():
                 setattr(brand, field, value)
-        if not await db.scalar(select(ProductImage.id).where(ProductImage.product_id == product.id)):
+        primary_image = await db.scalar(select(ProductImage).where(
+            ProductImage.product_id == product.id,
+            ProductImage.sort_order == 0,
+        ))
+        if primary_image is None:
             db.add(ProductImage(id=demo_id("image", str(product.id)), product_id=product.id, url=product.image_url, alt=product.image_alt, sort_order=0))
+        elif brand.is_demo:
+            primary_image.url = product.image_url
+            primary_image.alt = product.image_alt
         # A manufacturer/brand is not a supplier business. Use explicitly fictional wholesalers.
         code = "DEMO-XL" if "domina" in product.supplier_name.lower() else "DEMO-PLUSH"
         supplier = await db.scalar(select(Supplier).where(Supplier.code == code))

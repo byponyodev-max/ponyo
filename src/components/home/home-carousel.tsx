@@ -4,15 +4,56 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalization } from "@/components/layout/localization-provider";
+import type { ProductImage } from "@/types/product";
 
-const slideCatalog = [
-  { key: "xl", collection: "domina-xl", kicker: "DOMINA BY PONYO", title: "XL Goodies", description: "Big plush that fills a room, including Domina.", action: "Shop XL Goodies", href: "/shop?category=domina-xl", image: "/images/catalog/ponyo-3.png", imageAlt: "A person holding an oversized cream bunny plush", imageAltKey: "home.image_alt.carousel.xl" },
-  { key: "premium", collection: "premium", kicker: "MADE TO LAST", title: "Premium Plushies", description: "Soft, well-made plush chosen for materials and craftsmanship.", action: "Shop Premium Plushies", href: "/shop?category=premium", image: "/images/catalog/ponyo-5.png", imageAlt: "A grid of soft premium plush friends", imageAltKey: "home.image_alt.carousel.premium" },
-  { key: "new", collection: "new-arrival", kicker: "JUST LANDED", title: "New Discoveries", description: "Fresh finds from new brands and makers.", action: "See what is new", href: "/shop?category=new-arrival", image: "/images/catalog/ponyo-6.png", imageAlt: "A pile of new plush friends on a cozy bed", imageAltKey: "home.image_alt.carousel.new" },
-];
+type HomeCarouselCategory = {
+  slug: string;
+  title: string;
+  description: string;
+  href: string;
+  image: ProductImage;
+  heroImage: ProductImage;
+  imageAlt: string;
+};
 
-export function HomeCarousel({ hasCollectibles = false }: { hasCollectibles?: boolean }) {
-  const slides = hasCollectibles ? [slideCatalog[0], slideCatalog[1], { key: "collectibles", collection: "collectibles", kicker: "FOR COLLECTORS", title: "Collectibles", description: "Figurines and collectible toys.", action: "Shop Collectibles", href: "/shop?category=collectibles", image: "/images/catalog/ponyo-7.png", imageAlt: "A grid of collectible plush friends", imageAltKey: "home.image_alt.carousel.collectibles" }, slideCatalog[2]] : slideCatalog;
+type HomeCarouselSlide = {
+  key: string;
+  category?: boolean;
+  kicker: string;
+  title: string;
+  description: string;
+  action: string;
+  href: string;
+  image: ProductImage;
+  imageAlt: string;
+};
+
+const newArrivalsSlide: HomeCarouselSlide = {
+  key: "new",
+  kicker: "JUST LANDED",
+  title: "New Discoveries",
+  description: "Fresh finds from new brands and makers.",
+  action: "See what is new",
+  href: "/collections/new-arrivals",
+  image: "/images/home-hero/plush-room-hd.png",
+  imageAlt: "",
+};
+
+export function HomeCarousel({ categories }: { categories: HomeCarouselCategory[] }) {
+  const slides: HomeCarouselSlide[] = [
+    ...categories.map((category) => ({
+      key: category.slug,
+      category: true,
+      kicker: "",
+      title: category.title,
+      description: category.description,
+      action: "Shop All",
+      href: category.href,
+      image: category.heroImage,
+      imageAlt: category.imageAlt,
+    })),
+    newArrivalsSlide,
+  ];
   const trackRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef(0);
   const timerRef = useRef<number | null>(null);
@@ -21,10 +62,7 @@ export function HomeCarousel({ hasCollectibles = false }: { hasCollectibles?: bo
   const { t } = useLocalization();
 
   const copyKeys: Record<string, { kicker: string; title: string; description: string; action: string }> = {
-    xl: { kicker: "home.slides.xl_eyebrow", title: "home.pillars.xl_title", description: "home.pillars.xl_body", action: "home.slides.xl_cta" },
-    premium: { kicker: "home.slides.premium_eyebrow", title: "home.pillars.premium_title", description: "home.pillars.premium_body", action: "home.slides.premium_cta" },
     new: { kicker: "home.slides.new_eyebrow", title: "home.pillars.new_title", description: "home.pillars.new_body", action: "home.slides.new_cta" },
-    collectibles: { kicker: "home.slides.collectibles_eyebrow", title: "home.pillars.collectibles_title", description: "home.pillars.collectibles_body", action: "home.slides.collectibles_cta" },
   };
 
   const markActive = useCallback(() => {
@@ -71,10 +109,10 @@ export function HomeCarousel({ hasCollectibles = false }: { hasCollectibles?: bo
     <section className="store-hero-carousel" aria-label={t("home.slides.label", "Featured plush")} aria-roledescription="carousel">
       <div className="store-hero-track" ref={trackRef} onScroll={markActive} onTouchStart={stop} onTouchEnd={restart}>
         {slides.map((slide, index) => <div className="store-hero-slide" key={slide.key} role="group" aria-roledescription="slide" aria-label={`${index + 1} / ${slides.length}`}>
-          <Image className="store-hero-image" src={slide.image} alt={t(slide.imageAltKey, slide.imageAlt)} fill priority={index === 0} sizes="(min-width: 1400px) 1400px, 100vw" />
+          <Image className="store-hero-image" src={slide.image} alt={slide.imageAlt} fill priority={index === 0} quality={90} sizes="(min-width: 1400px) 1400px, 100vw" />
           <div className="store-hero-overlay" aria-hidden="true" />
           <div className="store-hero-copy" aria-live={index === active ? "polite" : undefined}>
-            <span className="store-hero-kicker">{t(copyKeys[slide.key]?.kicker ?? "", slide.kicker)}</span><h2>{t(copyKeys[slide.key]?.title ?? "", slide.title)}</h2><p>{t(copyKeys[slide.key]?.description ?? "", slide.description)}</p><Link className="store-hero-action" href={slide.href}>{t(copyKeys[slide.key]?.action ?? "", slide.action)}</Link>
+            <span className="store-hero-kicker">{slide.category ? t("home.slides.label", "Featured plush") : t(copyKeys[slide.key].kicker, slide.kicker)}</span><h2>{slide.category ? slide.title : t(copyKeys[slide.key].title, slide.title)}</h2><p>{slide.category ? slide.description : t(copyKeys[slide.key].description, slide.description)}</p><Link className="store-hero-action" href={slide.href}>{slide.category ? t("home.footer.shop_all", "Shop All") : t(copyKeys[slide.key].action, slide.action)}</Link>
           </div>
         </div>)}
       </div>

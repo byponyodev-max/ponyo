@@ -23,8 +23,8 @@ PRODUCTS = [
     {"slug": "better-days-panda", "name": "Better Days Panda", "description": "A cloud-soft panda with a blush bow and a little reminder to stay happy.", "price": 25600, "category": "Pandas", "type": "Plush", "tags": ["panda", "rare", "premium"], "size": "Medium", "dimensions": "32 cm", "supplier": "Ponyo selected maker", "image": "/images/catalog/ponyo-12.png", "alt": "Cream and charcoal panda plush with a blush bow", "stock": 6},
     {"slug": "cloud-cat", "name": "Cloud Cat", "description": "A sleepy cream-and-caramel cat plush, soft as a little cloud and hard to find.", "price": 19600, "category": "Cats", "type": "Plush", "tags": ["cat", "rare", "limited-edition"], "size": "Small", "dimensions": "24 cm", "supplier": "Ponyo selected maker", "image": "/images/catalog/maker-cat.jpg", "alt": "Sleepy cream cat plush with caramel markings", "stock": 7},
     {"slug": "bluebell-penguin", "name": "Bluebell Penguin", "description": "A tiny round penguin in soft blue and snowy white.", "price": 27500, "category": "Penguins", "type": "Plush", "tags": ["new-arrival", "penguin", "premium"], "size": "Small", "dimensions": "25 cm", "supplier": "Ponyo", "image": "/images/catalog/maker-penguin.jpg", "alt": "Round blue and white penguin plush", "stock": 20},
-    {"slug": "hoshi-cloud-bear-xl", "name": "Hoshi Cloud Bear XL", "description": "The 90 cm giant version of Hoshi Cloud Bear. An extra-big cuddle buddy from Domina.", "price": 68000, "category": "Giant plush", "type": "XL Plush", "tags": ["bear", "domina-xl"], "size": "XL", "dimensions": "90 cm", "supplier": "Domina", "image": "/images/catalog/maker-bear.jpg", "alt": "Warm cream teddy bear plush with a checkered bow", "stock": 3},
-    {"slug": "haneul-bunny-xl", "name": "Haneul Bunny XL", "description": "A giant cream bunny standing 100 cm tall, from Domina.", "price": 74500, "category": "Giant plush", "type": "XL Plush", "tags": ["bunny", "domina-xl"], "size": "XL", "dimensions": "100 cm", "supplier": "Domina", "image": "/images/catalog/maker-bunny.jpg", "alt": "Oversized cream bunny plush shown at room scale", "stock": 3},
+    {"slug": "hoshi-cloud-bear-xl", "name": "Hoshi Cloud Bear XL", "description": "The 90 cm giant version of Hoshi Cloud Bear. An extra-big cuddle buddy from Domina.", "price": 68000, "category": "Giant plush", "type": "XL Plush", "tags": ["bear", "domina-xl"], "size": "XL", "dimensions": "90 cm", "supplier": "Domina", "image": "/images/catalog/hoshi-cloud-bear-xl.png", "alt": "Large brown teddy bear plush with a gingham bow", "stock": 3},
+    {"slug": "haneul-bunny-xl", "name": "Haneul Bunny XL", "description": "A giant cream bunny standing 100 cm tall, from Domina.", "price": 74500, "category": "Giant plush", "type": "XL Plush", "tags": ["bunny", "domina-xl"], "size": "XL", "dimensions": "100 cm", "supplier": "Domina", "image": "/images/catalog/haneul-bunny-xl.png", "alt": "Oversized cream bunny plush shown at room scale", "stock": 3},
     {"slug": "baluran-elephant-xl", "name": "Baluran Elephant XL", "description": "An extra-large 120 cm elephant plush from Domina, the centrepiece of any room.", "price": 89000, "category": "Giant plush", "type": "XL Plush", "tags": ["character", "domina-xl"], "size": "XL", "dimensions": "120 cm", "supplier": "Domina", "image": "/images/catalog/ponyo-6.png", "alt": "An oversized elephant plush", "stock": 3},
     {"slug": "mochi-cloud", "name": "Mochi Cloud", "description": "A smiling cloud with a crescent moon and dangling raindrops. Demo catalog item; size, price and inventory are illustrative.", "price": 14800, "category": "Characters", "type": "Plush", "tags": ["character", "new-arrival", "demo"], "size": "Small", "dimensions": "22 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/lineup/mochi-cloud.png", "alt": "Cream cloud plush with a yellow crescent moon and blue raindrops", "stock": 12},
     {"slug": "blossom-fawn", "name": "Blossom Fawn", "description": "A rosy little fawn with soft antlers and a flower crown. Demo catalog item; size, price and inventory are illustrative.", "price": 16900, "category": "Characters", "type": "Plush", "tags": ["character", "new-arrival", "demo"], "size": "Small", "dimensions": "24 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/lineup/blossom-fawn.png", "alt": "Pink fawn plush with brown antlers and a pastel flower crown", "stock": 10},
@@ -36,6 +36,9 @@ PRODUCTS = [
     {"slug": "starlight-kitty", "name": "Starlight Kitty", "description": "A midnight-black kitty scattered with golden stars and a crescent moon. Demo catalog item; size, price and inventory are illustrative.", "price": 23900, "category": "Cats", "type": "Plush", "tags": ["cat", "premium", "demo"], "size": "Medium", "dimensions": "31 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/lineup/starlight-kitty.png", "alt": "Black cat plush decorated with golden stars and a crescent moon", "stock": 8},
     {"slug": "clover-turtle", "name": "Clover Turtle", "description": "A smiling green turtle with a soft shell and little pastel flowers. Demo catalog item; size, price and inventory are illustrative.", "price": 17900, "category": "Characters", "type": "Plush", "tags": ["character", "new-arrival", "demo"], "size": "Small", "dimensions": "23 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/lineup/clover-turtle.png", "alt": "Soft green turtle plush with a darker shell and pastel flowers", "stock": 14},
     {"slug": "pebble-otter", "name": "Pebble Otter", "description": "A pocket-sized grey otter holding a little golden star. Demo catalog item; size, price and inventory are illustrative.", "price": 12800, "category": "Characters", "type": "Plush", "tags": ["character", "new-arrival", "demo"], "size": "Small", "dimensions": "16 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/lineup/pebble-otter.png", "alt": "Small grey otter plush holding a golden star", "stock": 18},
+    {"slug": "daisy-flower-cushion", "name": "Daisy Flower Cushion", "description": "A soft daisy-shaped cushion in warm cream and sunny yellow. Demo catalog item; size, price and inventory are illustrative.", "price": 19800, "category": "Cushions", "type": "Character Cushion", "tags": ["cushion", "character", "demo"], "size": "Medium", "dimensions": "38 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/daisy-flower-cushion.png", "alt": "Cream daisy-shaped cushion with a sunny yellow centre", "stock": 10},
+    {"slug": "mallow-cloud-sofa", "name": "Mallow Cloud Sofa", "description": "A low, cushioned sofa made for cozy reading corners. Demo catalog item; size, price and inventory are illustrative.", "price": 62800, "category": "Soft Furniture", "type": "Seating", "tags": ["seating", "furniture", "demo"], "size": "Medium", "dimensions": "110 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/mallow-floor-sofa.png", "alt": "A plush-filled cream sofa in a cozy pastel room", "stock": 4},
+    {"slug": "moon-jelly-wall-hanging", "name": "Moon Jelly Wall Hanging", "description": "A soft pink wall hanging featuring a friendly jellyfish design. Demo catalog item; size, price and inventory are illustrative.", "price": 21800, "category": "Wall & Decor", "type": "Wall Hanging", "tags": ["wall-decor", "decor", "demo"], "size": "Medium", "dimensions": "45 cm", "supplier": "Ponyo demo collection", "image": "/images/catalog/moon-jelly-wall-hanging.png", "alt": "Pink wall hanging decorated with a smiling jellyfish", "stock": 8},
 ]
 
 PRODUCT_COLORS = {
@@ -59,6 +62,9 @@ PRODUCT_COLORS = {
     "starlight-kitty": "Black and gold",
     "clover-turtle": "Green",
     "pebble-otter": "Grey",
+    "daisy-flower-cushion": "Cream and yellow",
+    "mallow-cloud-sofa": "Cream",
+    "moon-jelly-wall-hanging": "Pink",
 }
 
 PRODUCT_STATUSES = {
@@ -82,6 +88,9 @@ PRODUCT_STATUSES = {
     "starlight-kitty": "Available",
     "clover-turtle": "Available",
     "pebble-otter": "Available",
+    "daisy-flower-cushion": "Available",
+    "mallow-cloud-sofa": "Available",
+    "moon-jelly-wall-hanging": "Available",
 }
 
 
