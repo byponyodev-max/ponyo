@@ -27,6 +27,7 @@ def test_full_migration_chain_generates_postgresql_sql_without_database(monkeypa
     assert "id UUID NOT NULL" in sql
     assert "ADD CONSTRAINT uq_products_sku UNIQUE (sku)" in sql
     assert "CREATE TABLE email_verification_tokens" in sql
+    assert "WARNING: Product category backfill requires this revision to run online." in sql
     for revision in scripts.walk_revisions():
         assert revision.revision in sql
     assert sql.count("-- Running upgrade") == len(list(scripts.walk_revisions()))

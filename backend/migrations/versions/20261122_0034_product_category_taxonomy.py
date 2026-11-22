@@ -17,6 +17,7 @@ depends_on = None
 def upgrade() -> None:
     if context.is_offline_mode():
         # This data backfill classifies existing product rows and needs a live connection.
+        op.execute("-- WARNING: Product category backfill requires this revision to run online.")
         return
 
     connection = op.get_bind()
