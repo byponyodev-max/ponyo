@@ -1,7 +1,7 @@
 """Provider mocks and disposable databases only; never use the application DB."""
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import reservation_expiry as recovery
 from app.models import (
-    Base, Order, OrderItem, OrderStatusHistory, OutboxEvent, Product,
-    ProductVariant, Supplier, SupplierInventory, SupplierOffer,
+    Base, EmailNotification, Order, OrderItem, OrderStatusHistory, OutboxEvent, Product,
+    ProductReservation, ProductVariant, Supplier, SupplierInventory, SupplierOffer,
 )
 
 NOW = datetime(2026, 11, 11, 12, tzinfo=timezone.utc)
@@ -43,7 +43,7 @@ async def flow(monkeypatch):
         db.add(variant)
         await db.flush()
         offer = SupplierOffer(supplier_id=supplier.id, variant_id=variant.id,
-                              supplier_sku="EXPIRY", cost_amount=50, currency="JPY")
+                              supplier_sku="EXPIRY", cost_amount=50, currency="JPY", is_primary=True)
         db.add(offer)
         await db.flush()
         inventory = SupplierInventory(offer_id=offer.id, on_hand=10, reserved=2)
@@ -281,6 +281,52 @@ async def test_batch_is_bounded_at_100(flow):
     assert provider.call_count == 100
 
 
+async def test_campaign_deadlines_close_once_and_queue_reservation_updates(flow):
+    async with flow.factory() as db:
+        missed = Product(
+            slug="deadline-missed",
+            name="Deadline Missed",
+            price_amount=100,
+            image_url="/test.jpg",
+            reservations_open=True,
+            reservation_target=2,
+            reservation_deadline=date(2026, 11, 10),
+        )
+        reached = Product(
+            slug="deadline-reached",
+            name="Deadline Reached",
+            price_amount=100,
+            image_url="/test.jpg",
+            reservations_open=True,
+            reservation_target=1,
+            reservation_deadline=date(2026, 11, 10),
+        )
+        db.add_all([missed, reached])
+        await db.flush()
+        db.add_all([
+            ProductReservation(product_id=missed.id, email="missed@example.com", country="JP"),
+            ProductReservation(product_id=reached.id, email="reached@example.com", country="JP"),
+        ])
+        await db.commit()
+        missed_id, reached_id = missed.id, reached.id
+
+    async with flow.factory() as db:
+        assert await recovery.expire_product_reservation_campaigns(db, now=NOW) == 2
+        await db.commit()
+        assert await recovery.expire_product_reservation_campaigns(db, now=NOW) == 0
+
+    async with flow.factory() as db:
+        missed = await db.get(Product, missed_id)
+        reached = await db.get(Product, reached_id)
+        assert missed.production_status == "target_missed" and missed.reservations_open is False
+        assert missed.reservation_target_missed_at is not None
+        assert reached.production_status == "target_reached" and reached.reservations_open is False
+        queued = (await db.scalars(select(EmailNotification))).all()
+        assert len(queued) == 1
+        assert queued[0].template == "reservation_target_missed"
+        assert queued[0].recipient == "missed@example.com"
+
+
 async def test_postgres_claim_and_variant_lock_order_and_atomic_increment(flow, monkeypatch):
     statements = []
     async with flow.factory() as db:
@@ -300,7 +346,8 @@ async def test_postgres_claim_and_variant_lock_order_and_atomic_increment(flow, 
                         if "ORDER BY product_variants.id FOR UPDATE" in sql)
     supplier_update = next(i for i, sql in enumerate(statements) if sql.startswith("UPDATE supplier_inventory"))
     assert variant_lock < supplier_update
-    assert any("stock_quantity=(product_variants.stock_quantity +" in sql for sql in statements)
+    assert any("supplier_offers.is_primary" in sql for sql in statements)
+    assert any(sql.startswith("UPDATE product_variants SET stock_quantity=") for sql in statements)
 
 
 async def test_worker_retries_and_cancellation_closes_session(flow, monkeypatch, caplog):
@@ -340,6 +387,6 @@ async def test_lifespan_optional_worker_cleanup_on_body_error(monkeypatch, enabl
     with pytest.raises(RuntimeError, match="body failure"):
         async with main.lifespan(main.app):
             raise RuntimeError("body failure")
-    assert worker.call_count == int(enabled)
+    assert worker.call_count == 1
     redis.aclose.assert_awaited_once()
     dispose.assert_awaited_once()

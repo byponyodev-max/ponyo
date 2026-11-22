@@ -1323,6 +1323,7 @@ async def test_auth_smtp_message_and_transport_are_correct(smtp_transport, monke
     message = smtp.send_message.call_args.args[0]
     assert message["To"] == "buyer@example.com"
     assert message["From"].addresses[0].addr_spec == "accounts@example.com"
+    assert message["From"].addresses[0].display_name == "Ponyo"
     assert message["Subject"] == subject
     assert url in message.get_body(preferencelist=("plain",)).get_content()
 

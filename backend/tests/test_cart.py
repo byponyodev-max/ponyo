@@ -255,7 +255,7 @@ async def test_supplier_availability_is_checked_but_not_reserved(signed_in, cart
         await db.flush()
         offer = SupplierOffer(
             supplier_id=supplier.id, variant_id=variant_id, supplier_sku="toy", cost_amount=500,
-            currency="JPY",
+            currency="JPY", is_primary=True,
         )
         db.add(offer)
         await db.flush()

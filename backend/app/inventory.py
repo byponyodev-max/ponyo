@@ -12,7 +12,8 @@ async def refresh_synced_variant(db: AsyncSession, variant_id) -> None:
         .join(SupplierOffer, SupplierOffer.id == SupplierInventory.offer_id)
         .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
         .join(ProductVariant, ProductVariant.id == SupplierOffer.variant_id)
-        .where(SupplierOffer.variant_id == variant_id, SupplierOffer.active.is_(True),
+        .where(SupplierOffer.variant_id == variant_id, SupplierOffer.is_primary.is_(True),
+               SupplierOffer.active.is_(True),
                Supplier.active.is_(True), SupplierOffer.currency == ProductVariant.currency))
     await db.execute(update(ProductVariant).where(ProductVariant.id == variant_id).values(
         stock_quantity=max(0, quantity or 0),
@@ -26,7 +27,7 @@ async def has_synced_inventory(db: AsyncSession, variant_id) -> bool:
 
 
 async def restore_variant_stock(db: AsyncSession, item: OrderItem) -> None:
-    if await has_synced_inventory(db, item.variant_id):
+    if item.supplier_offer_id is not None or await has_synced_inventory(db, item.variant_id):
         await refresh_synced_variant(db, item.variant_id)
     else:
         await db.execute(update(ProductVariant).where(ProductVariant.id == item.variant_id).values(
@@ -43,7 +44,8 @@ async def reserve_supplier_stock(db: AsyncSession, variant: ProductVariant, quan
         .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
         .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
         .where(
-            SupplierOffer.variant_id == variant.id, SupplierOffer.active.is_(True),
+            SupplierOffer.variant_id == variant.id, SupplierOffer.is_primary.is_(True),
+            SupplierOffer.active.is_(True),
             Supplier.active.is_(True), SupplierOffer.currency == variant.currency,
             SupplierOffer.minimum_order_quantity <= quantity,
             SupplierInventory.on_hand - SupplierInventory.reserved >= quantity,
@@ -78,5 +80,5 @@ async def settle_supplier_stock(db: AsyncSession, item: OrderItem, *, paid: bool
     )
     if result.rowcount != 1:
         raise HTTPException(409, "Supplier reservation is not available for this order.")
-    if paid and await has_synced_inventory(db, item.variant_id):
+    if paid:
         await refresh_synced_variant(db, item.variant_id)

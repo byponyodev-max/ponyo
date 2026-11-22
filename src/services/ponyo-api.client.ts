@@ -105,10 +105,18 @@ export type SupplierListing = {
 	reserved: number;
 	availableQuantity: number;
 	active: boolean;
+	isPrimary: boolean;
+	pendingChange: {
+		productionCapacity: number;
+		costAmount: number;
+		minimumOrderQuantity: number;
+		leadTimeDays: number;
+		submittedAt: string;
+	} | null;
 };
 
 export type SupplierListingUpdate = {
-	onHand: number;
+	productionCapacity: number;
 	costAmount: number;
 	minimumOrderQuantity: number;
 	leadTimeDays: number;
@@ -184,6 +192,8 @@ export type AdminProduct = {
 	priceAmount: number;
 	currency: string;
 	categoryName: string;
+	categoryId: string | null;
+	categorySlug: string | null;
 	brandName: string;
 	published: boolean;
 	createdAt: string;
@@ -198,12 +208,25 @@ export type AdminProduct = {
 	onlyAtPonyo: boolean;
 	reservationsOpen: boolean;
 	reservationTarget: number | null;
+	reservationDeadline: string | null;
+	productionStatus: string;
+	productionApprovedAt: string | null;
+	preorderInvitesSentAt: string | null;
+	reservationTargetMissedAt: string | null;
 	shippingCountries?: string[] | null;
 	reservationMinimumReachedAt?: string | null;
 	reservationCount?: number;
 	reservationsByCountry?: Array<{ country: string; count: number }>;
 	interestCount?: number;
 	interestsByCountry?: Array<{ country: string; count: number }>;
+};
+
+export type ProductCategory = {
+	id: string;
+	slug: string;
+	name: string;
+	parentId: string | null;
+	productCount: number;
 };
 
 export type AdminReservationEntry = {
@@ -440,6 +463,34 @@ export type AdminSupplier = {
 	isDemo: boolean;
 	accountCount: number;
 	offerCount: number;
+};
+
+export type AdminSupplierOfferChange = {
+	id: string;
+	supplierId: string;
+	supplierName: string;
+	offerId: string;
+	productId: string;
+	productName: string;
+	variantId: string;
+	variantSku: string;
+	currency: string;
+	current: {
+		productionCapacity: number;
+		costAmount: number;
+		minimumOrderQuantity: number;
+		leadTimeDays: number;
+		isPrimary: boolean;
+		retailPriceAmount: number;
+	};
+	proposed: {
+		productionCapacity: number;
+		costAmount: number;
+		minimumOrderQuantity: number;
+		leadTimeDays: number;
+	};
+	status: string;
+	submittedAt: string;
 };
 
 export type AdminBrand = {
@@ -788,7 +839,9 @@ async function apiRequest<T>(
 	const method = (init.method ?? "GET").toUpperCase();
 	const headers = new Headers(init.headers);
 	headers.set("Accept", "application/json");
-	if (init.body && !headers.has("Content-Type"))
+	const multipartBody =
+		typeof FormData !== "undefined" && init.body instanceof FormData;
+	if (init.body && !headers.has("Content-Type") && !multipartBody)
 		headers.set("Content-Type", "application/json");
 	if (csrf && !["GET", "HEAD", "OPTIONS"].includes(method)) {
 		const token = await ensureCsrfToken();
@@ -877,6 +930,8 @@ export const ponyoApi = {
 		params.set("locale", locale);
 		return apiRequest<Product[]>(`/products?${params.toString()}`);
 	},
+	listProductCategories: () =>
+		apiRequest<ProductCategory[]>("/categories?limit=100"),
 	getProduct: (id: string, locale = "en") =>
 		apiRequest<Product>(
 			`/products/${encodeURIComponent(id)}?locale=${encodeURIComponent(locale)}`,
@@ -885,17 +940,17 @@ export const ponyoApi = {
 		apiRequest<{ maker: MakerProfile; products: Product[] }>(
 			`/makers/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
 		),
-	submitMakerApplication: (input: MakerApplicationInput) =>
+	submitMakerApplication: (input: FormData) =>
 		apiRequest<{ id: string; status: MakerApplicationStatus }>(
 			"/makers/applications",
-			{ method: "POST", body: JSON.stringify(input) },
+			{ method: "POST", body: input },
 		),
 	getProductReservations: (productId: string) =>
-			apiRequest<{ reservationCount: number; target: number | null; open: boolean }>(
+			apiRequest<{ reservationCount: number; target: number | null; open: boolean; deadline: string | null; productionStatus: string }>(
 			`/products/${encodeURIComponent(productId)}/reservations`,
 		),
 	submitProductReservation: (productId: string, input: { email: string; country: string }) =>
-			apiRequest<{ accepted: boolean; reservationCount: number; target: number | null }>(
+			apiRequest<{ accepted: boolean; reservationCount: number; target: number | null; open: boolean; productionStatus: string }>(
 			`/products/${encodeURIComponent(productId)}/reservations`,
 			{ method: "POST", body: JSON.stringify(input) },
 		),
@@ -1178,11 +1233,26 @@ export const ponyoApi = {
 	},
 	setAdminProductReservations: (
 		id: string,
-		input: { reservationsOpen: boolean; reservationTarget: number | null },
+		input: { reservationsOpen: boolean; reservationTarget: number | null; reservationDeadline: string | null },
 	) =>
-		apiRequest<{ id: string; reservationsOpen: boolean; reservationTarget: number | null }>(
+		apiRequest<{ id: string; reservationsOpen: boolean; reservationTarget: number | null; reservationDeadline: string | null; productionStatus: string }>(
 			`/admin/products/${encodeURIComponent(id)}/reservations`,
 			{ method: "PATCH", body: JSON.stringify(input) },
+		),
+	approveAdminProductProduction: (id: string) =>
+		apiRequest<{ productId: string; status: string; invitationsQueued: number; paymentEnabled: false }>(
+			`/admin/products/${encodeURIComponent(id)}/production-approval`,
+			{ method: "POST", body: JSON.stringify({ confirmMakerReady: true }) },
+		),
+	listAdminSupplierOfferChanges: () =>
+		apiRequest<AdminSupplierOfferChange[]>("/admin/supplier-offer-changes?status=pending"),
+	decideAdminSupplierOfferChange: (
+		id: string,
+		input: { decision: "approve" | "reject"; isPrimary: boolean; note?: string },
+	) =>
+		apiRequest<AdminSupplierOfferChange>(
+			`/admin/supplier-offer-changes/${encodeURIComponent(id)}/decision`,
+			{ method: "POST", body: JSON.stringify(input) },
 		),
 	updateAdminProductProof: (
 		id: string,
@@ -1198,6 +1268,11 @@ export const ponyoApi = {
 		apiRequest<AdminProduct>(
 			`/admin/products/${encodeURIComponent(id)}/proof`,
 			{ method: "PATCH", body: JSON.stringify(input) },
+		),
+	setAdminProductCategory: (id: string, categoryId: string) =>
+		apiRequest<AdminProduct>(
+			`/admin/products/${encodeURIComponent(id)}/category`,
+			{ method: "PATCH", body: JSON.stringify({ categoryId }) },
 		),
 	setAdminProductPublication: (id: string, published: boolean) =>
 		apiRequest<AdminProduct>(

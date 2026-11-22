@@ -196,7 +196,8 @@ async def _validate_stock(db: AsyncSession, items: list[CartItemUpdate]) -> None
                 .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
                 .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
                 .where(
-                    SupplierOffer.variant_id == variant.id, SupplierOffer.active.is_(True),
+                    SupplierOffer.variant_id == variant.id, SupplierOffer.is_primary.is_(True),
+                    SupplierOffer.active.is_(True),
                     Supplier.active.is_(True), SupplierOffer.currency == variant.currency,
                     SupplierInventory.on_hand - SupplierInventory.reserved >= item.quantity,
                 ).limit(1)

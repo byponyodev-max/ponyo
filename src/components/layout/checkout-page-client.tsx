@@ -9,6 +9,7 @@ import { refreshCartItems } from "@/lib/cart-validation";
 import { saveLocalOrder } from "@/lib/local-orders";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
+import { PonyoSelect } from "@/components/ui/ponyo-select";
 import { ApiNotConfiguredError, ApiRequestError, ponyoApi, PONYO_API_BASE_URL, type CheckoutQuote, type CheckoutQuoteInput } from "@/services/ponyo-api.client";
 import { useCustomerSession } from "@/components/layout/customer-session-provider";
 import { AccountAuthForm } from "@/components/account/account-auth-form";
@@ -414,7 +415,20 @@ export function CheckoutPageClient({ buyNow = false }: { buyNow?: boolean }) {
               <label>{t("checkout.address2", "Apartment, suite, etc. (if applicable)")}<input name="address2" autoComplete="address-line2" placeholder={t("checkout.address2_placeholder", "Building, apartment, room")} value={delivery.address2} onChange={(event) => setDelivery({ ...delivery, address2: event.target.value })} /></label>
               <div className="checkout-field-grid checkout-field-grid-city"><label>{t("checkout.city_required", "City *")}<input name="city" autoComplete="address-level2" placeholder={t("checkout.city", "City")} value={delivery.city} onChange={(event) => setDelivery({ ...delivery, city: event.target.value })} required /></label><label>{t("checkout.region_required", "Prefecture / region *")}<input name="region" autoComplete="address-level1" placeholder={t("checkout.region_placeholder", "Tokyo")} value={delivery.region} onChange={(event) => setDelivery({ ...delivery, region: event.target.value })} required /></label></div>
               <div className="checkout-field-grid checkout-field-grid-city"><label>{t("checkout.postal_required", "Postal code *")}<input name="postal" autoComplete="postal-code" placeholder={t("checkout.postal", "Postal code")} pattern={postalCodePatterns[deliveryCountryCode]} title={t("checkout.postal_validation", "Enter a valid postal code for the selected country.")} value={delivery.postal} onChange={(event) => setDelivery({ ...delivery, postal: event.target.value })} required /></label><label>{t("checkout.phone_required", "Phone *")}<input name="phone" type="tel" autoComplete="tel" pattern="\\+?[0-9\\s().-]{7,30}" title={t("checkout.phone_validation", "Enter a valid phone number, including its country code when possible.")} placeholder={t("checkout.phone_placeholder", "For delivery updates")} value={delivery.phone} onChange={(event) => setDelivery({ ...delivery, phone: event.target.value })} required /></label></div>
-              <label>{t("checkout.country_required", "Country or region *")}<select name="country" value={delivery.country} onChange={(event) => setDelivery({ ...delivery, country: event.target.value })} required>{deliveryCountries.map((item) => <option key={item.code} value={item.label}>{regionName(item.code, language, item.label)}</option>)}</select></label>
+              <label htmlFor="checkout-country">{t("checkout.country_required", "Country or region *")}<PonyoSelect
+                id="checkout-country"
+                name="country"
+                autoComplete="country-name"
+                value={delivery.country}
+                onChange={(country) => setDelivery({ ...delivery, country })}
+                required
+                label={t("checkout.country_required", "Country or region")}
+                options={deliveryCountries.map((item) => ({
+                  value: item.label,
+                  label: regionName(item.code, language, item.label),
+                  icon: item.code,
+                }))}
+              /></label>
             </section>
             <section className="checkout-form-section">
               <div className="checkout-section-heading"><span>03</span><div><h2>{t("checkout.shipping_heading", "Delivery method")}</h2><p>{t("checkout.shipping_body", "Choose how quickly your plush should travel.")}</p></div></div>

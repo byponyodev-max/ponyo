@@ -152,6 +152,25 @@
     gap: 32px;
 }
 
+.collection-page .collection-category-group {
+    display: grid;
+    gap: 2px;
+}
+
+.collection-page .collection-sidebar .collection-category-child {
+    min-height: 34px;
+    padding-left: 27px;
+    color: #806d62;
+    font-size: 12px;
+    font-weight: 550;
+}
+
+.collection-page .collection-sidebar .collection-category-child::before {
+    width: 4px;
+    height: 4px;
+    margin-right: 7px;
+}
+
 @media (max-width: 767px) {
     .store-main.collection-page {
         padding-bottom: calc(84px + env(safe-area-inset-bottom));

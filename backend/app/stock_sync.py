@@ -169,7 +169,8 @@ async def sync_supplier_stock(
                 .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
                 .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
                 .join(ProductVariant, ProductVariant.id == SupplierOffer.variant_id)
-                .where(SupplierOffer.variant_id.in_(changed_variants), SupplierOffer.active.is_(True),
+                .where(SupplierOffer.variant_id.in_(changed_variants), SupplierOffer.is_primary.is_(True),
+                       SupplierOffer.active.is_(True),
                        Supplier.active.is_(True), SupplierOffer.currency == ProductVariant.currency)
                 .group_by(SupplierOffer.variant_id)
             )).all())

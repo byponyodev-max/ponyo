@@ -156,6 +156,7 @@ def test_contact_request_email_is_branded_and_escapes_customer_message(monkeypat
     message = transport.return_value.__enter__.return_value.send_message.call_args.args[0]
     rendered = message.get_body(preferencelist=("html",)).get_content()
     assert message["To"] == "ponyo@example.test"
+    assert message["From"].addresses[0].display_name == "Ponyo"
     assert message["Reply-To"] == "mika@example.com"
     assert "A customer reached out" in rendered and "PONYO" in rendered
     assert "&lt;script&gt;" in rendered and "<script>" not in rendered

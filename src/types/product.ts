@@ -47,6 +47,7 @@ export type Product = {
 	imageAlt: string;
 	galleryImages?: { src: string; alt: string }[];
 	categoryId?: string | null;
+	categorySlug?: string | null;
 	brandId?: string | null;
 	brandName?: string | null;
 	publishedAt?: string;
@@ -68,6 +69,9 @@ export type Product = {
 	estimatedDeliveryDate?: string | null;
 	onlyAtPonyo?: boolean;
 	reservationsOpen?: boolean;
+	reservationTarget?: number | null;
+	reservationDeadline?: string | null;
+	productionStatus?: "collecting" | "target_reached" | "preorder_invited" | "target_missed";
 	shippingCountries?: string[] | null;
 	isExampleData?: boolean;
 	badge?: string;

@@ -4,6 +4,8 @@
 
 This adds durable supplier purchase orders (POs), per-item routing history, forwarding, confirmations, rejections and bounded retries. It does not pretend a real supplier is connected. Outbound forwarding defaults **off**, and demo suppliers are **never** sent customer data or auto-confirmed.
 
+The current storefront phase keeps checkout, payment and payouts disabled. The reservation campaign is non-binding; a reached target requires Ponyo admin confirmation before priority invitations are sent. A deadline missed below target closes the campaign and queues notices to reservers. Do not treat reservation or invitation as an order or production commitment.
+
 Apply reviewed migration `20261111_0021` after `20261111_0020` before deploying this API/worker. Tests do not migrate the application database. The legacy populated local database must be reconciled deliberately as described in the backend README; never blindly stamp/upgrade it.
 
 - `SUPPLIER_FORWARDING_ENABLED=false` by default. When true, the API lifespan starts the durable planner/delivery worker; shutdown cancels it cleanly.
@@ -16,7 +18,9 @@ Only configure `idempotent: "true"` after the supplier contract guarantees that 
 
 ## Selection, mapping and order splitting
 
-Checkout chooses an active offer for the exact variant, active supplier, matching source currency, minimum order quantity satisfied and sufficient unreserved inventory. Rank: shortest lead time, then lowest cost, then offer ID for deterministic ties. Atomic supplier reservation guards stock; payment capture settles that reservation exactly once.
+When commerce is enabled after its launch prerequisites are met, checkout and PO routing use only the single Ponyo-approved primary offer for the exact variant. That offer must be active, belong to an active supplier, match the source currency, satisfy MOQ and have sufficient unreserved inventory. There is no automatic switch to a non-primary offer when the primary is unavailable or rejected. Atomic supplier reservation guards stock; payment capture settles that reservation exactly once.
+
+Supplier wholesale cost and production capacity are proposed changes, not live storefront terms. Ponyo admin approval is required to apply them; the approval flow can also select the primary offer. The public retail price is set to the approved wholesale cost plus 20%. Changing the primary maker requires Ponyo approval. Variants with multiple existing offers remain unassigned until an admin explicitly selects a primary.
 
 After an order is `paid` + `processing`, the enabled worker discovers it from the database, independent of SQS timing, and plans POs. Admins may also explicitly plan while forwarding is off. Planning locks the parent order, reuses the already-settled source offer and groups all eligible order items by supplier. One group becomes one PO with a unique number, stable provider idempotency key, supplier-cost currency, total cost, immutable shipping-address snapshot, supplier SKU/unit-cost/quantity/product-name snapshots and explicit order-item mapping.
 
@@ -56,7 +60,9 @@ The Ponyo Supplier Studio uses a separate supplier-only sign-in surface and the 
 
 The frontend rewrites the root of `supplier.byponyo.com` to `/supplier-portal` (override the host at frontend build time with `NEXT_PUBLIC_SUPPLIER_PORTAL_HOST`). To make that hostname public, configure its DNS record to the deployed frontend ingress and provision HTTPS for the hostname at the hosting/CDN layer. DNS, certificate issuance and production host routing are infrastructure/provider settings; the local Docker/temporary tunnel does not create a permanent public supplier subdomain.
 
-Supplier Studio also exposes approved supplier offers for catalog/inventory maintenance. `GET /v1/supplier-catalog/offers?limit=100` returns only published, active Ponyo variants linked to the signed-in supplier. `PATCH /v1/supplier-catalog/offers/{offer_id}` accepts `{ "onHand": 8, "costAmount": 725, "minimumOrderQuantity": 2, "leadTimeDays": 3 }` with CSRF. The API derives supplier ownership from `SupplierAccount`, rejects stock below existing reservations, and updates `SupplierInventory.on_hand` plus the supplier's private wholesale offer terms in one transaction. It then recomputes the public `ProductVariant.stock_quantity` projection from the maximum eligible supplier availability, so existing product/availability APIs reflect stock changes immediately. Public retail price, product text/images, variant identity, offer activity and approval state remain Ponyo-controlled; wholesale cost is never returned by public catalog endpoints. New product/variant submissions and a Ponyo review queue are not implemented by this endpoint.
+Supplier Studio exposes approved offers and pending change requests. `GET /v1/supplier-catalog/offers?limit=100` returns only published, active Ponyo variants linked to the signed-in supplier. `PATCH /v1/supplier-catalog/offers/{offer_id}` accepts proposed production capacity and wholesale terms with CSRF. The API derives supplier ownership from `SupplierAccount` and rejects proposed capacity below existing reservations; it records a pending request without changing live inventory, supplier terms, or public retail price.
+
+Ponyo admin reviews and approves or rejects each request. Approval applies the wholesale terms and capacity, refreshes inventory from the selected primary offer, and sets public retail price to approved wholesale cost plus 20%. Public retail price, product text/images, variant identity and maker selection remain Ponyo-controlled; wholesale cost is never returned by public catalog endpoints. A supplier's pending changes do not affect storefront availability until approved.
 
 - `GET /v1/supplier-orders?limit=50&offset=0`: own supplier POs (admin sees all), capped at 100. Does not expose delivery addresses in list responses.
 - `GET /v1/supplier-orders/{po_id}`: assigned supplier/admin only; includes delivery snapshot and immutable forwarding payload.
@@ -71,7 +77,7 @@ No unauthenticated supplier confirmation webhook is introduced. Async suppliers 
 
 ## Rejection, alternative supply and retries
 
-Only an **explicit rejection** permits alternative routing. The old PO remains rejected for audit; a replacement PO gets a new immutable assignment/generation/key. Exclude every supplier previously attempted for that order item. Never substitute another product variant or convert supplier cost currencies implicitly.
+Only an **explicit rejection** permits re-planning, and re-planning still considers only the currently Ponyo-approved primary offer; it does not silently pick another offer. If a replacement maker is needed, Ponyo must approve the primary-maker change first. The old PO remains rejected for audit; any replacement PO gets a new immutable assignment/generation/key. Never substitute another product variant or convert supplier cost currencies implicitly.
 
 Replacement inventory is atomically debited from `on_hand` only when `on_hand - reserved >= quantity`. Existing customer checkout stock is not decremented again. Do not silently restore rejected stock: an unavailable supplier's claimed stock is untrustworthy. For `inventory_unavailable`, only its unreserved inventory is zeroed (`on_hand = reserved`) so other paid/pending reservations retain their accounting protections; synced catalog projections refresh normally.
 

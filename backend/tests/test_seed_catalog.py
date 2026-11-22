@@ -115,8 +115,8 @@ async def test_seed_twenty_products_is_idempotent_without_replenishing_stock(mon
                 lambda *_args: pytest.fail("Demo product cache must not call LibreTranslate."),
             )
             for locale, expected_name, expected_category, expected_variant_title in (
-                ("ja", "もち雲", "キャラクター", "通常版"),
-                ("ko", "모찌 구름", "캐릭터", "기본형"),
+                ("ja", "もち雲", "キャラクターぬいぐるみ", "通常版"),
+                ("ko", "모찌 구름", "캐릭터 인형", "기본형"),
             ):
                 translation = await get_product_translation(product, locale, db)
                 assert translation.name == expected_name

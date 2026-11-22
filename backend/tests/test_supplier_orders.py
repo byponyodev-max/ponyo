@@ -32,9 +32,14 @@ async def flow(test_client, mocked_services, monkeypatch):
         db.add_all([a, b, alt])
         await db.flush()
         offers = []
-        for supplier, variant, cost, lead in ((a, variants[0], 500, 1), (b, variants[1], 600, 1), (alt, variants[0], 400, 2)):
+        for supplier, variant, cost, lead, is_primary in (
+            (a, variants[0], 500, 1, True),
+            (b, variants[1], 600, 1, True),
+            (alt, variants[0], 400, 2, False),
+        ):
             offer = SupplierOffer(supplier_id=supplier.id, variant_id=variant, supplier_sku=f"SKU-{len(offers)}",
-                                  cost_amount=cost, currency="JPY", lead_time_days=lead, minimum_order_quantity=1, active=True)
+                                  cost_amount=cost, currency="JPY", lead_time_days=lead, minimum_order_quantity=1,
+                                  active=True, is_primary=is_primary)
             db.add(offer)
             await db.flush()
             db.add(SupplierInventory(offer_id=offer.id, on_hand=10, reserved=0))
@@ -154,7 +159,7 @@ async def test_timeout_retry_same_po_key_never_routes_elsewhere(flow):
         assert inventory.on_hand == 10
 
 
-async def test_explicit_rejection_routes_alternative_once_and_preserves_audit(flow):
+async def test_explicit_rejection_never_routes_to_non_primary_supplier(flow):
     await plan(flow)
     identifier = await po_for(flow, 0)
     await dispatch_purchase_order(flow.factory, identifier, accepted)
@@ -164,23 +169,24 @@ async def test_explicit_rejection_routes_alternative_once_and_preserves_audit(fl
         result = await post(flow, f"/v1/supplier-orders/{identifier}/confirmation", decision)
         assert result.status_code == 200, result.text
     async with flow.factory() as db:
-        assert await db.scalar(select(func.count()).select_from(SupplierPurchaseOrder)) == 3
+        assert await db.scalar(select(func.count()).select_from(SupplierPurchaseOrder)) == 2
         assert await db.scalar(select(func.count()).select_from(SupplierConfirmation)) == 1
         alt = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == flow.offers[2]))
         original = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == flow.offers[0]))
-        assert (alt.on_hand, original.on_hand) == (9, 0)
-        assert (await db.get(ProductVariant, flow.variants[0])).stock_quantity == 9
+        assert alt.on_hand == 10
+        assert original.on_hand == 0
+        assert (await db.get(ProductVariant, flow.variants[0])).stock_quantity == 0
         routes = (await db.scalars(select(SupplierPurchaseOrderItem).where(SupplierPurchaseOrderItem.variant_id == flow.variants[0])
                                    .order_by(SupplierPurchaseOrderItem.route_attempt))).all()
-        assert [row.offer_id for row in routes] == [flow.offers[0], flow.offers[2]]
-        assert [row.route_attempt for row in routes] == [1, 2]
+        assert [row.offer_id for row in routes] == [flow.offers[0]]
+        assert [row.route_attempt for row in routes] == [1]
 
 
 async def test_rejection_without_alternative_enters_hold_then_retries_on_restock(flow):
     await plan(flow)
     identifier = await po_for(flow, 0)
     async with flow.factory() as db:
-        inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == flow.offers[2]))
+        inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == flow.offers[0]))
         inventory.on_hand = 0
         await db.commit()
     await dispatch_purchase_order(flow.factory, identifier, accepted)
@@ -191,12 +197,12 @@ async def test_rejection_without_alternative_enters_hold_then_retries_on_restock
     async with flow.factory() as db:
         order = await db.get(Order, flow.order_id)
         assert order.fulfillment_status == "on_hold" and order.supplier_retry_at is not None
-        inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == flow.offers[2]))
+        inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == flow.offers[0]))
         inventory.on_hand = 5
         order.supplier_retry_at = datetime.now(timezone.utc) - timedelta(seconds=1)
         await db.commit()
     await run_supplier_iteration(flow.factory, accepted)
-    assert await po_for(flow, 2) is not None
+    assert await po_for(flow, 2) is None
 
 
 async def test_confirm_all_suppliers_advances_fulfillment_and_reject_after_confirm_fails(flow):
@@ -320,12 +326,12 @@ async def test_same_event_cannot_change_decision_or_supplier_reference(flow):
     assert (await post(flow, f"/v1/supplier-orders/{identifier}/confirmation", payload)).status_code == 409
 
 
-async def test_alternative_more_expensive_than_original_requires_review(flow):
+async def test_non_primary_supplier_is_not_used_after_primary_rejection(flow):
     await plan(flow)
     identifier = await po_for(flow, 0)
     async with flow.factory() as db:
         alternative = await db.get(SupplierOffer, flow.offers[2])
-        alternative.cost_amount = 501  # Original allocation costs 500.
+        alternative.cost_amount = 400
         await db.commit()
     await dispatch_purchase_order(flow.factory, identifier, accepted)
     await admin(flow)
@@ -353,17 +359,17 @@ async def test_expired_delivery_lease_retries_same_identity(flow):
         assert (await db.get(SupplierPurchaseOrder, identifier)).attempts == 2
 
 
-async def test_checkout_selection_respects_minimum_order_and_deterministic_cost(flow, mocked_services):
+async def test_checkout_blocks_when_primary_maker_cannot_meet_minimum_order(flow, mocked_services):
     async with flow.factory() as db:
         primary = await db.get(SupplierOffer, flow.offers[0])
         primary.minimum_order_quantity = 2
         await db.commit()
     mocked_services.create.return_value.id = "cs_moq_second"
     result = await post(flow, "/v1/checkout/sessions", checkout_payload(flow.variants[0]))
-    assert result.status_code == 200, result.text
+    assert result.status_code == 409, result.text
     async with flow.factory() as db:
-        item = await db.scalar(select(OrderItem).where(OrderItem.order_id == UUID(result.json()["data"]["orderId"])))
-        assert item.supplier_offer_id == flow.offers[2]
+        inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == flow.offers[2]))
+        assert inventory.on_hand == 10
 
 
 async def test_admin_supplier_binding_and_unmapped_supplier_blocked(flow):

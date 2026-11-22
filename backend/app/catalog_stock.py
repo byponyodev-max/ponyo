@@ -11,7 +11,8 @@ def sellable_variant():
     stocked_offer = select(SupplierOffer.id).join(
         SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id,
     ).join(Supplier, Supplier.id == SupplierOffer.supplier_id).where(
-        SupplierOffer.variant_id == ProductVariant.id, SupplierOffer.active.is_(True),
+        SupplierOffer.variant_id == ProductVariant.id, SupplierOffer.is_primary.is_(True),
+        SupplierOffer.active.is_(True),
         Supplier.active.is_(True), SupplierOffer.currency == ProductVariant.currency,
         SupplierInventory.on_hand > SupplierInventory.reserved,
     ).correlate(ProductVariant).exists()
@@ -29,7 +30,9 @@ async def available_quantities(db: AsyncSession, variants) -> dict:
         .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
         .join(Supplier, Supplier.id == SupplierOffer.supplier_id)
         .join(ProductVariant, ProductVariant.id == SupplierOffer.variant_id)
-        .where(SupplierOffer.variant_id.in_(ids), SupplierOffer.active.is_(True), Supplier.active.is_(True), SupplierOffer.currency == ProductVariant.currency)
+        .where(SupplierOffer.variant_id.in_(ids), SupplierOffer.is_primary.is_(True),
+               SupplierOffer.active.is_(True), Supplier.active.is_(True),
+               SupplierOffer.currency == ProductVariant.currency)
         .group_by(SupplierOffer.variant_id)
     )).all()
     supplied = dict(rows)

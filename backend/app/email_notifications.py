@@ -171,7 +171,7 @@ def _send_smtp_message(message: EmailMessage) -> None:
     sender = settings.smtp_from_email or settings.smtp_username
     if not settings.smtp_host or not sender:
         raise RuntimeError("Contact email transport is not configured")
-    message["From"] = sender
+    message["From"] = formataddr(("Ponyo", sender))
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds) as smtp:
         smtp.ehlo()
         if settings.smtp_starttls:
@@ -277,7 +277,7 @@ def _send_password_reset_email(email: str, reset_url: str) -> None:
 
     message = EmailMessage()
     message["Subject"] = "Reset your Ponyo password"
-    message["From"] = sender
+    message["From"] = formataddr(("Ponyo", sender))
     message["To"] = email
     message.set_content(
         "We received a request to reset the password for your Ponyo account.\n\n"

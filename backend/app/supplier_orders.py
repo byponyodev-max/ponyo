@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.inventory import has_synced_inventory, refresh_synced_variant
+from app.inventory import refresh_synced_variant
 from app.models import (Order, OrderItem, OrderStatusHistory, OutboxEvent, ProductVariant, Supplier,
                         SupplierConfirmation, SupplierInventory, SupplierOffer,
                         SupplierPurchaseOrder, SupplierPurchaseOrderItem)
@@ -86,7 +86,8 @@ async def select_alternative(db: AsyncSession, item: OrderItem, excluded_supplie
         return None  # Do not compare supplier costs across unconverted currencies.
     query = (select(SupplierOffer).join(Supplier, Supplier.id == SupplierOffer.supplier_id)
              .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
-             .where(SupplierOffer.variant_id == item.variant_id, SupplierOffer.active.is_(True), Supplier.active.is_(True),
+             .where(SupplierOffer.variant_id == item.variant_id, SupplierOffer.is_primary.is_(True),
+                    SupplierOffer.active.is_(True), Supplier.active.is_(True),
                     SupplierOffer.currency == variant.currency, SupplierOffer.minimum_order_quantity <= item.quantity,
                     SupplierInventory.on_hand - SupplierInventory.reserved >= item.quantity)
              .order_by(SupplierOffer.lead_time_days, SupplierOffer.cost_amount, SupplierOffer.id).with_for_update())
@@ -102,8 +103,7 @@ async def select_alternative(db: AsyncSession, item: OrderItem, excluded_supplie
             SupplierInventory.on_hand - SupplierInventory.reserved >= item.quantity,
         ).values(on_hand=SupplierInventory.on_hand - item.quantity).execution_options(synchronize_session=False))
         if result.rowcount == 1:
-            if await has_synced_inventory(db, item.variant_id):
-                await refresh_synced_variant(db, item.variant_id)
+            await refresh_synced_variant(db, item.variant_id)
             return offer
     return None
 
@@ -134,7 +134,8 @@ async def generate_purchase_orders(db: AsyncSession, order: Order) -> list[Suppl
         if previous is None and item.supplier_offer_id:
             # This exact quantity was already deducted during payment settlement.
             offer = await db.scalar(select(SupplierOffer).join(Supplier, Supplier.id == SupplierOffer.supplier_id).where(
-                SupplierOffer.id == item.supplier_offer_id, SupplierOffer.active.is_(True), Supplier.active.is_(True),
+                SupplierOffer.id == item.supplier_offer_id, SupplierOffer.is_primary.is_(True),
+                SupplierOffer.active.is_(True), Supplier.active.is_(True),
                 SupplierOffer.minimum_order_quantity <= item.quantity,
                 SupplierOffer.currency == item.product_snapshot.get("sourceCurrency", item.currency),
             ))
@@ -226,8 +227,7 @@ async def confirm_purchase_order(db: AsyncSession, order: Order, po: SupplierPur
                 await db.scalar(select(ProductVariant).where(ProductVariant.id == item.variant_id).with_for_update())
                 await db.execute(update(SupplierInventory).where(SupplierInventory.offer_id == item.offer_id)
                                  .values(on_hand=SupplierInventory.reserved).execution_options(synchronize_session=False))
-                if await has_synced_inventory(db, item.variant_id):
-                    await refresh_synced_variant(db, item.variant_id)
+                await refresh_synced_variant(db, item.variant_id)
         await generate_purchase_orders(db, order)
     else:
         await refresh_fulfillment(db, order)

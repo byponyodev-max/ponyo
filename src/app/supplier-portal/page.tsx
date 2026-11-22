@@ -24,11 +24,12 @@ type SupplierListingDraft = {
 };
 
 function listingDraft(listing: SupplierListing): SupplierListingDraft {
+	const pending = listing.pendingChange;
 	return {
-		onHand: String(listing.onHand),
-		costAmount: String(listing.costAmount),
-		minimumOrderQuantity: String(listing.minimumOrderQuantity),
-		leadTimeDays: String(listing.leadTimeDays),
+		onHand: String(pending?.productionCapacity ?? listing.onHand),
+		costAmount: String(pending?.costAmount ?? listing.costAmount),
+		minimumOrderQuantity: String(pending?.minimumOrderQuantity ?? listing.minimumOrderQuantity),
+		leadTimeDays: String(pending?.leadTimeDays ?? listing.leadTimeDays),
 	};
 }
 
@@ -232,14 +233,14 @@ export default function SupplierPortalPage() {
 		setError("");
 		try {
 			const saved = await ponyoApi.updateSupplierListing(listing.offerId, {
-				onHand: Number(draft.onHand),
+				productionCapacity: Number(draft.onHand),
 				costAmount: Number(draft.costAmount),
 				minimumOrderQuantity: Number(draft.minimumOrderQuantity),
 				leadTimeDays: Number(draft.leadTimeDays),
 			});
 			setListings((current) => current.map((item) => item.offerId === saved.offerId ? saved : item));
 			setListingDrafts((current) => ({ ...current, [saved.offerId]: listingDraft(saved) }));
-			setNotice(`Saved ${saved.productName}. Stock availability is updated for the storefront.`);
+			setNotice(`Change request submitted for ${saved.productName}. Storefront terms will update only after Ponyo approval.`);
 		} catch (requestError) {
 			setError(errorMessage(requestError));
 		} finally {
@@ -335,17 +336,18 @@ export default function SupplierPortalPage() {
 			</div>
 			{section === "products" ? <>
 				<div className="sp-section-heading" id="supplier-products"><div><span className="sp-eyebrow">YOUR APPROVED PONYO LISTINGS</span><h2>Products &amp; inventory</h2></div><span className="sp-order-total">{listings.length} listings</span></div>
-				<div className="sp-listing-note"><span aria-hidden="true">✦</span><p>Update your physical stock, wholesale cost, MOQ and dispatch lead time. Ponyo keeps retail prices and product content curated; stock changes refresh storefront availability.</p></div>
+				<div className="sp-listing-note"><span aria-hidden="true">✦</span><p>Submit production capacity, wholesale cost, MOQ and lead-time changes for Ponyo review. Approved wholesale costs set the public retail price at 20% above wholesale; no changes reach the storefront before approval.</p></div>
 				{listings.length ? <div className="sp-listing-grid">{listings.map((listing) => {
 					const draft = listingDrafts[listing.offerId] ?? listingDraft(listing);
 					return <article className="sp-listing-card" key={listing.offerId}>
-						<div className="sp-listing-heading"><span className="sp-line-item-art">♡</span><div><span className="sp-eyebrow">{listing.active ? "PONYO APPROVED" : "PAUSED LISTING"}</span><h3>{listing.productName}</h3><small>{listing.variantTitle} · Variant SKU {listing.variantSku}</small></div><span className={`sp-status ${listing.active ? "sp-status--confirmed" : "sp-status--manual_review"}`}>{listing.active ? "Live" : "Paused"}</span></div>
-						<div className="sp-listing-retail"><span>Storefront retail price</span><strong>{supplierAmount(listing.retailPriceAmount, listing.currency, formatPrice)}</strong><small>Managed by Ponyo · not changed by wholesale updates</small></div>
+						<div className="sp-listing-heading"><span className="sp-line-item-art">♡</span><div><span className="sp-eyebrow">{listing.isPrimary ? "PRIMARY PONYO MAKER" : listing.active ? "PONYO APPROVED" : "PAUSED LISTING"}</span><h3>{listing.productName}</h3><small>{listing.variantTitle} · Variant SKU {listing.variantSku}</small></div><span className={`sp-status ${listing.pendingChange ? "sp-status--manual_review" : listing.active ? "sp-status--confirmed" : "sp-status--manual_review"}`}>{listing.pendingChange ? "Changes pending" : listing.active ? "Live" : "Paused"}</span></div>
+						<div className="sp-listing-retail"><span>Storefront retail price</span><strong>{supplierAmount(listing.retailPriceAmount, listing.currency, formatPrice)}</strong><small>{listing.isPrimary ? "After approval: wholesale cost + 20%" : "Managed by Ponyo; only the primary maker sets retail pricing."}</small></div>
+						{listing.pendingChange && <p className="sp-waiting-note">Your latest changes were submitted on {formatDate(listing.pendingChange.submittedAt)} and are waiting for Ponyo approval.</p>}
 						<form className="sp-listing-form" onSubmit={(event) => void handleSaveListing(event, listing)}>
-							<label>Physical stock on hand<input type="number" min={listing.reserved} step="1" required value={draft.onHand} onChange={(event) => updateListingDraft(listing, "onHand", event.target.value)} /><small>{listing.reserved} units reserved · {Math.max(0, Number(draft.onHand || 0) - listing.reserved)} available from this studio</small></label>
+							<label>Proposed production capacity<input type="number" min={listing.reserved} step="1" required value={draft.onHand} onChange={(event) => updateListingDraft(listing, "onHand", event.target.value)} /><small>{listing.reserved} units already reserved; approved capacity cannot be lower than this.</small></label>
 							<label>Wholesale cost · smallest currency unit ({listing.currency})<input type="number" min="0" step="1" required value={draft.costAmount} onChange={(event) => updateListingDraft(listing, "costAmount", event.target.value)} /><small>Current: {supplierAmount(listing.costAmount, listing.currency, formatPrice)} · JPY uses whole yen; USD uses cents.</small></label>
 							<div className="sp-listing-form-row"><label>MOQ<input type="number" min="1" step="1" required value={draft.minimumOrderQuantity} onChange={(event) => updateListingDraft(listing, "minimumOrderQuantity", event.target.value)} /></label><label>Dispatch lead time (days)<input type="number" min="0" step="1" required value={draft.leadTimeDays} onChange={(event) => updateListingDraft(listing, "leadTimeDays", event.target.value)} /></label></div>
-							<button className="sp-primary-button" type="submit" disabled={savingOfferId === listing.offerId}>{savingOfferId === listing.offerId ? "Saving…" : "Save listing updates"}<span aria-hidden="true">✓</span></button>
+							<button className="sp-primary-button" type="submit" disabled={savingOfferId === listing.offerId}>{savingOfferId === listing.offerId ? "Submitting…" : listing.pendingChange ? "Resubmit changes" : "Submit for Ponyo approval"}<span aria-hidden="true">✓</span></button>
 						</form>
 					</article>;
 				})}</div> : <div className="sp-empty-state sp-listing-empty"><span>♡</span><strong>No approved listings yet</strong><p>Once Ponyo links an approved product to your studio, you can manage its stock and supplier terms here.</p></div>}

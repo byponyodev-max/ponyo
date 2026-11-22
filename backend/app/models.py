@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, Uuid, false, func, true
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, Uuid, false, func, text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -171,6 +171,7 @@ class Product(Base):
         CheckConstraint("weight_grams IS NULL OR weight_grams >= 0", name="ck_products_weight_nonnegative"),
         CheckConstraint("edition_count IS NULL OR edition_count > 0", name="ck_products_edition_positive"),
         CheckConstraint("reservation_target IS NULL OR reservation_target > 0", name="ck_products_reservation_target_positive"),
+        Index("ix_products_production_deadline", "production_status", "reservation_deadline"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -203,6 +204,11 @@ class Product(Base):
     reservations_open: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     reservation_target: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reservation_minimum_reached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reservation_deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    production_status: Mapped[str] = mapped_column(String(32), default="collecting", server_default="collecting")
+    production_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    preorder_invites_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reservation_target_missed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     variants: Mapped[list[ProductVariant]] = relationship(back_populates="product", cascade="all, delete-orphan")
@@ -572,6 +578,13 @@ class SupplierOffer(Base):
         CheckConstraint("cost_amount >= 0", name="ck_supplier_offers_cost"),
         CheckConstraint("minimum_order_quantity > 0", name="ck_supplier_offers_minimum"),
         CheckConstraint("lead_time_days >= 0", name="ck_supplier_offers_lead_time"),
+        Index(
+            "uq_supplier_offers_primary_variant",
+            "variant_id",
+            unique=True,
+            postgresql_where=text("is_primary = true"),
+            sqlite_where=text("is_primary = 1"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -582,6 +595,7 @@ class SupplierOffer(Base):
     currency: Mapped[str] = mapped_column(String(3))
     minimum_order_quantity: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     lead_time_days: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     supplier: Mapped[Supplier] = relationship()
     variant: Mapped[ProductVariant] = relationship()
@@ -602,6 +616,29 @@ class SupplierInventory(Base):
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
     offer: Mapped[SupplierOffer] = relationship(back_populates="inventory")
+
+
+class SupplierOfferChangeRequest(Base):
+    __tablename__ = "supplier_offer_change_requests"
+    __table_args__ = (
+        CheckConstraint("production_capacity >= 0", name="ck_supplier_offer_change_capacity"),
+        CheckConstraint("cost_amount >= 0", name="ck_supplier_offer_change_cost"),
+        CheckConstraint("minimum_order_quantity > 0", name="ck_supplier_offer_change_minimum"),
+        CheckConstraint("lead_time_days >= 0", name="ck_supplier_offer_change_lead_time"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id", ondelete="RESTRICT"), index=True)
+    offer_id: Mapped[UUID] = mapped_column(ForeignKey("supplier_offers.id", ondelete="RESTRICT"), index=True)
+    production_capacity: Mapped[int] = mapped_column(Integer)
+    cost_amount: Mapped[int] = mapped_column(Integer)
+    minimum_order_quantity: Mapped[int] = mapped_column(Integer)
+    lead_time_days: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending", index=True)
+    decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
 
 
 class SupplierAccount(Base):

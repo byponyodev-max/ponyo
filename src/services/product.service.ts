@@ -419,6 +419,7 @@ export const storefrontPreviewProducts = sampleProducts.map((product) => {
 		makerLocation: makerLocation ?? null,
 		onlyAtPonyo: true,
 		reservationsOpen: true,
+		productionStatus: "collecting" as const,
 		availabilityStatus: storefrontPreviewStatuses[product.slug],
 		publishedAt: "2026-11-05T15:00:00+09:00",
 		isNew: true,

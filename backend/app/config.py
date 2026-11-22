@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     checkout_express_shipping_jpy: int = 1200
 
     aws_region: str = "ap-northeast-1"
+    supabase_url: str | None = None
+    supabase_service_role_key: SecretStr = SecretStr("")
+    supabase_maker_applications_bucket: str = "maker-application-photos"
     translation_provider: Literal["disabled", "libretranslate"] = "libretranslate"
     translation_timeout_seconds: int = 8
     libretranslate_url: str = "http://localhost:5000"
@@ -136,6 +139,14 @@ class Settings(BaseSettings):
     @property
     def stripe_configured(self) -> bool:
         return bool(self.stripe_secret_key and self.stripe_webhook_secret)
+
+    @property
+    def maker_photo_storage_configured(self) -> bool:
+        return bool(
+            self.supabase_url
+            and self.supabase_service_role_key.get_secret_value().strip()
+            and self.supabase_maker_applications_bucket.strip()
+        )
 
     @property
     def contact_email_configured(self) -> bool:
@@ -197,6 +208,12 @@ class Settings(BaseSettings):
             raise ValueError("Shipping fees cannot be negative.")
         if self.cookie_domain == "":
             self.cookie_domain = None
+        if self.supabase_url:
+            storage_url = urlparse(self.supabase_url)
+            if storage_url.scheme not in {"http", "https"} or not storage_url.netloc or storage_url.username or storage_url.password or storage_url.fragment:
+                raise ValueError("SUPABASE_URL must be an absolute URL without embedded credentials or fragments.")
+            if self.environment != "local" and storage_url.scheme != "https":
+                raise ValueError("SUPABASE_URL must use HTTPS outside local development.")
         if self.environment == "local" and any("localhost" in origin for origin in self.cors_origins):
             self.cookie_samesite = "none"
             self.cookie_secure = True

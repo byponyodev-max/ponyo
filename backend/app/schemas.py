@@ -36,6 +36,7 @@ class ProductOut(BaseModel):
     availabilityStatus: str | None = Field(default=None, validation_alias="availability_status")
     variantId: str | None = None
     categoryId: str | None = None
+    categorySlug: str | None = None
     brandId: str | None = None
     brandName: str | None = None
     makerName: str | None = None
@@ -51,6 +52,9 @@ class ProductOut(BaseModel):
     estimatedDeliveryDate: date | None = None
     onlyAtPonyo: bool = False
     reservationsOpen: bool = False
+    reservationTarget: int | None = None
+    reservationDeadline: date | None = None
+    productionStatus: str = "collecting"
     shippingCountries: list[str] | None = None
     images: list[dict[str, str]] = Field(default_factory=list)
     galleryImages: list[dict[str, str]] = Field(default_factory=list)
@@ -255,7 +259,7 @@ class ProductInterestRequest(BaseModel):
     country: str = Field(min_length=2, max_length=100)
 
 
-class MakerApplicationCreate(BaseModel):
+class MakerApplicationFields(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     makerName: str = Field(min_length=1, max_length=180)
@@ -270,21 +274,36 @@ class MakerApplicationCreate(BaseModel):
     provenDesireEvidence: str = Field(min_length=10, max_length=2000)
     materials: str = Field(min_length=2, max_length=2000)
     priceRange: str = Field(min_length=1, max_length=160)
-    productPhotos: list[str] = Field(min_length=1, max_length=3)
     ponyoExclusivity: str = Field(min_length=10, max_length=2000)
+
+    @field_validator("priceRange")
+    @classmethod
+    def validate_price_range(cls, value: str) -> str:
+        amount = r"(?:[1-9]\d{0,14}|[1-9]\d{0,2}(?:,\d{3})+)"
+        match = re.fullmatch(rf"(JPY|KRW)\s+({amount})[–-]({amount})", value)
+        if match is None:
+            raise ValueError("Choose JPY or KRW and enter whole-number minimum and maximum prices.")
+        minimum, maximum = (int(price.replace(",", "")) for price in match.groups()[1:])
+        if minimum > maximum:
+            raise ValueError("The maximum price must be greater than or equal to the minimum price.")
+        return value
+
+
+class MakerApplicationCreate(MakerApplicationFields):
+    productPhotos: list[str] = Field(min_length=1, max_length=3)
 
     @field_validator("productPhotos")
     @classmethod
     def validate_product_photos(cls, photos: list[str]) -> list[str]:
         for photo in photos:
-            if len(photo) > 550_000 or not photo.startswith("data:image/jpeg;base64,"):
-                raise ValueError("Product photos must be optimized JPEG images under 400 KB each.")
             try:
-                image_bytes = base64.b64decode(photo.partition(",")[2], validate=True)
-            except (binascii.Error, ValueError):
-                raise ValueError("One of the product photos is invalid.") from None
-            if len(image_bytes) > 400_000 or not image_bytes.startswith(b"\xff\xd8\xff"):
-                raise ValueError("Product photos must be valid JPEG images under 400 KB each.")
+                prefix, application_id, filename = photo.split("/")
+                UUID(application_id)
+                UUID(filename.removesuffix(".jpg"))
+            except (ValueError, AttributeError):
+                raise ValueError("Product photo references must point to stored maker-application JPEGs.") from None
+            if prefix != "maker-applications" or not filename.endswith(".jpg"):
+                raise ValueError("Product photo references must point to stored maker-application JPEGs.")
         return photos
 
 
@@ -498,10 +517,34 @@ class AdminProductPublicationRequest(BaseModel):
     published: bool
 
 
+class AdminProductCategoryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    categoryId: UUID
+
+
 class AdminProductReservationSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reservationsOpen: bool
     reservationTarget: int | None = Field(default=None, gt=0, strict=True)
+    reservationDeadline: date | None = None
+
+    @model_validator(mode="after")
+    def deadline_requires_target(self):
+        if self.reservationDeadline is not None and self.reservationTarget is None:
+            raise ValueError("A reservation deadline requires a target.")
+        return self
+
+
+class AdminProductProductionApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirmMakerReady: bool
+
+
+class AdminSupplierOfferChangeDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    decision: Literal["approve", "reject"]
+    isPrimary: bool = False
+    note: str | None = Field(default=None, max_length=500)
 
 
 class AdminProductProofRequest(BaseModel):
@@ -551,7 +594,7 @@ class AdminSupplierStatusRequest(BaseModel):
 class SupplierOfferUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    onHand: int = Field(ge=0, strict=True)
+    productionCapacity: int = Field(ge=0, strict=True)
     costAmount: int = Field(ge=0, strict=True)
     minimumOrderQuantity: int = Field(gt=0, strict=True)
     leadTimeDays: int = Field(ge=0, strict=True)

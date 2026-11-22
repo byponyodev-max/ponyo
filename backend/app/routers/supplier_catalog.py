@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.inventory import refresh_synced_variant
 from app.models import (
 	Customer,
 	Product,
@@ -16,6 +15,7 @@ from app.models import (
 	Supplier,
 	SupplierAccount,
 	SupplierInventory,
+	SupplierOfferChangeRequest,
 	SupplierOffer,
 )
 from app.rate_limit import enforce_rate_limit
@@ -38,6 +38,7 @@ def offer_payload(
 	inventory: SupplierInventory,
 	variant: ProductVariant,
 	product: Product,
+	pending_change: SupplierOfferChangeRequest | None = None,
 ) -> dict:
 	return {
 		"offerId": str(offer.id),
@@ -48,6 +49,7 @@ def offer_payload(
 		"variantSku": variant.sku,
 		"retailPriceAmount": variant.price_amount,
 		"currency": variant.currency,
+		"isPrimary": offer.is_primary,
 		"supplierSku": offer.supplier_sku,
 		"costAmount": offer.cost_amount,
 		"minimumOrderQuantity": offer.minimum_order_quantity,
@@ -56,6 +58,13 @@ def offer_payload(
 		"reserved": inventory.reserved,
 		"availableQuantity": max(0, inventory.on_hand - inventory.reserved),
 		"active": offer.active,
+		"pendingChange": ({
+			"productionCapacity": pending_change.production_capacity,
+			"costAmount": pending_change.cost_amount,
+			"minimumOrderQuantity": pending_change.minimum_order_quantity,
+			"leadTimeDays": pending_change.lead_time_days,
+			"submittedAt": pending_change.submitted_at.isoformat(),
+		} if pending_change else None),
 	}
 
 
@@ -83,7 +92,22 @@ async def list_supplier_offers(
 ):
 	supplier_id = await assigned_supplier_id(db, actor)
 	rows = await supplier_offers_query(db, supplier_id, limit)
-	return {"data": [offer_payload(*row) for row in rows]}
+	offer_ids = [row[0].id for row in rows]
+	pending_changes = (await db.scalars(
+		select(SupplierOfferChangeRequest)
+		.where(
+			SupplierOfferChangeRequest.offer_id.in_(offer_ids),
+			SupplierOfferChangeRequest.status == "pending",
+		)
+		.order_by(SupplierOfferChangeRequest.submitted_at.desc(), SupplierOfferChangeRequest.id.desc())
+	)).all() if offer_ids else []
+	pending_by_offer = {}
+	for change in pending_changes:
+		pending_by_offer.setdefault(change.offer_id, change)
+	return {"data": [
+		offer_payload(*row, pending_by_offer.get(row[0].id))
+		for row in rows
+	]}
 
 
 @router.patch("/offers/{offer_id}", response_model=dict)
@@ -124,22 +148,33 @@ async def update_supplier_offer(
 	product = await db.get(Product, variant.product_id)
 	if not product or not product.published or not variant.active:
 		raise HTTPException(404, "Approved supplier listing not found.")
-	if payload.onHand < inventory.reserved:
+	if payload.productionCapacity < inventory.reserved:
 		raise HTTPException(409, {
 			"code": "stock_below_reserved",
-			"message": "Available physical stock cannot be lower than units already reserved for orders.",
+			"message": "Production capacity cannot be lower than units already reserved for orders.",
 		})
 	if offer.currency != variant.currency:
 		raise HTTPException(409, "Offer currency must match the approved product variant.")
 
-	# Wholesale cost and supplier terms remain private. Storefront product copy and
-	# retail price remain Ponyo-controlled; only physical stock affects availability.
-	inventory.on_hand = payload.onHand
-	# Manual supplier edits supersede any older feed snapshot already in storage.
-	inventory.last_synced_at = datetime.now(timezone.utc)
-	offer.cost_amount = payload.costAmount
-	offer.minimum_order_quantity = payload.minimumOrderQuantity
-	offer.lead_time_days = payload.leadTimeDays
-	await refresh_synced_variant(db, variant.id)
+	pending = await db.scalar(select(SupplierOfferChangeRequest).where(
+		SupplierOfferChangeRequest.offer_id == offer.id,
+		SupplierOfferChangeRequest.status == "pending",
+	).order_by(SupplierOfferChangeRequest.submitted_at.desc()).with_for_update())
+	if pending is None:
+		pending = SupplierOfferChangeRequest(
+			supplier_id=supplier_id,
+			offer_id=offer.id,
+			production_capacity=payload.productionCapacity,
+			cost_amount=payload.costAmount,
+			minimum_order_quantity=payload.minimumOrderQuantity,
+			lead_time_days=payload.leadTimeDays,
+		)
+		db.add(pending)
+	else:
+		pending.production_capacity = payload.productionCapacity
+		pending.cost_amount = payload.costAmount
+		pending.minimum_order_quantity = payload.minimumOrderQuantity
+		pending.lead_time_days = payload.leadTimeDays
+		pending.submitted_at = datetime.now(timezone.utc)
 	await db.commit()
-	return {"data": offer_payload(offer, inventory, variant, product)}
+	return {"data": offer_payload(offer, inventory, variant, product, pending)}

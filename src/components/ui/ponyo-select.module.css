@@ -1,0 +1,258 @@
+.root {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  color: #3d2923;
+  font: inherit;
+}
+
+.nativeSelect {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 11px;
+  border: 1px solid #dfd2c3;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #fffdfa, #fff8f1);
+  color: #3d2923;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  border-color: #c5a35b;
+  box-shadow: 0 0 0 3px rgb(197 163 91 / 12%);
+  background: #fffaf3;
+}
+
+.trigger:focus-visible,
+.option:focus-visible,
+.heading button:focus-visible {
+  outline: 3px solid #b87958;
+  outline-offset: 2px;
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.badge {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid #e5d4ae;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff8e9;
+  color: #8d6c2b;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.copy b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy small,
+.optionCopy small {
+  color: #897970;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.placeholder {
+  color: #807166;
+}
+
+.chevron {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  color: #8d6c2b;
+  transition: transform .18s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.popover {
+  padding: 13px;
+  border: 1px solid #ead9cf;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fffaf6;
+  color: #3f302b;
+  box-shadow: 0 16px 38px rgb(46 33 29 / 20%);
+}
+
+.heading {
+  min-height: 29px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #3d2923;
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: 13px;
+}
+
+.heading > span {
+  color: #b99243;
+}
+
+.heading > strong {
+  min-width: 0;
+  flex: 1;
+}
+
+.heading button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: #f3e7df;
+  color: #5b4339;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search {
+  min-width: 0;
+  height: 40px;
+  margin-top: 9px;
+  padding: 0 10px;
+  border: 1px solid #e8d9cf;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: #8c756a;
+  font-size: 15px;
+}
+
+.search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #3d2923;
+  font: inherit;
+  font-size: 13px;
+}
+
+.options {
+  min-height: 0;
+  margin: 7px -4px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.option {
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  color: #43332d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover,
+.option[aria-selected="true"] {
+  background: #f6e9df;
+}
+
+.option:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.optionCopy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.optionCopy b {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.check {
+  color: #8d6c2b;
+  font-weight: 900;
+}
+
+.empty {
+  margin: 10px;
+  color: #826c61;
+  font-size: 12px;
+}
+
+.compact .trigger {
+  min-height: 36px;
+  padding: 3px 7px;
+  border-radius: 9px;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.compact {
+  min-width: 130px;
+  width: auto;
+  max-width: 220px;
+}
+
+.compact .badge {
+  width: 25px;
+  height: 25px;
+  flex-basis: 25px;
+  font-size: 11px;
+}

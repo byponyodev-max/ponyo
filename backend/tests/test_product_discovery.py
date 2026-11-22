@@ -54,6 +54,7 @@ async def discovery_catalog(test_client):
         second.name = "Sun Bear"
         second.supplier_name = "Solar Makers"
         second.category_name = "Friendly Bears"
+        second.tags = ["character"]
         second.size_tier = "large"
         await db.flush()
         await link_demo_catalog(db)
@@ -64,7 +65,7 @@ async def discovery_catalog(test_client):
 
 @pytest.mark.parametrize("params", [
     {"brand": "lunar-makers"}, {"brand": " LUNAR MAKERS "},
-    {"category": "cuddly-bunnies"}, {"category": " CUDDLY BUNNIES "},
+    {"category": "collectible-plush"}, {"category": " COLLECTIBLE PLUSH "},
     {"q": "LUNAR MAKERS"}, {"q": "PNY-MOON-EXCLUSIVE"},
     {"q": "moonbeam"}, {"q": " Moon Bunny "},
     {"size": " SMALL "}, {"min_price": 1800, "max_price": 1800},
@@ -80,7 +81,7 @@ async def test_taxonomy_ids_and_combined_filters(discovery_catalog):
     for params in [
         {"category_id": str(category_id)}, {"brand_id": str(brand_id)},
         {"category_id": str(category_id), "brand_id": str(brand_id),
-         "brand": "lunar-makers", "category": "cuddly-bunnies", "availability": "available"},
+         "brand": "lunar-makers", "category": "collectible-plush", "availability": "available"},
     ]:
         assert [row["id"] for row in await get_data(client, **params)] == [str(bunny)]
     # A missing UUID is a valid filter, not an instruction to ignore it.
@@ -94,6 +95,24 @@ async def test_taxonomy_ids_and_combined_filters(discovery_catalog):
         assert response.json()["data"] == []
         assert response.json()["total"] == 0
     assert {row["id"] for row in await get_data(client)} == {str(bunny), str(bear)}
+
+
+async def test_parent_category_filter_includes_only_its_descendants(test_client):
+    client, sessions = test_client
+    bunny, _ = await add_product(sessions, slug="category-bunny")
+    bear, _ = await add_product(sessions, slug="category-bear")
+    giant, _ = await add_product(sessions, slug="category-giant")
+    async with sessions() as db:
+        giant_product = await db.get(Product, giant)
+        giant_product.size_tier = "XL"
+        giant_product.tags = ["domina-xl"]
+        await link_demo_catalog(db)
+        await db.commit()
+
+    plush_toys = await get_data(client, category="plush-toys")
+    oversized = await get_data(client, category="oversized")
+    assert {row["id"] for row in plush_toys} == {str(bunny), str(bear)}
+    assert [row["id"] for row in oversized] == [str(giant)]
 
 
 @pytest.mark.parametrize("sort", [
@@ -163,13 +182,13 @@ async def test_invalid_discovery_parameters_return_422(test_client, params):
 
 
 async def add_offer(db, variant_id, *, on_hand=10, reserved=0, supplier_active=True,
-                    active=True, currency="JPY", inventory=True):
+                    active=True, currency="JPY", inventory=True, is_primary=True):
     supplier = Supplier(code=f"PRIVATE-{uuid4().hex}", name="Confidential wholesale", active=supplier_active)
     db.add(supplier)
     await db.flush()
     offer = SupplierOffer(
         supplier_id=supplier.id, variant_id=variant_id, supplier_sku=f"SECRET-{uuid4().hex}",
-        cost_amount=987654, currency=currency, active=active,
+        cost_amount=987654, currency=currency, active=active, is_primary=is_primary,
     )
     db.add(offer)
     await db.flush()
@@ -188,11 +207,11 @@ async def add_offer(db, variant_id, *, on_hand=10, reserved=0, supplier_active=T
     (10, [{"currency": "USD"}], 0),
     (10, [{"inventory": False}], 0),
     (0, [{"on_hand": 20}], 0),
-    (10, [{"on_hand": 3}, {"on_hand": 4}], 4),  # One offer must fulfill: max, never sum.
-    (10, [{"on_hand": 9, "reserved": 7}, {"on_hand": 8, "reserved": 3}], 5),
-    (10, [{"supplier_active": False, "on_hand": 100}, {"on_hand": 2}], 2),
-    (10, [{"active": False, "on_hand": 100}, {"on_hand": 2}], 2),
-    (10, [{"currency": "USD", "on_hand": 100}, {"on_hand": 2}], 2),
+    (10, [{"on_hand": 3}, {"on_hand": 4, "is_primary": False}], 3),
+    (10, [{"on_hand": 9, "reserved": 7}, {"on_hand": 8, "reserved": 3, "is_primary": False}], 2),
+    (10, [{"supplier_active": False, "on_hand": 100}, {"on_hand": 2, "is_primary": False}], 0),
+    (10, [{"active": False, "on_hand": 100}, {"on_hand": 2, "is_primary": False}], 0),
+    (10, [{"currency": "USD", "on_hand": 100}, {"on_hand": 2, "is_primary": False}], 0),
 ])
 async def test_supplier_availability_agrees_across_all_public_views(test_client, stock, offers, quantity):
     client, sessions = test_client
@@ -272,7 +291,7 @@ async def test_unpublished_and_unknown_products_are_404_everywhere(test_client):
 async def test_public_views_never_expose_supplier_costs_or_identifiers(discovery_catalog):
     client, sessions, product_id, variant_id, *_ = discovery_catalog
     async with sessions() as db:
-        await add_offer(db, variant_id)
+        await add_offer(db, variant_id, is_primary=False)
         await db.commit()
         supplier_ids = [str(value) for value in (await db.scalars(select(Supplier.id))).all()]
         offer_ids = [str(value) for value in (await db.scalars(select(SupplierOffer.id))).all()]

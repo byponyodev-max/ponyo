@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { PONYO_API_BASE_URL, ponyoApi } from "@/services/ponyo-api.client";
 import { useCustomerSession } from "@/components/layout/customer-session-provider";
 import { useLocalization } from "@/components/layout/localization-provider";
+import { PonyoSelect } from "@/components/ui/ponyo-select";
 
 type InquiryDetails = { company: string; email: string; emailNotificationSent: boolean };
 
@@ -14,6 +15,7 @@ export function PartnerInquiryForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contactName, setContactName] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [productType, setProductType] = useState("");
   const { customer } = useCustomerSession();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -46,6 +48,7 @@ export function PartnerInquiryForm() {
         ].join("\n"),
       });
       setSubmitted({ company, email, emailNotificationSent: result.emailNotificationSent });
+      setProductType("");
       form.reset();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t("static.partner.submit_failed", "Unable to submit your partnership inquiry."));
@@ -72,14 +75,22 @@ export function PartnerInquiryForm() {
           <label>{t("static.partner.email", "Business email")} <span>*</span><input name="email" type="email" required maxLength={320} autoComplete="email" placeholder={t("static.account.email_placeholder", "you@example.com")} value={email ?? customer?.email ?? ""} onChange={(event) => setEmail(event.target.value)} /></label>
           <label>{t("static.partner.website", "Website or social link")}<input name="website" type="url" maxLength={500} placeholder="https://" /></label>
       </div>
-        <label>{t("static.partner.product_type", "What do you make?")} <span>*</span>
-        <select name="productType" required defaultValue="">
-            <option value="" disabled>{t("static.partner.select_category", "Select a product category")}</option>
-            <option value="Plush toys">{t("static.partner.plush", "Plush toys")}</option>
-            <option value="Collectible characters">{t("static.partner.characters", "Collectible characters")}</option>
-            <option value="Handmade or limited-edition plush">{t("static.partner.handmade", "Handmade or limited-edition plush")}</option>
-            <option value="Other">{t("static.partner.other", "Other")}</option>
-        </select>
+        <label htmlFor="partner-product-type">{t("static.partner.product_type", "What do you make?")} <span>*</span>
+        <PonyoSelect
+          id="partner-product-type"
+          name="productType"
+          label={t("static.partner.product_type", "What do you make?")}
+          value={productType}
+          onChange={setProductType}
+          required
+          placeholder={t("static.partner.select_category", "Select a product category")}
+          options={[
+            { value: "Plush toys", label: t("static.partner.plush", "Plush toys") },
+            { value: "Collectible characters", label: t("static.partner.characters", "Collectible characters") },
+            { value: "Handmade or limited-edition plush", label: t("static.partner.handmade", "Handmade or limited-edition plush") },
+            { value: "Other", label: t("static.partner.other", "Other") },
+          ]}
+        />
       </label>
         <label>{t("static.partner.message", "Tell us about your products and partnership idea")} <span>*</span><textarea name="message" required minLength={20} maxLength={4000} rows={6} placeholder={t("static.partner.message_placeholder", "Share your product range, where you make it, and how you would like to work with Ponyo.")} /></label>
       {errorMessage && <p className="api-form-error" role="alert">{errorMessage}</p>}

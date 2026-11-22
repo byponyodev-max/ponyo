@@ -5,12 +5,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.db import get_db
 from app.models import Brand, Product, ProductCategory
+from app.product_categories import PRODUCT_CATEGORY_SLUGS
 
 router = APIRouter(tags=["catalog"])
 
@@ -41,17 +42,22 @@ class TaxonomyDetail(BaseModel, Generic[TaxonomyItem]):
 
 
 def _taxonomy_query(model: type[ProductCategory] | type[Brand]) -> Select[Any]:
-    product_key = Product.category_id if model is ProductCategory else Product.brand_id
-    counts = (
-        select(product_key.label("taxonomy_id"), func.count(Product.id).label("productCount"))
-        .where(Product.published.is_(True))
-        .group_by(product_key)
-        .subquery()
-    )
-    query = select(model.id, model.slug, model.name, counts.c.productCount).join(
-        counts, counts.c.taxonomy_id == model.id,
-    )
     if model is ProductCategory:
+        child = aliased(ProductCategory)
+        query = (
+            select(model.id, model.slug, model.name, func.count(func.distinct(Product.id)).label("productCount"))
+            .select_from(model)
+            .outerjoin(child, child.parent_id == model.id)
+            .outerjoin(
+                Product,
+                and_(
+                    Product.published.is_(True),
+                    or_(Product.category_id == model.id, Product.category_id == child.id),
+                ),
+            )
+            .where(model.active.is_(True), model.slug.in_(PRODUCT_CATEGORY_SLUGS))
+            .group_by(model.id)
+        )
         parent = aliased(ProductCategory)
         visible_parent = (
             select(parent.id)
@@ -59,8 +65,17 @@ def _taxonomy_query(model: type[ProductCategory] | type[Brand]) -> Select[Any]:
             .correlate(ProductCategory)
             .scalar_subquery()
         )
-        query = query.add_columns(visible_parent.label("parentId")).where(ProductCategory.active.is_(True))
-    return query
+        return query.add_columns(visible_parent.label("parentId"))
+    product_key = Product.brand_id
+    counts = (
+        select(product_key.label("taxonomy_id"), func.count(Product.id).label("productCount"))
+        .where(Product.published.is_(True))
+        .group_by(product_key)
+        .subquery()
+    )
+    return select(model.id, model.slug, model.name, counts.c.productCount).join(
+        counts, counts.c.taxonomy_id == model.id,
+    )
 
 
 async def _list_taxonomy(

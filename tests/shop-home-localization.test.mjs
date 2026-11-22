@@ -19,7 +19,12 @@ const shopKeys = [
 	"shop.description.default", "shop.description.premium", "shop.category.all", "shop.category.bears",
 	"shop.category.bunnies", "shop.category.cats", "shop.category.characters", "shop.category.new_arrivals",
 	"shop.category.pandas", "shop.category.penguins", "shop.category.premium", "shop.category.puppies",
-	"shop.category.trending", "shop.category.xl", "shop.category.rare", "shop.size.small",
+	"shop.category.trending", "shop.category.xl", "shop.category.rare", "shop.category.plush_toys",
+	"shop.category.collectible_plush", "shop.category.character_plush", "shop.category.oversized",
+	"shop.category.giant_plush", "shop.category.oversized_soft_objects", "shop.category.cushions",
+	"shop.category.designer_cushions", "shop.category.character_pillows", "shop.category.soft_furniture",
+	"shop.category.chairs", "shop.category.beds", "shop.category.seating", "shop.category.wall_decor",
+	"shop.size.small",
 	"shop.size.medium", "shop.size.large", "shop.size.xl", "shop.badge.rare", "shop.badge.premium",
 	"shop.badge.new", "shop.filter.categories_aria",
 	"shop.filter.product_categories_aria", "shop.filter.products_aria", "shop.filter.active_aria",
@@ -43,7 +48,9 @@ const homeKeys = [
 	"home.shelf.coming_soon_link", "home.v2.new_title", "home.v2.new_sub", "home.v2.see_all",
 	"home.more_plush.title", "home.more_plush.sub", "home.domina_shelf.eyebrow",
 	"home.domina_shelf.title", "home.most_loved.eyebrow", "home.most_loved.title",
-	"home.most_loved.sub", "home.aisles.see_more_simple", "home.see_all", "home.see_all_short",
+	"home.most_loved.sub", "home.aisles.see_more_simple", "home.aisles.view_all",
+	"home.aisles.empty_title", "home.aisles.empty", "home.aisles.wall_decor_sub",
+	"home.see_all", "home.see_all_short",
 	"home.category_rail.aria_label", "home.slides.choose_collection", "home.size.marquee_label",
 	"home.size.marquee_big_hugs", "home.size.marquee_up_to", "home.image_alt.lifestyle",
 	"home.size.image_alt", "home.image_alt.domina", "home.image_alt.carousel.xl",
@@ -85,12 +92,18 @@ test("shop metadata, labels, filters, counts, and empty states are wired to tran
 
 test("homepage shelf, category rail, marquee, and descriptive image alt text use localized keys", () => {
 	const homePage = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+	const homeStyles = readFileSync(new URL("../src/app/theme-parity.css", import.meta.url), "utf8");
 	const siteHeader = readFileSync(new URL("../src/components/layout/site-header.tsx", import.meta.url), "utf8");
 	const homeCarousel = readFileSync(new URL("../src/components/home/home-carousel.tsx", import.meta.url), "utf8");
 	const shelf = readFileSync(new URL("../src/components/product/product-shelf.tsx", import.meta.url), "utf8");
 	for (const key of ["home.category_rail.aria_label", "home.size.marquee_label", "home.size.marquee_big_hugs", "home.image_alt.lifestyle", "home.image_alt.domina", "home.size.image_alt"]) {
 		assert.ok(homePage.includes(key), `homepage does not use ${key}`);
 	}
+	for (const key of ["home.aisles.empty_title", "home.aisles.empty", "home.aisles.view_all", "home.aisles.wall_decor_sub"]) {
+		assert.ok(homePage.includes(key), `homepage does not use ${key}`);
+	}
+	assert.doesNotMatch(homePage, /New products in this category are coming soon/);
+	assert.match(homeStyles, /grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/);
 	assert.match(homePage, /t\("home\.size\.image_alt", \{ size: t\(`shop\.size\.\$\{tile\.name\.toLowerCase\(\)\}`\) \}\)/);
 	assert.doesNotMatch(homePage, /home\.size\.\$\{tile\.name\.toLowerCase\(\)\}/);
 	assert.match(homeCarousel, /t\(slide\.imageAltKey, slide\.imageAlt\)/);

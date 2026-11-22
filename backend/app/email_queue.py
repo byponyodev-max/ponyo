@@ -110,6 +110,48 @@ def _content(notification: EmailNotification) -> tuple[str, str, str]:
             footnote="You received this one-time alert because you joined this product’s availability waitlist.",
         )
         return subject, "\n\n".join(lines), html_body
+    if template in {"reservation_preorder_invitation", "reservation_target_missed"}:
+        product_name = str(payload["productName"]).strip()[:240]
+        product_url = str(payload.get("productUrl", "")).strip()
+        parsed_url = urlsplit(product_url)
+        if parsed_url.scheme != "https" and not (
+            parsed_url.scheme == "http" and parsed_url.hostname in {"localhost", "127.0.0.1"}
+        ):
+            product_url = ""
+        if template == "reservation_preorder_invitation":
+            subject = f"A Ponyo production update for {product_name}"
+            intro = f"The maker is ready to begin planning production for {product_name}."
+            text = (
+                f"Hello,\n\n{intro}\n\n"
+                "You reserved a spot, so you’re receiving this priority update. This is not an order, "
+                "and no payment has been taken. Ponyo will contact you again when paid preorders are ready.\n\n"
+                "With care, The Ponyo team"
+            )
+            eyebrow = "A PRIORITY PONYO UPDATE"
+            title = "A little production milestone."
+            footnote = "This is an update for a reservation you made. It is not an order and no payment has been taken."
+        else:
+            subject = f"An update about {product_name}"
+            intro = f"The reservation period for {product_name} ended before the production target was reached."
+            text = (
+                f"Hello,\n\n{intro}\n\n"
+                "Your reservation was non-binding, so there is no order to cancel and no payment to refund. "
+                "We’ll share another update if the maker plans a new production round.\n\n"
+                "With care, The Ponyo team"
+            )
+            eyebrow = "A PONYO RESERVATION UPDATE"
+            title = "This reservation round has closed."
+            footnote = "Your reservation did not create an order or payment."
+        html_body = ponyo_branded_email_html(
+            eyebrow=eyebrow,
+            title=title,
+            intro=intro,
+            content_html=_detail_panel([("Product", product_name)]),
+            action_label="View product update" if product_url else None,
+            action_url=product_url or None,
+            footnote=footnote,
+        )
+        return subject, text, html_body
     if template == "newsletter_campaign":
         subject = str(payload["subject"]).strip()[:200]
         body = str(payload["body"]).strip()[:10000].replace("\r\n", "\n").replace("\r", "\n")

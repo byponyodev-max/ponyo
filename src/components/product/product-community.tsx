@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useId, useRef } from "react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocalization } from "@/components/layout/localization-provider";
+import { PonyoSelect } from "@/components/ui/ponyo-select";
 import { regionName, supportedShippingCountries } from "@/lib/localization-options";
 import { getShippingStatus } from "@/lib/product-shipping";
 import { ponyoApi, PONYO_API_BASE_URL, type CustomerProfile, type ProductReview, type ProductReviewSummary } from "@/services/ponyo-api.client";
@@ -221,17 +222,21 @@ export function ProductActionPanel({
   productId,
   productName,
   reservationsOpen,
+  reservationDeadline,
+  productionStatus,
   shippingCountries,
 }: {
   productId: string;
   productName: string;
   reservationsOpen: boolean;
+  reservationDeadline?: string | null;
+  productionStatus?: string;
   shippingCountries?: string[] | null;
 }) {
   const { country } = useLocalization();
   const shippingStatus = getShippingStatus(shippingCountries, country);
   return shippingStatus === "deliverable"
-    ? <ProductReservationPanel productId={productId} productName={productName} reservationsOpen={reservationsOpen} country={country} />
+    ? <ProductReservationPanel productId={productId} productName={productName} reservationsOpen={reservationsOpen} reservationDeadline={reservationDeadline} productionStatus={productionStatus} country={country} />
     : <ProductInterestPanel productId={productId} productName={productName} defaultCountry={country} shippingCountries={shippingCountries} />;
 }
 
@@ -239,17 +244,23 @@ function ProductReservationPanel({
   productId,
   productName,
   reservationsOpen,
+  reservationDeadline: initialDeadline,
+  productionStatus: initialProductionStatus,
   country,
 }: {
   productId: string;
   productName: string;
   reservationsOpen: boolean;
+  reservationDeadline?: string | null;
+  productionStatus?: string;
   country: string;
 }) {
   const { language, t } = useLocalization();
   const [reservationCount, setReservationCount] = useState<number | null>(null);
   const [target, setTarget] = useState<number | null>(null);
   const [open, setOpen] = useState(reservationsOpen);
+  const [deadline, setDeadline] = useState(initialDeadline ?? null);
+  const [productionStatus, setProductionStatus] = useState(initialProductionStatus ?? "collecting");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(Boolean(PONYO_API_BASE_URL));
   const [saving, setSaving] = useState(false);
@@ -264,6 +275,8 @@ function ProductReservationPanel({
       setReservationCount(result.reservationCount);
       setTarget(result.target);
       setOpen(result.open);
+      setDeadline(result.deadline);
+      setProductionStatus(result.productionStatus);
     }).catch((loadError) => {
       if (active) setError(loadError instanceof Error ? loadError.message : "Reservation information is unavailable.");
     }).finally(() => {
@@ -284,6 +297,8 @@ function ProductReservationPanel({
       });
       setReservationCount(result.reservationCount);
       setTarget(result.target);
+      setOpen(result.open);
+      setProductionStatus(result.productionStatus);
       setMessage(t("product.reservation.success", "Thanks — your reservation is recorded. This is not a purchase, and no payment was taken."));
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t("product.reservation.error", "Your reservation could not be saved."));
@@ -309,7 +324,11 @@ function ProductReservationPanel({
           : t("product.reservation.people_other", "{{count}} people have reserved a spot", { count: reservationCount })}</span>
         {progress !== null && <><div className="product-reservation-progress" role="progressbar" aria-label={t("product.reservation.progress_label", "Reservation target progress")} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div><small>{t("product.reservation.progress", "{{progress}}% of the reservation target reached", { progress })}</small></>}
       </div>}
-    {!open ? <p className="product-reservation-status">{t("product.reservation.closed", "Reservations are closed for this product.")}</p>
+    {productionStatus === "target_reached" && <p className="product-reservation-status">{t("product.reservation.status.target_reached", "The target has been reached. Ponyo is confirming production with the maker; this is not an order and no payment has been taken.")}</p>}
+    {productionStatus === "preorder_invited" && <p className="product-reservation-status">{t("product.reservation.status.preorder_invited", "Production has been approved. Priority updates were sent to people who reserved; paid preorders are not open yet.")}</p>}
+    {productionStatus === "target_missed" && <p className="product-reservation-status">{t("product.reservation.status.target_missed", "This reservation round closed before the target was reached. No order or payment was created.")}</p>}
+    {open && deadline && <p className="product-reservation-deadline">{t("product.reservation.deadline", "Reserve by {{date}}", { date: new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(new Date(`${deadline}T12:00:00`)) })}</p>}
+    {!open && productionStatus === "collecting" ? <p className="product-reservation-status">{t("product.reservation.closed", "Reservations are closed for this product.")}</p>
       : !PONYO_API_BASE_URL ? <p className="product-reservation-status" role="status">{t("product.reservation.service_unavailable", "The reservation service is not configured right now.")}</p>
       : <form onSubmit={reserve}>
         <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} /></label>
@@ -376,10 +395,21 @@ function ProductInterestPanel({
       ? <p className="product-reservation-status" role="status">{t("product.interest.service_unavailable", "The interest form is not available right now.")}</p>
       : <form onSubmit={registerInterest}>
         <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} /></label>
-        <label>{t("product.reservation.country", "Country or region")}<select autoComplete="country-name" value={country} onChange={(event) => setCountry(event.target.value)} required>
-          {supportedShippingCountries.filter((item) => !shippingCountries?.includes(item.code)).map((item) => <option key={item.code} value={item.code}>{regionName(item.code, language, item.label)}</option>)}
-          <option value="OTHER">{t("product.reservation.other_country", "Other country or region")}</option>
-        </select></label>
+        <label htmlFor="product-interest-country">{t("product.reservation.country", "Country or region")}<PonyoSelect
+          id="product-interest-country"
+          name="country"
+          autoComplete="country-name"
+          value={country}
+          onChange={setCountry}
+          required
+          label={t("product.reservation.country", "Country or region")}
+          options={[
+            ...supportedShippingCountries
+              .filter((item) => !shippingCountries?.includes(item.code))
+              .map((item) => ({ value: item.code, label: regionName(item.code, language, item.label) })),
+            { value: "OTHER", label: t("product.reservation.other_country", "Other country or region") },
+          ]}
+        /></label>
         {country === "OTHER" && <label>{t("product.reservation.other_country_name", "Country or region")}<input autoComplete="country-name" value={otherCountry} onChange={(event) => setOtherCountry(event.target.value)} required maxLength={100} /></label>}
         {error && <p className="api-form-error" role="alert">{error}</p>}
         {message && <p className="product-form-success" role="status">{message}</p>}

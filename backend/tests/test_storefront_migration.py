@@ -23,8 +23,30 @@ NEW_COLUMNS = {
     "products": {"category_id", "brand_id"},
     "order_items": {"supplier_offer_id"},
 }
-LATER_SUPPLIER_TABLES = {"supplier_accounts", "supplier_purchase_orders", "supplier_purchase_order_items", "supplier_confirmations"}
+LATER_SUPPLIER_TABLES = {
+    "supplier_accounts", "supplier_purchase_orders", "supplier_purchase_order_items",
+    "supplier_confirmations", "supplier_offer_change_requests",
+}
+LATER_COLUMNS = {
+    "products": {
+        "reservation_deadline", "production_status", "production_approved_at",
+        "preorder_invites_sent_at", "reservation_target_missed_at",
+    },
+    "suppliers": {"created_at"},
+    "supplier_offers": {"is_primary"},
+}
 NOW = datetime.now(timezone.utc)
+
+
+def _remove_columns(table, names):
+    for index in list(table.indexes):
+        if index.name == "uq_supplier_offers_primary_variant" or set(index.columns.keys()).intersection(names):
+            table.indexes.remove(index)
+    for constraint in list(table.constraints):
+        if names.intersection(constraint.columns.keys()):
+            table.constraints.remove(constraint)
+    for name in names:
+        table._columns.remove(table.c[name])
 
 
 def _expected_storefront_metadata() -> sa.MetaData:
@@ -33,6 +55,9 @@ def _expected_storefront_metadata() -> sa.MetaData:
     for table in Base.metadata.tables.values():
         if table.name not in LATER_SUPPLIER_TABLES:
             table.to_metadata(metadata)
+    for name, columns in LATER_COLUMNS.items():
+        if name in metadata.tables:
+            _remove_columns(metadata.tables[name], columns)
     inventory = metadata.tables["supplier_inventory"]
     inventory._columns.remove(inventory.c.last_synced_at)
     brands = metadata.tables["brands"]
@@ -64,6 +89,9 @@ def _legacy_metadata() -> sa.MetaData:
             # SQLAlchemy exposes no public API for removing a copied column.
             # Mutate only this detached copy, never the ORM's metadata.
             table._columns.remove(table.c[column])
+    for name, columns in LATER_COLUMNS.items():
+        if name in metadata.tables:
+            _remove_columns(metadata.tables[name], columns)
     assert set(metadata.tables) == set(Base.metadata.tables) - NEW_TABLES - LATER_SUPPLIER_TABLES
     for name, removed in NEW_COLUMNS.items():
         assert not removed.intersection(metadata.tables[name].c.keys())

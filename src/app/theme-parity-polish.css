@@ -212,6 +212,9 @@
     .store-home .marketplace-aisle:nth-child(4) {
         --aisle-accent: #a8c9b4;
     }
+    .store-home .marketplace-aisle:nth-child(5) {
+        --aisle-accent: #c4a8d7;
+    }
     .store-home .marketplace-aisle h3,
     .store-home .marketplace-aisle>p {
         text-align: center;

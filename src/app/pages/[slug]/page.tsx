@@ -10,6 +10,7 @@ import { PartnerInquiryForm } from "@/components/layout/partner-inquiry-form";
 import { ProductGrid } from "@/components/product/product-grid";
 import { SortSelect } from "@/components/product/sort-select";
 import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
+import { PonyoSelect } from "@/components/ui/ponyo-select";
 import { getLocalizedProducts } from "@/services/localized-products.server";
 import locale from "@/locales/en.default.json";
 
@@ -370,7 +371,19 @@ async function DominaPage({ searchParams }: { searchParams: Promise<Query> }) {
         <form className="domina-catalog-filters" action="/pages/domina-xl" method="get" aria-labelledby="domina-filter-label">
           <PageCopy as="span" id="domina.filter_aria" fallback="Filter XL plush" className="sr-only" htmlId="domina-filter-label" />
           <input type="hidden" name="sort_by" value={sort} />
-          <label className="domina-size-filter"><PageCopy as="span" id="domina.size" fallback="Size" /><select name="size" defaultValue={size}><option value="">{t("pages.domina.any_size")}</option>{["Small", "Medium", "Large", "XL", "Giant"].map((tier) => <option key={tier} value={tier}>{t(`pages.domina.size_${tier.toLowerCase()}`)}</option>)}</select></label>
+          <label className="domina-size-filter" htmlFor="domina-size-filter"><PageCopy as="span" id="domina.size" fallback="Size" /><PonyoSelect
+            id="domina-size-filter"
+            name="size"
+            defaultValue={size}
+            label={t("pages.domina.size")}
+            options={[
+              { value: "", label: t("pages.domina.any_size") },
+              ...["Small", "Medium", "Large", "XL", "Giant"].map((tier) => ({
+                value: tier,
+                label: t(`pages.domina.size_${tier.toLowerCase()}`),
+              })),
+            ]}
+          /></label>
           <label><PageCopy as="span" id="domina.price_from" fallback="Price from ¥" /><input type="number" name="min" min="0" inputMode="numeric" defaultValue={minimum || ""} placeholder="0" /></label>
           <label><PageCopy as="span" id="domina.price_to" fallback="To ¥" /><input type="number" name="max" min="0" inputMode="numeric" defaultValue={Number.isFinite(maximum) ? maximum : ""} placeholder="No limit" /></label>
           <label className="domina-stock-filter"><input type="checkbox" name="filter.v.availability" value="1" defaultChecked={availability === "1"} /><PageCopy as="span" id="domina.in_stock" fallback="In stock only" /></label>

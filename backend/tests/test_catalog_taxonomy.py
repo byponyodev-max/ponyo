@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.models import Brand, Product, ProductCategory
+from app.product_categories import product_category_slug
 from app.routers.catalog import router
 from app.storefront_data import link_demo_catalog
 
@@ -40,9 +41,9 @@ async def taxonomy_client():
 async def taxonomy_data(taxonomy_client):
     _, sessions, _ = taxonomy_client
     categories = {
-        "first": ProductCategory(id=UUID(int=1), slug="cuddly-bunnies", name="Bunnies"),
-        "second": ProductCategory(id=UUID(int=2), slug="bunny-friends", name="Bunnies", parent_id=UUID(int=1)),
-        "third": ProductCategory(id=UUID(int=3), slug="clouds", name="Clouds", parent_id=UUID(int=4)),
+        "first": ProductCategory(id=UUID(int=1), slug="plush-toys", name="Bunnies"),
+        "second": ProductCategory(id=UUID(int=2), slug="collectible-plush", name="Bunnies", parent_id=UUID(int=1)),
+        "third": ProductCategory(id=UUID(int=3), slug="oversized", name="Clouds"),
         "inactive": ProductCategory(id=UUID(int=4), slug="inactive", name="Inactive", active=False),
         "draft": ProductCategory(id=UUID(int=5), slug="draft-only", name="Draft only"),
         "empty": ProductCategory(id=UUID(int=6), slug="empty", name="Empty"),
@@ -84,7 +85,7 @@ async def test_list_visibility_counts_order_and_privacy(taxonomy_client, taxonom
     assert set(payload) == {"data", "page", "limit", "total"}
     assert (payload["page"], payload["limit"], payload["total"]) == (1, 24, 3)
     assert [row["id"] for row in payload["data"]] == [str(objects[key].id) for key in ("first", "second", "third")]
-    assert [row["productCount"] for row in payload["data"]] == ([2, 1, 1] if resource == "categories" else [2, 1, 2])
+    assert [row["productCount"] for row in payload["data"]] == ([3, 1, 1] if resource == "categories" else [2, 1, 2])
     expected_keys = {"id", "slug", "name", "productCount"}
     if resource == "categories":
         expected_keys.add("parentId")
@@ -107,11 +108,12 @@ async def test_search_and_pagination(taxonomy_client, taxonomy_data, resource):
         assert response.json() == {
             "data": [{
                 "id": str(objects[key].id), "slug": objects[key].slug, "name": objects[key].name,
-                "productCount": 2 if key == "first" else 1,
+                "productCount": (3 if resource == "categories" else 2) if key == "first" else 1,
                 **({"parentId": str(objects["first"].id) if key == "second" else None} if resource == "categories" else {}),
             }], "page": page, "limit": 1, "total": 2,
         }
-    slug_search = await client.get(f"/v1/{resource}", params={"q": "CUDDLY"})
+    search_slug = "PLUSH-TOYS" if resource == "categories" else "CUDDLY-MAKERS"
+    slug_search = await client.get(f"/v1/{resource}", params={"q": search_slug})
     assert [row["id"] for row in slug_search.json()["data"]] == [str(objects["first"].id)]
     for q in ["no-match", "%", "_", "\\"]:
         response = await client.get(f"/v1/{resource}", params={"q": q})
@@ -191,10 +193,32 @@ async def test_empty_catalog_and_demo_links(taxonomy_client):
         await db.commit()
     for resource, slug in [("categories", "bunnies"), ("brands", "demo-brand")]:
         payload = (await client.get(f"/v1/{resource}")).json()
-        assert payload["total"] == 1
-        assert payload["data"][0]["slug"] == slug
-        assert payload["data"][0]["productCount"] == 1
-        assert "is_demo" not in payload["data"][0]
+        if resource == "categories":
+            assert payload["total"] == 14
+            row = next(item for item in payload["data"] if item["slug"] == "collectible-plush")
+        else:
+            assert payload["total"] == 1
+            row = payload["data"][0]
+        assert row["slug"] == ("collectible-plush" if resource == "categories" else slug)
+        assert row["productCount"] == 1
+        assert "is_demo" not in row
+
+
+@pytest.mark.parametrize(("name", "category_name", "product_type", "tags", "size_tier", "expected"), [
+    ("Cloud Chair", "", "Chair", [], "Large", "chairs"),
+    ("Character Pillow", "", "Pillow", ["character"], "Small", "character-pillows"),
+    ("Domina XL Bunny", "", "Plush", ["domina-xl"], "XL", "giant-plush"),
+    ("Cloud Plush", "", "Plush", ["character"], "Small", "character-plush"),
+    ("Classic Plush", "", "Plush", [], "Small", "collectible-plush"),
+])
+def test_existing_product_category_classifier(name, category_name, product_type, tags, size_tier, expected):
+    assert product_category_slug(
+        name=name,
+        category_name=category_name,
+        product_type=product_type,
+        tags=tags,
+        size_tier=size_tier,
+    ) == expected
 
 
 def test_router_is_read_only_without_prefix_and_has_typed_responses():

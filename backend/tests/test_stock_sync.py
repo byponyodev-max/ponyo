@@ -38,7 +38,7 @@ async def stock_db():
 
 
 async def add_offer(factory, *, variant_id=None, on_hand=10, reserved=2,
-                    active=True, supplier_active=True, currency="JPY", inventory=True):
+                    active=True, supplier_active=True, currency="JPY", inventory=True, is_primary=True):
     async with factory() as db:
         if variant_id is None:
             product = Product(
@@ -57,7 +57,7 @@ async def add_offer(factory, *, variant_id=None, on_hand=10, reserved=2,
         db.add(supplier)
         await db.flush()
         offer = SupplierOffer(supplier_id=supplier.id, variant_id=variant_id, supplier_sku=uuid4().hex,
-                              cost_amount=50, currency=currency, active=active)
+                              cost_amount=50, currency=currency, active=active, is_primary=is_primary)
         db.add(offer)
         await db.flush()
         if inventory:
@@ -225,15 +225,15 @@ async def test_inactive_or_currency_mismatch_is_synced_but_excluded(stock_db, op
 @pytest.mark.asyncio
 async def test_projection_uses_max_of_all_eligible_offers_not_sum(stock_db):
     first = await add_offer(stock_db, on_hand=8, reserved=2)
-    second = await add_offer(stock_db, variant_id=first.variant_id, on_hand=15, reserved=3)
-    await add_offer(stock_db, variant_id=first.variant_id, on_hand=100, active=False)
-    await add_offer(stock_db, variant_id=first.variant_id, on_hand=100, supplier_active=False)
-    await add_offer(stock_db, variant_id=first.variant_id, on_hand=100, currency="USD")
+    second = await add_offer(stock_db, variant_id=first.variant_id, on_hand=15, reserved=3, is_primary=False)
+    await add_offer(stock_db, variant_id=first.variant_id, on_hand=100, active=False, is_primary=False)
+    await add_offer(stock_db, variant_id=first.variant_id, on_hand=100, supplier_active=False, is_primary=False)
+    await add_offer(stock_db, variant_id=first.variant_id, on_hand=100, currency="USD", is_primary=False)
     async with stock_db() as db:
         await sync_supplier_stock(db, [snapshot(first.offer_id, onHand=4)], now=NOW)
         await db.commit()
     _, projected, available = await read_stock(stock_db, first)
-    assert projected == available == 12  # Other eligible offer, not 2 + 12.
+    assert projected == available == 2  # Non-primary offers do not affect storefront availability.
     inventory, _, _ = await read_stock(stock_db, second)
     assert (inventory.on_hand, inventory.reserved, inventory.last_synced_at) == (15, 3, None)
 

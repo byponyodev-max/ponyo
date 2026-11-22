@@ -1,9 +1,9 @@
 """Development-only linked catalog fixtures; no real supplier partnerships implied."""
 
 import re
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,6 +12,7 @@ from app.models import (
     Brand, Order, OrderStatusHistory, Product, ProductCategory, ProductImage,
     Supplier, SupplierInventory, SupplierOffer,
 )
+from app.product_categories import PRODUCT_CATEGORY_DEFINITIONS, product_category_slug
 
 DEMO_MAKER_PROFILES = {
     "ponyo": {
@@ -66,20 +67,39 @@ def catalog_slug(name: str) -> str:
     return slug[:140] or f"catalog-{demo_id('name', name).hex[:16]}"
 
 
+async def ensure_product_category_taxonomy(db: AsyncSession) -> dict[str, ProductCategory]:
+    categories: dict[str, ProductCategory] = {}
+    for definition in PRODUCT_CATEGORY_DEFINITIONS:
+        category = await db.scalar(select(ProductCategory).where(ProductCategory.slug == definition.slug))
+        if category is None:
+            category = ProductCategory(id=uuid4(), slug=definition.slug, name=definition.name)
+            db.add(category)
+        category.name = definition.name
+        category.parent_id = categories[definition.parent_slug].id if definition.parent_slug else None
+        category.active = True
+        categories[definition.slug] = category
+        await db.flush()
+    return categories
+
+
 async def link_demo_catalog(db: AsyncSession) -> None:
     """Backfill missing links only. Never replenish stock or overwrite supplier edits."""
     if settings.environment == "production":
         raise RuntimeError("Demo supplier data must not be created in production.")
+    categories = await ensure_product_category_taxonomy(db)
     products = (await db.scalars(select(Product).options(selectinload(Product.variants)))).all()
     for product in products:
         if product.category_id is None:
-            slug = catalog_slug(product.category_name)
-            category = await db.scalar(select(ProductCategory).where(ProductCategory.slug == slug))
-            if category is None:
-                category = ProductCategory(id=demo_id("category", slug), slug=slug, name=product.category_name)
-                db.add(category)
-                await db.flush()
+            slug = product_category_slug(
+                name=product.name,
+                category_name=product.category_name,
+                product_type=product.product_type,
+                tags=product.tags,
+                size_tier=product.size_tier,
+            )
+            category = categories[slug]
             product.category_id = category.id
+            product.category_name = category.name
         brand = await db.get(Brand, product.brand_id) if product.brand_id else None
         if brand is None:
             slug = catalog_slug(product.supplier_name)
@@ -114,9 +134,16 @@ async def link_demo_catalog(db: AsyncSession) -> None:
                     id=demo_id("offer", str(variant.id)), supplier_id=supplier.id,
                     variant_id=variant.id, supplier_sku=f"DEMO-{variant.id.hex[:24].upper()}",
                     cost_amount=max(0, variant.price_amount * 60 // 100), currency=variant.currency,
+                    is_primary=True,
                 )
                 db.add(offer)
                 await db.flush()
+            elif not offer.is_primary:
+                offer_count = await db.scalar(select(func.count()).select_from(SupplierOffer).where(
+                    SupplierOffer.variant_id == variant.id,
+                )) or 0
+                if offer_count == 1:
+                    offer.is_primary = True
             if not await db.scalar(select(SupplierInventory.id).where(SupplierInventory.offer_id == offer.id)):
                 db.add(SupplierInventory(
                     id=demo_id("inventory", str(offer.id)), offer_id=offer.id,

@@ -72,6 +72,7 @@ def product_response(product: Product, translation: ProductTranslation | None = 
         availabilityStatus=product.availability_status,
         categoryName=localized(("categoryName",), product.category.name if product.category else product.category_name),
         categoryId=str(product.category_id) if product.category_id else None,
+        categorySlug=product.category.slug if product.category else None,
         brandId=str(product.brand_id) if product.brand_id else None,
         brandName=product.brand.name if product.brand else product.supplier_name,
         makerName=product.brand.name if has_maker_profile else None,
@@ -90,6 +91,9 @@ def product_response(product: Product, translation: ProductTranslation | None = 
         estimatedDeliveryDate=product.estimated_delivery_date,
         onlyAtPonyo=product.only_at_ponyo,
         reservationsOpen=product.reservations_open,
+        reservationTarget=product.reservation_target,
+        reservationDeadline=product.reservation_deadline,
+        productionStatus=product.production_status,
         shippingCountries=product.shipping_countries,
         images=[{"url": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],
         galleryImages=[{"src": storefront_image_url(image.url), "alt": localized(("imageAlts", str(image.id)), image.alt)} for image in product.images],
@@ -134,7 +138,20 @@ async def list_products(
         ).exists() if locale != "en" else False
         query = query.where(or_(Product.name.ilike(term), Product.description.ilike(term), Product.category_name.ilike(term), Product.sku.ilike(term), Product.brand.has(Brand.name.ilike(term)), translated_match))
     if category:
-        query = query.where(or_(Product.category_name.ilike(category.strip()), Product.category.has(or_(ProductCategory.slug == category.strip(), ProductCategory.name.ilike(category.strip())))))
+        category_term = category.strip()
+        selected_category = select(ProductCategory.id).where(
+            or_(ProductCategory.slug == category_term, ProductCategory.name.ilike(category_term)),
+            ProductCategory.active.is_(True),
+        )
+        child_category_ids = select(ProductCategory.id).where(
+            ProductCategory.parent_id.in_(selected_category),
+            ProductCategory.active.is_(True),
+        )
+        query = query.where(or_(
+            Product.category_name.ilike(category_term),
+            Product.category_id.in_(selected_category),
+            Product.category_id.in_(child_category_ids),
+        ))
     if brand:
         query = query.where(Product.brand.has(or_(Brand.slug == brand.strip(), Brand.name.ilike(brand.strip()))))
     if category_id:
@@ -364,6 +381,8 @@ async def get_product_reservations(product_id: UUID, db: AsyncSession = Depends(
         "reservationCount": count,
         "target": product.reservation_target,
         "open": product.reservations_open,
+        "deadline": product.reservation_deadline.isoformat() if product.reservation_deadline else None,
+        "productionStatus": product.production_status,
     }}
 
 
@@ -383,8 +402,27 @@ async def create_product_reservation(
     )
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found.")
+    email = str(payload.email).lower().strip()
+    existing = await db.scalar(select(ProductReservation.id).where(
+        ProductReservation.product_id == product.id,
+        ProductReservation.email == email,
+    ))
+    if existing is not None:
+        count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+            ProductReservation.product_id == product.id,
+        )) or 0
+        return {"data": {
+            "accepted": True,
+            "reservationCount": count,
+            "target": product.reservation_target,
+            "open": product.reservations_open,
+            "deadline": product.reservation_deadline.isoformat() if product.reservation_deadline else None,
+            "productionStatus": product.production_status,
+        }}
     if not product.reservations_open:
         raise HTTPException(status_code=409, detail="Reservations are not open for this product.")
+    if product.reservation_deadline is not None and product.reservation_deadline < utc_now().date():
+        raise HTTPException(status_code=409, detail="The reservation period has ended.")
     country_code = shipping_country_code(payload.country)
     if product.shipping_countries is None or country_code not in product.shipping_countries:
         raise HTTPException(
@@ -394,46 +432,45 @@ async def create_product_reservation(
 
     reservation_target = product.reservation_target
     product_name = product.name
-    email = str(payload.email).lower().strip()
-    existing = await db.scalar(select(ProductReservation.id).where(
-        ProductReservation.product_id == product.id,
-        ProductReservation.email == email,
-    ))
-    if existing is None:
-        try:
-            db.add(ProductReservation(
-                product_id=product.id,
-                email=email,
-                country=country_code,
-            ))
-            db.add(OutboxEvent(event_type="product.reservation_created", payload={
-                "productId": str(product.id), "productName": product.name, "email": email,
+    try:
+        db.add(ProductReservation(
+            product_id=product.id,
+            email=email,
+            country=country_code,
+        ))
+        db.add(OutboxEvent(event_type="product.reservation_created", payload={
+            "productId": str(product.id), "productName": product.name, "email": email,
+        }))
+        await db.flush()
+        count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+            ProductReservation.product_id == product.id,
+        )) or 0
+        if (
+            reservation_target is not None
+            and count >= reservation_target
+            and product.reservation_minimum_reached_at is None
+        ):
+            product.reservation_minimum_reached_at = utc_now()
+            product.reservations_open = False
+            product.production_status = "target_reached"
+            db.add(OutboxEvent(event_type="product.reservation_minimum_reached", payload={
+                "productId": str(product.id),
+                "productName": product_name,
+                "reservationCount": count,
+                "target": reservation_target,
             }))
-            await db.flush()
-            count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
-                ProductReservation.product_id == product.id,
-            )) or 0
-            if (
-                reservation_target is not None
-                and count >= reservation_target
-                and product.reservation_minimum_reached_at is None
-            ):
-                product.reservation_minimum_reached_at = utc_now()
-                db.add(OutboxEvent(event_type="product.reservation_minimum_reached", payload={
-                    "productId": str(product.id),
-                    "productName": product_name,
-                    "reservationCount": count,
-                    "target": reservation_target,
-                }))
-            await db.commit()
-        except IntegrityError:
-            await db.rollback()
-            duplicate = await db.scalar(select(ProductReservation.id).where(
-                ProductReservation.product_id == product_id,
-                ProductReservation.email == email,
-            ))
-            if duplicate is None:
-                raise
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        duplicate = await db.scalar(select(ProductReservation.id).where(
+            ProductReservation.product_id == product_id,
+            ProductReservation.email == email,
+        ))
+        if duplicate is None:
+            raise
+        product = await db.get(Product, product_id)
+        if product is None:
+            raise HTTPException(status_code=404, detail="Product not found.")
 
     count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
         ProductReservation.product_id == product_id,
@@ -442,6 +479,9 @@ async def create_product_reservation(
         "accepted": True,
         "reservationCount": count,
         "target": reservation_target,
+        "open": product.reservations_open,
+        "deadline": product.reservation_deadline.isoformat() if product.reservation_deadline else None,
+        "productionStatus": product.production_status,
     }}
 
 

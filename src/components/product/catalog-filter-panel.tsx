@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useLocalization } from "@/components/layout/localization-provider";
+import { PonyoSelect } from "@/components/ui/ponyo-select";
 
 type CatalogFilterPanelProps = {
-  categories: Array<{ title: string; key: string; slug: string }>;
+  categories: Array<{ title: string; key: string; slug: string; parentTitle?: string }>;
   category: string;
   size: string;
   minimum: number;
@@ -50,22 +51,40 @@ export function CatalogFilterPanel({ categories, category, size, minimum, maximu
         <form action="/shop" method="get" className="catalog-filter-form">
           {Object.entries(preservedQuery).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
           <h2>{t("shop.filter.refine", "Refine your finds")}</h2>
-          <label>{t("shop.filter.category", "Category")}
-            <select name="category" defaultValue={category}>
-              <option value="">{t("shop.filter.all", "All plush")}</option>
-              {categories.map((item) => <option key={item.slug} value={item.slug}>{t(`shop.category.${item.key}`, item.title)}</option>)}
-            </select>
+          <label htmlFor="catalog-category-filter">{t("shop.filter.category", "Category")}
+            <PonyoSelect
+              id="catalog-category-filter"
+              name="category"
+              defaultValue={category}
+              label={t("shop.filter.category", "Category")}
+              searchable={categories.length > 8}
+              searchPlaceholder={t("general.search", "Search")}
+              emptyMessage={t("localization.no_matches", "No matches yet. Try another search.")}
+              options={[
+                { value: "", label: t("shop.filter.all", "All plush") },
+                ...categories.map((item) => ({
+                  value: item.slug,
+                  label: `${item.parentTitle ? `${item.parentTitle} · ` : ""}${t(`shop.category.${item.key}`, item.title)}`,
+                })),
+              ]}
+            />
           </label>
-          <label>{t("shop.filter.size", "Size")}
-            <select name="size" defaultValue={size}>
-              <option value="">{t("shop.filter.any_size", "Any size")}</option>
-              {[
+          <label htmlFor="catalog-size-filter">{t("shop.filter.size", "Size")}
+            <PonyoSelect
+              id="catalog-size-filter"
+              name="size"
+              defaultValue={size}
+              label={t("shop.filter.size", "Size")}
+              options={[
+                { value: "", label: t("shop.filter.any_size", "Any size") },
+                ...[
                 ["Small", "shop.size.small"],
                 ["Medium", "shop.size.medium"],
                 ["Large", "shop.size.large"],
                 ["XL", "shop.size.xl"],
-              ].map(([tier, key]) => <option key={tier} value={tier}>{t(key, tier)}</option>)}
-            </select>
+                ].map(([tier, key]) => ({ value: tier, label: t(key, tier) })),
+              ]}
+            />
           </label>
           <fieldset>
             <legend>{t("shop.filter.price_range", "Price range")}</legend>

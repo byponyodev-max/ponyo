@@ -35,6 +35,7 @@ async def create_supplier_listing(client, factory):
             currency="JPY",
             minimum_order_quantity=1,
             lead_time_days=4,
+            is_primary=True,
             active=True,
         )
         db.add(offer)
@@ -76,14 +77,15 @@ async def test_supplier_offer_updates_are_persisted_and_refresh_storefront_avail
     assert listings.json()["data"][0]["retailPriceAmount"] == 1500
 
     response = await supplier_update(client, offer_id, {
-        "onHand": 8,
+        "productionCapacity": 8,
         "costAmount": 725,
         "minimumOrderQuantity": 2,
         "leadTimeDays": 3,
     })
     assert response.status_code == 200, response.text
-    assert response.json()["data"]["availableQuantity"] == 8
+    assert response.json()["data"]["availableQuantity"] == 0
     assert response.json()["data"]["retailPriceAmount"] == 1500
+    assert response.json()["data"]["pendingChange"]["productionCapacity"] == 8
 
     async with factory() as db:
         offer = await db.get(SupplierOffer, offer_id)
@@ -91,16 +93,34 @@ async def test_supplier_offer_updates_are_persisted_and_refresh_storefront_avail
             select(SupplierInventory).where(SupplierInventory.offer_id == offer_id),
         )
         variant = await db.get(ProductVariant, variant_id)
-        assert (offer.cost_amount, offer.minimum_order_quantity, offer.lead_time_days) == (725, 2, 3)
-        assert inventory.on_hand == 8
+        assert (offer.cost_amount, offer.minimum_order_quantity, offer.lead_time_days) == (600, 1, 4)
+        assert inventory.on_hand == 0
         assert inventory.reserved == 0
-        assert inventory.last_synced_at is not None
-        assert variant.stock_quantity == 8
+        assert inventory.last_synced_at is None
+        assert variant.stock_quantity == 0
+
+    client.cookies.clear()
+    admin_id = await seed_customer_session(client, factory, email="catalog-admin@example.com")
+    async with factory() as db:
+        admin = await db.get(Customer, admin_id)
+        admin.role = "admin"
+        await db.commit()
+    queued = await client.get("/v1/admin/supplier-offer-changes")
+    assert queued.status_code == 200
+    assert len(queued.json()["data"]) == 1
+    change_id = queued.json()["data"][0]["id"]
+    approved = await client.post(
+        f"/v1/admin/supplier-offer-changes/{change_id}/decision",
+        headers={"X-CSRF-Token": await csrf_token(client)},
+        json={"decision": "approve", "isPrimary": True},
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["data"]["current"]["retailPriceAmount"] == 870
 
     after = await client.get(f"/v1/products/{product_id}")
     assert after.status_code == 200
     assert after.json()["data"]["availability"] == "available"
-    assert after.json()["data"]["priceAmount"] == 1500
+    assert after.json()["data"]["priceAmount"] == 870
     assert "costAmount" not in after.json()["data"]
 
 
@@ -138,14 +158,14 @@ async def test_supplier_catalog_is_supplier_scoped_and_protects_reserved_stock(t
     listings = await client.get("/v1/supplier-catalog/offers")
     assert [row["offerId"] for row in listings.json()["data"]] == [str(owned_offer_id)]
     assert (await supplier_update(client, other_offer_id, {
-        "onHand": 10,
+        "productionCapacity": 10,
         "costAmount": 500,
         "minimumOrderQuantity": 1,
         "leadTimeDays": 2,
     })).status_code == 404
 
     conflict = await supplier_update(client, owned_offer_id, {
-        "onHand": 1,
+        "productionCapacity": 1,
         "costAmount": 700,
         "minimumOrderQuantity": 1,
         "leadTimeDays": 4,

@@ -23,11 +23,13 @@ test("supplier API client uses the protected auth and purchase-order endpoints",
         assert.ok(api.includes(value), `missing supplier API endpoint: ${value}`);
 });
 
-test("supplier listings update approved offer stock and private wholesale terms through the API", () => {
+test("supplier listings submit capacity and wholesale changes for Ponyo approval", () => {
     for (const value of[
             "/supplier-catalog/offers?limit=${limit}",
             "/supplier-catalog/offers/${encodeURIComponent(offerId)}",
             "onHand: number",
+            "productionCapacity: number",
+            "pendingChange:",
             "costAmount: number",
         ])
         assert.ok(
@@ -37,19 +39,18 @@ test("supplier listings update approved offer stock and private wholesale terms 
     for (const value of[
             "/offers",
             "SupplierOffer.supplier_id == supplier_id",
-            "payload.onHand < inventory.reserved",
-            "offer.cost_amount = payload.costAmount",
-            "await refresh_synced_variant(db, variant.id)",
+            "payload.productionCapacity < inventory.reserved",
+            "SupplierOfferChangeRequest(",
+            "pending.production_capacity = payload.productionCapacity",
         ])
         assert.ok(
             supplierCatalog.includes(value),
             `missing supplier catalog API behavior: ${value}`,
         );
-    assert.ok(portal.includes("Save listing updates"));
+    assert.ok(portal.includes("Submit for Ponyo approval"));
     assert.ok(portal.includes("Storefront retail price"));
-    assert.ok(
-        portal.includes("Ponyo keeps retail prices and product content curated"),
-    );
+    assert.ok(portal.includes("Storefront terms will update only after Ponyo approval"));
+    assert.ok(portal.includes("Approved wholesale costs set the public retail price at 20% above wholesale"));
 });
 
 test("supplier server auth checks verified role, active assignment, and CSRF on writes", () => {
@@ -100,7 +101,7 @@ test("supplier workspace adopts Ponyo palette and a compact mobile layout", () =
 
 test("supplier subdomain root rewrites to the portal without redirecting storefront traffic", () => {
     assert.ok(proxy.includes('?? "supplier.byponyo.com"'));
-    assert.ok(proxy.includes('request.nextUrl.pathname !== "/"'));
+    assert.ok(proxy.includes('if (pathname !== "/" || host !== supplierPortalHost)'));
     assert.ok(proxy.includes('destination.pathname = "/supplier-portal"'));
     assert.ok(proxy.includes("NextResponse.rewrite(destination)"));
 });

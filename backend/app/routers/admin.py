@@ -4,7 +4,7 @@ import csv
 import hashlib
 import logging
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from io import BytesIO, StringIO
 from uuid import UUID, uuid4
 
@@ -27,6 +27,7 @@ from app.mailbox_sync import (
     sync_mailbox_once,
     sync_portal_messages,
 )
+from app.product_categories import PRODUCT_CATEGORY_SLUGS
 from app.newsletter import unsubscribe_url
 from app.models import (
     Brand,
@@ -49,6 +50,8 @@ from app.models import (
     Shipment,
     Supplier,
     SupplierAccount,
+    SupplierInventory,
+    SupplierOfferChangeRequest,
     SupplierOffer,
     SupplierPurchaseOrder,
     SupplierPurchaseOrderItem,
@@ -63,13 +66,19 @@ from app.schemas import (
     AdminEmailThreadArchiveRequest,
     AdminMakerApplicationStatusRequest,
     AdminNewsletterCampaignRequest,
+    AdminProductCategoryRequest,
     AdminProductProofRequest,
     AdminProductPublicationRequest,
     AdminProductReservationSettings,
+    AdminProductProductionApprovalRequest,
+    AdminSupplierOfferChangeDecision,
     AdminSupplierStatusRequest,
 )
 from app.security import hash_password, require_csrf, require_roles
 from app.translations import TranslationUnavailableError, ensure_product_translations
+from app.inventory import refresh_synced_variant
+from app.maker_application_storage import MakerPhotoStorageError, signed_maker_application_photo_url
+from app.supplier_pricing import retail_price_for_wholesale_cost
 
 router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
 
@@ -265,6 +274,8 @@ def product_summary(product: Product) -> dict:
         "priceAmount": product.price_amount,
         "currency": product.currency,
         "categoryName": product.category.name if product.category else product.category_name,
+        "categoryId": str(product.category_id) if product.category_id else None,
+        "categorySlug": product.category.slug if product.category else None,
         "brandName": product.brand.name if product.brand else product.supplier_name,
         "published": product.published,
         "createdAt": product.created_at.isoformat(),
@@ -279,6 +290,11 @@ def product_summary(product: Product) -> dict:
         "onlyAtPonyo": product.only_at_ponyo,
         "reservationsOpen": product.reservations_open,
         "reservationTarget": product.reservation_target,
+        "reservationDeadline": product.reservation_deadline.isoformat() if product.reservation_deadline else None,
+        "productionStatus": product.production_status,
+        "productionApprovedAt": product.production_approved_at.isoformat() if product.production_approved_at else None,
+        "preorderInvitesSentAt": product.preorder_invites_sent_at.isoformat() if product.preorder_invites_sent_at else None,
+        "reservationTargetMissedAt": product.reservation_target_missed_at.isoformat() if product.reservation_target_missed_at else None,
         "shippingCountries": product.shipping_countries,
     }
 
@@ -778,6 +794,42 @@ async def set_product_publication(product_id: UUID, payload: AdminProductPublica
     return {"data": product_summary(product)}
 
 
+@router.patch("/products/{product_id}/category", response_model=dict)
+async def set_product_category(
+    product_id: UUID,
+    payload: AdminProductCategoryRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-product-category", 30, 60)
+    product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update().options(
+        selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images),
+    ))
+    if product is None:
+        raise HTTPException(404, "Product not found.")
+    category = await db.scalar(select(ProductCategory).where(
+        ProductCategory.id == payload.categoryId,
+        ProductCategory.active.is_(True),
+        ProductCategory.slug.in_(PRODUCT_CATEGORY_SLUGS),
+    ))
+    if category is None:
+        raise HTTPException(422, "Choose an active product category.")
+    has_children = await db.scalar(select(ProductCategory.id).where(
+        ProductCategory.parent_id == category.id,
+        ProductCategory.active.is_(True),
+        ProductCategory.slug.in_(PRODUCT_CATEGORY_SLUGS),
+    ).limit(1))
+    if has_children:
+        raise HTTPException(422, "Choose a product subcategory.")
+    product.category = category
+    product.category_name = category.name
+    await db.commit()
+    await db.refresh(product)
+    return {"data": product_summary(product)}
+
+
 @router.get("/reservations", response_model=dict)
 async def list_product_reservations(_admin: Customer = Depends(require_roles("admin")), db: AsyncSession = Depends(get_db)):
     products = (await db.scalars(
@@ -1140,28 +1192,243 @@ async def set_product_reservation_settings(
     reservation_count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
         ProductReservation.product_id == product.id,
     )) or 0
+    if payload.reservationDeadline is not None and payload.reservationDeadline < utc_now().date():
+        raise HTTPException(422, "Choose a reservation deadline that has not passed.")
+    if product.production_status in {"preorder_invited", "target_missed"}:
+        raise HTTPException(409, "This reservation campaign is already complete and cannot be changed.")
     product.reservations_open = payload.reservationsOpen
     product.reservation_target = payload.reservationTarget
+    product.reservation_deadline = payload.reservationDeadline
     if payload.reservationTarget is None or reservation_count < payload.reservationTarget:
         product.reservation_minimum_reached_at = None
+        product.production_status = "collecting"
     elif product.reservation_minimum_reached_at is None:
         product.reservation_minimum_reached_at = utc_now()
+        product.reservations_open = False
+        product.production_status = "target_reached"
         db.add(OutboxEvent(event_type="product.reservation_minimum_reached", payload={
             "productId": str(product.id),
             "productName": product.name,
             "reservationCount": reservation_count,
             "target": payload.reservationTarget,
         }))
+    else:
+        product.reservations_open = False
+        product.production_status = "target_reached"
     await db.commit()
     return {"data": {
         "id": str(product.id),
         "reservationsOpen": product.reservations_open,
         "reservationTarget": product.reservation_target,
+        "reservationDeadline": product.reservation_deadline.isoformat() if product.reservation_deadline else None,
+        "productionStatus": product.production_status,
         "reservationMinimumReachedAt": (
             product.reservation_minimum_reached_at.isoformat()
             if product.reservation_minimum_reached_at else None
         ),
     }}
+
+
+@router.post("/products/{product_id}/production-approval", response_model=dict)
+async def approve_product_production(
+    product_id: UUID,
+    payload: AdminProductProductionApprovalRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-production-approval", 20, 60)
+    if not payload.confirmMakerReady:
+        raise HTTPException(422, "Confirm that the maker is ready before opening the preorder invitation stage.")
+    product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update())
+    if product is None:
+        raise HTTPException(404, "Product not found.")
+    if product.production_status == "preorder_invited":
+        return {"data": {"productId": str(product.id), "status": product.production_status, "invitationsQueued": 0}}
+    if product.production_status != "target_reached" or product.reservation_target is None:
+        raise HTTPException(409, "The reservation target must be reached before production can be approved.")
+    reservation_count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+        ProductReservation.product_id == product.id,
+    )) or 0
+    if reservation_count < product.reservation_target:
+        raise HTTPException(409, "The current reservation count is below the production target.")
+
+    mail_settings = get_settings()
+    mailbox_key = None
+    if not mail_settings.contact_email_configured:
+        mailbox_key = next(
+            (key for key, mailbox in mail_settings.email_inbox_accounts.items() if mailbox.smtp_configured),
+            None,
+        )
+        if mailbox_key is None:
+            raise HTTPException(503, "Transactional email is not configured.")
+
+    reservations = list((await db.scalars(
+        select(ProductReservation).where(ProductReservation.product_id == product.id)
+        .order_by(ProductReservation.created_at, ProductReservation.id)
+    )).all())
+    product_url = f"{mail_settings.storefront_base_url.rstrip('/')}/products/{product.slug}"
+    now = utc_now()
+    for reservation in reservations:
+        event = OutboxEvent(
+            event_type="product.preorder_invitation_requested",
+            payload={"productId": str(product.id), "reservationId": str(reservation.id)},
+        )
+        enqueue_email_notification(
+            db,
+            event,
+            template="reservation_preorder_invitation",
+            recipient=reservation.email,
+            payload={
+                "productName": product.name,
+                "productUrl": product_url,
+                "reservationTarget": product.reservation_target,
+                "mailboxKey": mailbox_key,
+            },
+            notification_key=f"reservation_preorder_invitation:{reservation.id}",
+        )
+    product.production_approved_at = now
+    product.preorder_invites_sent_at = now
+    product.production_status = "preorder_invited"
+    await db.commit()
+    return {"data": {
+        "productId": str(product.id),
+        "status": product.production_status,
+        "invitationsQueued": len(reservations),
+        "paymentEnabled": False,
+    }}
+
+
+def supplier_offer_change_payload(change, supplier, offer, inventory, variant, product) -> dict:
+    return {
+        "id": str(change.id),
+        "supplierId": str(supplier.id),
+        "supplierName": supplier.name,
+        "offerId": str(offer.id),
+        "productId": str(product.id),
+        "productName": product.name,
+        "variantId": str(variant.id),
+        "variantSku": variant.sku,
+        "currency": variant.currency,
+        "current": {
+            "productionCapacity": inventory.on_hand,
+            "costAmount": offer.cost_amount,
+            "minimumOrderQuantity": offer.minimum_order_quantity,
+            "leadTimeDays": offer.lead_time_days,
+            "isPrimary": offer.is_primary,
+            "retailPriceAmount": variant.price_amount,
+        },
+        "proposed": {
+            "productionCapacity": change.production_capacity,
+            "costAmount": change.cost_amount,
+            "minimumOrderQuantity": change.minimum_order_quantity,
+            "leadTimeDays": change.lead_time_days,
+        },
+        "status": change.status,
+        "submittedAt": change.submitted_at.isoformat(),
+        "reviewedAt": change.reviewed_at.isoformat() if change.reviewed_at else None,
+        "decisionNote": change.decision_note,
+    }
+
+
+@router.get("/supplier-offer-changes", response_model=dict)
+async def list_supplier_offer_changes(
+    status: str = Query(default="pending", pattern="^(pending|approved|rejected|all)$"),
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(SupplierOfferChangeRequest, Supplier, SupplierOffer, SupplierInventory, ProductVariant, Product)
+        .join(Supplier, Supplier.id == SupplierOfferChangeRequest.supplier_id)
+        .join(SupplierOffer, SupplierOffer.id == SupplierOfferChangeRequest.offer_id)
+        .join(SupplierInventory, SupplierInventory.offer_id == SupplierOffer.id)
+        .join(ProductVariant, ProductVariant.id == SupplierOffer.variant_id)
+        .join(Product, Product.id == ProductVariant.product_id)
+    )
+    if status != "all":
+        query = query.where(SupplierOfferChangeRequest.status == status)
+    rows = (await db.execute(
+        query.order_by(SupplierOfferChangeRequest.submitted_at.desc(), SupplierOfferChangeRequest.id)
+        .limit(200)
+    )).all()
+    return {"data": [
+        supplier_offer_change_payload(change, supplier, offer, inventory, variant, product)
+        for change, supplier, offer, inventory, variant, product in rows
+    ]}
+
+
+@router.post("/supplier-offer-changes/{change_id}/decision", response_model=dict)
+async def decide_supplier_offer_change(
+    change_id: UUID,
+    payload: AdminSupplierOfferChangeDecision,
+    request: Request,
+    admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-supplier-offer-change", 30, 60)
+    variant_id = await db.scalar(
+        select(ProductVariant.id)
+        .join(SupplierOffer, SupplierOffer.variant_id == ProductVariant.id)
+        .join(SupplierOfferChangeRequest, SupplierOfferChangeRequest.offer_id == SupplierOffer.id)
+        .where(SupplierOfferChangeRequest.id == change_id)
+    )
+    if variant_id is None:
+        raise HTTPException(404, "Supplier change request not found.")
+    variant = await db.scalar(select(ProductVariant).where(
+        ProductVariant.id == variant_id,
+    ).with_for_update().execution_options(populate_existing=True))
+    change = await db.scalar(select(SupplierOfferChangeRequest).where(
+        SupplierOfferChangeRequest.id == change_id,
+    ).with_for_update().execution_options(populate_existing=True))
+    if variant is None or change is None:
+        raise HTTPException(404, "Supplier change request not found.")
+    offer = await db.scalar(select(SupplierOffer).where(
+        SupplierOffer.id == change.offer_id,
+        SupplierOffer.variant_id == variant.id,
+    ).with_for_update().execution_options(populate_existing=True))
+    inventory = await db.scalar(select(SupplierInventory).where(
+        SupplierInventory.offer_id == change.offer_id,
+    ).with_for_update().execution_options(populate_existing=True))
+    supplier = await db.get(Supplier, change.supplier_id)
+    product = await db.get(Product, variant.product_id)
+    if offer is None or inventory is None or supplier is None or product is None:
+        raise HTTPException(404, "Supplier listing is no longer available.")
+    if change.status != "pending":
+        raise HTTPException(409, "This supplier change request has already been reviewed.")
+
+    if payload.decision == "approve":
+        if change.production_capacity < inventory.reserved:
+            raise HTTPException(409, "Approved production capacity cannot be lower than units already reserved.")
+        if offer.currency != variant.currency:
+            raise HTTPException(409, "Supplier offer currency no longer matches the product variant.")
+        primaries = (await db.scalars(select(SupplierOffer).where(
+            SupplierOffer.variant_id == variant.id,
+        ).with_for_update())).all()
+        has_primary = any(candidate.is_primary for candidate in primaries)
+        if (offer.is_primary or not has_primary) and not payload.isPrimary:
+            raise HTTPException(409, "This variant must retain a primary maker. Select this offer as primary or choose another approved primary first.")
+        if payload.isPrimary:
+            for candidate in primaries:
+                candidate.is_primary = candidate.id == offer.id
+        offer.cost_amount = change.cost_amount
+        offer.minimum_order_quantity = change.minimum_order_quantity
+        offer.lead_time_days = change.lead_time_days
+        inventory.on_hand = change.production_capacity
+        inventory.last_synced_at = utc_now()
+        if payload.isPrimary:
+            variant.price_amount = retail_price_for_wholesale_cost(change.cost_amount)
+            variant.compare_at_amount = None
+    change.status = "approved" if payload.decision == "approve" else "rejected"
+    change.decision_note = payload.note
+    change.reviewed_at = utc_now()
+    change.reviewed_by = admin.id
+    if payload.decision == "approve":
+        await refresh_synced_variant(db, variant.id)
+    await db.commit()
+    await db.refresh(change)
+    return {"data": supplier_offer_change_payload(change, supplier, offer, inventory, variant, product)}
 
 
 @router.patch("/products/{product_id}/proof", response_model=dict)
@@ -1263,25 +1530,38 @@ async def list_maker_applications(_admin: Customer = Depends(require_roles("admi
     applications = (await db.scalars(
         select(MakerApplication).order_by(MakerApplication.created_at.desc(), MakerApplication.id)
     )).all()
-    return {"data": [{
-        "id": str(application.id),
-        "makerName": application.maker_name,
-        "contactPerson": application.contact_person,
-        "email": application.email,
-        "country": application.country,
-        "city": application.city,
-        "website": application.website or None,
-        "socialMedia": application.social_media or None,
-        "productUrl": application.product_url,
-        "productDescription": application.product_description,
-        "provenDesireEvidence": application.proven_desire_evidence,
-        "materials": application.materials,
-        "priceRange": application.price_range,
-        "productPhotos": application.product_photos,
-        "ponyoExclusivity": application.ponyo_exclusivity,
-        "status": application.status,
-        "createdAt": application.created_at.isoformat(),
-    } for application in applications]}
+    results = []
+    for application in applications:
+        photos = []
+        try:
+            for photo in application.product_photos:
+                photos.append(
+                    await signed_maker_application_photo_url(photo)
+                    if photo.startswith("maker-applications/")
+                    else photo
+                )
+        except MakerPhotoStorageError as error:
+            raise HTTPException(503, "Maker application photos are temporarily unavailable.") from error
+        results.append({
+            "id": str(application.id),
+            "makerName": application.maker_name,
+            "contactPerson": application.contact_person,
+            "email": application.email,
+            "country": application.country,
+            "city": application.city,
+            "website": application.website or None,
+            "socialMedia": application.social_media or None,
+            "productUrl": application.product_url,
+            "productDescription": application.product_description,
+            "provenDesireEvidence": application.proven_desire_evidence,
+            "materials": application.materials,
+            "priceRange": application.price_range,
+            "productPhotos": photos,
+            "ponyoExclusivity": application.ponyo_exclusivity,
+            "status": application.status,
+            "createdAt": application.created_at.isoformat(),
+        })
+    return {"data": results}
 
 
 @router.patch("/maker-applications/{application_id}/status", response_model=dict)

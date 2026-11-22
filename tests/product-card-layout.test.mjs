@@ -69,7 +69,7 @@ test("the detail page passes six-item selection to its recommendations grid usin
 	);
 });
 
-test("the detail page shows six maker-supplied facts and an exclusivity badge for every product", () => {
+test("the detail page shows maker-supplied facts and only shows the exclusivity badge when verified", () => {
 	const page = read("../src/app/products/[id]/page.tsx");
 	const makerPage = read("../src/app/makers/[slug]/page.tsx");
 	assert.match(page, /const proofFacts = \[/);
@@ -83,9 +83,8 @@ test("the detail page shows six maker-supplied facts and an exclusivity badge fo
 	]) {
 		assert.match(page, new RegExp(`key: "${proof}"`));
 	}
-	assert.match(page, /<span className="product-gallery-approval-badge">/);
+	assert.match(page, /\{product\.onlyAtPonyo && <span className="product-gallery-approval-badge">/);
 	assert.match(page, /className="product-gallery-approval-star" aria-hidden="true">★/);
-	assert.doesNotMatch(page, /product\.onlyAtPonyo &&/);
 	assert.match(
 		page,
 		/\{product\.makerSlug && <Link className="product-brand-story"/,

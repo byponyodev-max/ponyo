@@ -3,9 +3,21 @@ import "server-only";
 import { cookies } from "next/headers";
 import { getProductById, getProducts } from "@/services/product.service";
 import { requestAppTranslations, type AppTranslationEntry } from "@/services/app-translations.server";
-import { PONYO_API_BASE_URL } from "@/services/ponyo-api.client";
+import { PONYO_API_BASE_URL, ponyoApi, type ProductCategory } from "@/services/ponyo-api.client";
 import { previewTranslatableFields, reviewedPreviewTranslations } from "@/services/preview-product-translations";
 import type { Product } from "@/types/product";
+import { PRODUCT_CATEGORY_DEFINITIONS } from "@/lib/product-categories";
+
+function categorizePreviewProduct(product: Product): Product {
+	const tags = product.tags ?? [];
+	const text = `${product.name} ${product.categoryName} ${product.productType ?? ""}`.toLowerCase();
+	const categorySlug = product.sizeTier?.toLowerCase() === "xl" || tags.includes("domina-xl")
+		? "giant-plush"
+		: tags.includes("character") || text.includes("character")
+			? "character-plush"
+			: "collectible-plush";
+	return { ...product, categoryId: categorySlug, categorySlug };
+}
 
 async function localizePreviewProducts(products: Product[], locale: string) {
 	if (locale !== "ja" && locale !== "ko") return products;
@@ -70,7 +82,18 @@ export async function getLocalizedProducts(query = "", locale?: string) {
 	const products = await getProducts(query, language);
 	return PONYO_API_BASE_URL
 		? products
-		: localizePreviewProducts(products, language);
+		: localizePreviewProducts(products.map(categorizePreviewProduct), language);
+}
+
+export async function getProductCategories(): Promise<ProductCategory[]> {
+	if (PONYO_API_BASE_URL) return ponyoApi.listProductCategories();
+	return PRODUCT_CATEGORY_DEFINITIONS.map((category) => ({
+		id: category.slug,
+		slug: category.slug,
+		name: category.name,
+		parentId: category.parentSlug ?? null,
+		productCount: 0,
+	}));
 }
 
 export async function getLocalizedProductById(id: string, locale?: string) {

@@ -7,10 +7,12 @@ import { AnimalTabs } from "@/components/home/animal-tabs";
 import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
 import { ProductShelf } from "@/components/product/product-shelf";
 import { HomeBudgetLinks } from "@/components/home/home-budget-links";
-import { getLocalizedProducts } from "@/services/localized-products.server";
+import { getLocalizedProducts, getProductCategories } from "@/services/localized-products.server";
 import { LocalizedPrice, LocalizedText } from "@/components/layout/localization-provider";
 import { getTranslations } from "next-intl/server";
 import type { Product } from "@/types/product";
+import { orderProductCategories, PRODUCT_CATEGORY_ROOT_SLUGS, productCategoryTranslationKey } from "@/lib/product-categories";
+import type { ProductCategory } from "@/services/ponyo-api.client";
 import locale from "@/locales/en.default.json";
 
 const images = {
@@ -54,31 +56,63 @@ function byTag(products: Product[], tag: string, limit = 4) {
   return products.filter((product) => product.tags?.includes(tag)).slice(0, limit);
 }
 
-function AisleCard({ title, description, titleKey, descriptionKey, href, products }: { title: string; description: string; titleKey: string; descriptionKey: string; href: string; products: Product[] }) {
+function AisleCard({ title, description, href, products }: { title: string; description: string; href: string; products: Product[] }) {
   return (
     <article className="marketplace-aisle">
-      <LocalizedText as="h3" translationKey={titleKey} fallback={title} /><LocalizedText as="p" translationKey={descriptionKey} fallback={description} />
+      <h3>{title}</h3><p>{description}</p>
       <div className="marketplace-aisle-grid">
-        {products.slice(0, 4).map((product) => <Link href={`/products/${product.id}`} className="aisle-product" key={product.id}><span className="aisle-product-image"><Image src={product.image} alt={product.imageAlt} fill sizes="(max-width: 640px) 42vw, 130px" /></span><span className="aisle-product-title"><LocalizedText translationKey={`product.names.${product.slug}`} fallback={product.name} /></span><strong><LocalizedPrice amount={product.priceAmount} sourceCurrency={product.currency} /></strong></Link>)}
-        {products.length > 0 && products.length < 4 && <Link href={href} className="aisle-see-all"><span>→</span><LocalizedText translationKey="home.see_all_short" fallback="See all" /></Link>}
+        {products.slice(0, 2).map((product) => <Link href={`/products/${product.id}`} className="aisle-product" key={product.id}><span className="aisle-product-image"><Image src={product.image} alt={product.imageAlt} fill sizes="(max-width: 640px) 42vw, 130px" /></span><span className="aisle-product-title"><LocalizedText translationKey={`product.names.${product.slug}`} fallback={product.name} /></span><strong><LocalizedPrice amount={product.priceAmount} sourceCurrency={product.currency} /></strong></Link>)}
+        {products.length === 0 && <div className="aisle-empty">
+          <span className="aisle-empty-mark" aria-hidden="true">✦</span>
+          <strong><LocalizedText translationKey="home.aisles.empty_title" fallback="A thoughtful collection is taking shape" /></strong>
+          <p><LocalizedText translationKey="home.aisles.empty" fallback="We're carefully curating the first finds for this category." /></p>
+        </div>}
+        {products.length === 1 && <Link href={href} className="aisle-see-all"><span>→</span><LocalizedText translationKey="home.see_all_short" fallback="See all" /></Link>}
       </div>
-      <Link href={href} className="aisle-link"><LocalizedText translationKey="home.aisles.see_more_simple" fallback={`Shop more ${title} →`} /></Link>
+      <Link href={products.length ? href : "/collections/all"} className="aisle-link">
+        <LocalizedText
+          translationKey={products.length ? "home.aisles.see_more_simple" : "home.aisles.view_all"}
+          fallback={products.length ? `Shop more ${title} →` : "Explore all plush"}
+        />
+      </Link>
     </article>
   );
 }
 
 export default async function Home() {
   const t = await getTranslations();
-  const products = await getLocalizedProducts();
-  const premium = byTag(products, "premium", 12);
+  const [products, categoryData] = await Promise.all([getLocalizedProducts(), getProductCategories()]);
+  const productCategories = orderProductCategories(categoryData);
+  const categoryLabel = (category: ProductCategory) => {
+    const key = productCategoryTranslationKey(category.slug);
+    return t.has(key) ? t(key) : category.name;
+  };
+  const parentCategories = PRODUCT_CATEGORY_ROOT_SLUGS
+    .map((slug) => productCategories.find((category) => category.slug === slug && !category.parentId))
+    .filter((category): category is ProductCategory => Boolean(category));
   const domina = byTag(products, "domina-xl", 6);
+  const premium = byTag(products, "premium", 10);
   const arrivals = byTag(products, "new-arrival", 10);
   const allTrending = products.filter((product) => !product.tags?.includes("new-arrival")).slice(0, 12);
-  const aisles = [
-    { title: "Premium Plushies", description: "Top-quality plush with extra-soft finishes.", titleKey: "home.aisles.premium_title", descriptionKey: "home.aisles.premium_sub", href: "/collections/premium", products: premium.slice(0, 4) },
-    { title: "XL Goodies", description: "Giant plush, big enough to hug back.", titleKey: "home.aisles.xl_title", descriptionKey: "home.aisles.xl_sub", href: "/collections/domina-xl", products: domina },
-    { title: "Shop by animal", description: "Bears, bunnies, cats and more.", titleKey: "home.aisles.animal_title", descriptionKey: "home.aisles.animal_sub", href: "/collections", products: ["bears", "bunnies", "cats", "pandas"].map((category) => products.find((product) => product.categoryName.toLocaleLowerCase() === category || product.tags?.some((tag) => tag.toLocaleLowerCase() === category))).filter((product): product is Product => Boolean(product)) },
-  ];
+  const aisles = parentCategories.map((category) => {
+    const children = productCategories.filter((item) => item.parentId === category.id);
+    const childIds = new Set(children.map((item) => item.id));
+    const categoryProducts = products.filter((product) =>
+      product.categoryId === category.id
+      || (product.categoryId != null && childIds.has(product.categoryId))
+      || product.categorySlug === category.slug
+      || children.some((child) => child.slug === product.categorySlug),
+    );
+    const description = children.length
+      ? children.map(categoryLabel).join(" · ")
+      : t.has("home.aisles.wall_decor_sub") ? t("home.aisles.wall_decor_sub") : "Wall art and decor";
+    return {
+      title: categoryLabel(category),
+      description,
+      href: `/collections/${category.slug}`,
+      products: categoryProducts,
+    };
+  });
   const faq = locale.pg.faq;
   const faqRows: Array<[keyof typeof faq, keyof typeof faq]> = [["ordering_q1", "ordering_a1"], ["shipping_q2", "shipping_a2"], ["sizes_q1", "sizes_a1"]];
 

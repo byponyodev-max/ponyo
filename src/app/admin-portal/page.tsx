@@ -6,8 +6,9 @@ import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 import { aggregateReservationsByCountry, filterAndSortDemandProducts, type DemandSortOrder } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminListPage, type AdminNewsletterPage, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier, type AdminWaitlistEntryPage, type AdminWaitlistProduct } from "@/services/ponyo-api.client";
-import { BrandProfileEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminListPage, type AdminNewsletterPage, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier, type AdminSupplierOfferChange, type AdminWaitlistEntryPage, type AdminWaitlistProduct, type ProductCategory } from "@/services/ponyo-api.client";
+import { BrandProfileEditor, ProductCategoryEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
+import { PonyoSelect } from "@/components/ui/ponyo-select";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
 
 type AdminSection = "dashboard" | "analytics" | "orders" | "products" | "reservations" | "waitlist" | "newsletter" | "email-inbox" | "maker-applications" | "suppliers" | "brands" | "customers" | "admin-accounts" | "fulfillment";
@@ -72,12 +73,15 @@ function AdminTablePagination({ page, pageSize, total, onPageChange, onPageSizeC
 	const to = Math.min((page + 1) * pageSize, total);
 	const lastPage = Math.max(0, Math.ceil(total / pageSize) - 1);
 	return <footer className="ad-table-pagination">
-		<label>{t("admin.ui.table_rows_per_page", "Rows per page")}
-			<select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
-				<option value={10}>10</option>
-				<option value={50}>50</option>
-				<option value={100}>100</option>
-			</select>
+		<label htmlFor="admin-table-page-size">{t("admin.ui.table_rows_per_page", "Rows per page")}
+			<PonyoSelect
+				id="admin-table-page-size"
+				value={String(pageSize)}
+				onChange={(value) => onPageSizeChange(Number(value))}
+				label={t("admin.ui.table_rows_per_page", "Rows per page")}
+				compact
+				options={[10, 50, 100].map((size) => ({ value: String(size), label: String(size) }))}
+			/>
 		</label>
 		<span>{t("admin.ui.table_page_summary", "Showing {{from}}–{{to}} of {{total}}", { from, to, total })}</span>
 		<div>
@@ -106,14 +110,30 @@ function AdminDemandReportFilters({ filters, countries, language, onChange, t }:
 }) {
 	return <div className="ad-demand-filters">
 		<label className="ad-search"><span>⌕</span><input value={filters.query} onChange={(event) => onChange({ ...filters, query: event.target.value })} placeholder={t("admin.ui.demand_search", "Search product or SKU")} /></label>
-		<label><span>{t("admin.ui.demand_country_label", "Country")}</span><select value={filters.country} onChange={(event) => onChange({ ...filters, country: event.target.value })}>
-			<option value="">{t("admin.ui.demand_country", "All countries")}</option>
-			{countries.map((country) => <option key={country} value={country}>{regionName(country, language, country)}</option>)}
-		</select></label>
-		<label><span>{t("admin.ui.demand_sort", "Sort by count")}</span><select value={filters.sort} onChange={(event) => onChange({ ...filters, sort: event.target.value as DemandSortOrder })}>
-			<option value="most">{t("admin.ui.demand_sort_most", "Most to least")}</option>
-			<option value="least">{t("admin.ui.demand_sort_least", "Least to most")}</option>
-		</select></label>
+		<label htmlFor="admin-demand-country"><span>{t("admin.ui.demand_country_label", "Country")}</span><PonyoSelect
+			id="admin-demand-country"
+			value={filters.country}
+			onChange={(country) => onChange({ ...filters, country })}
+			label={t("admin.ui.demand_country_label", "Country")}
+			compact
+			searchable={countries.length > 8}
+			searchPlaceholder={t("general.search", "Search")}
+			options={[
+				{ value: "", label: t("admin.ui.demand_country", "All countries") },
+				...countries.map((country) => ({ value: country, label: regionName(country, language, country) })),
+			]}
+		/></label>
+		<label htmlFor="admin-demand-sort"><span>{t("admin.ui.demand_sort", "Sort by count")}</span><PonyoSelect
+			id="admin-demand-sort"
+			value={filters.sort}
+			onChange={(sort) => onChange({ ...filters, sort: sort as DemandSortOrder })}
+			label={t("admin.ui.demand_sort", "Sort by count")}
+			compact
+			options={[
+				{ value: "most", label: t("admin.ui.demand_sort_most", "Most to least") },
+				{ value: "least", label: t("admin.ui.demand_sort_least", "Least to most") },
+			]}
+		/></label>
 	</div>;
 }
 
@@ -160,12 +180,20 @@ function AdminLanguageSelect({ language, setLanguage, label, showLiveStatus = fa
 	return <>
 		{showLiveStatus && <span className="ad-live-indicator" role="status"><i aria-hidden="true" />{t("admin.ui.live_updates", "Live updates · every 15 seconds")}</span>}
 		<label className="ad-language-control">
-			<span>{label}</span>
-			<select aria-label={label} value={language} onChange={(event) => void setLanguage(event.target.value)}>
-				<option value="en">English</option>
-				<option value="ja">日本語</option>
-				<option value="ko">한국어</option>
-			</select>
+			<span id="admin-language-label">{label}</span>
+			<PonyoSelect
+				id="admin-language"
+				value={language}
+				onChange={(value) => void setLanguage(value)}
+				label={label}
+				labelledBy="admin-language-label"
+				compact
+				options={[
+					{ value: "en", label: "English", icon: "EN" },
+					{ value: "ja", label: "日本語", icon: "JP" },
+					{ value: "ko", label: "한국어", icon: "KR" },
+				]}
+			/>
 		</label>
 	</>;
 }
@@ -291,12 +319,14 @@ export default function AdminPortalPage() {
 	const [analyticsRange, setAnalyticsRange] = useState<AdminAnalytics["period"]["range"]>("30d");
 	const [orders, setOrders] = useState<OrderPage>({ items: [], total: 0, limit: 10, offset: 0 });
 	const [products, setProducts] = useState<ProductPage>({ items: [], total: 0, limit: 10, offset: 0 });
+	const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
 	const [waitlistProducts, setWaitlistProducts] = useState<AdminListPage<AdminWaitlistProduct>>({ items: [], total: 0, limit: 10, offset: 0 });
 	const [waitlistEntries, setWaitlistEntries] = useState<AdminWaitlistEntryPage | null>(null);
 	const [selectedWaitlistProductId, setSelectedWaitlistProductId] = useState("");
 	const [waitlistConfirmProductId, setWaitlistConfirmProductId] = useState("");
 	const [waitlistEntriesLoading, setWaitlistEntriesLoading] = useState(false);
 	const [suppliers, setSuppliers] = useState<AdminSupplier[]>([]);
+	const [supplierOfferChanges, setSupplierOfferChanges] = useState<AdminSupplierOfferChange[]>([]);
 	const [brands, setBrands] = useState<AdminBrand[]>([]);
 	const [reservationProducts, setReservationProducts] = useState<AdminProduct[]>([]);
 	const [interestProducts, setInterestProducts] = useState<AdminProduct[]>([]);
@@ -449,7 +479,12 @@ export default function AdminPortalPage() {
 				case "products":
 					{
 						const size = pageSize ?? tablePaging.products.pageSize;
-						setProducts(await ponyoApi.listAdminProducts(search, publishedFilter === "all" ? undefined : publishedFilter === "published", size, page * size));
+						const [productPage, categories] = await Promise.all([
+							ponyoApi.listAdminProducts(search, publishedFilter === "all" ? undefined : publishedFilter === "published", size, page * size),
+							ponyoApi.listProductCategories(),
+						]);
+						setProducts(productPage);
+						setProductCategories(categories);
 						setTablePaging((current) => ({ ...current, products: { page, pageSize: size } }));
 					}
 				break;
@@ -487,7 +522,14 @@ export default function AdminPortalPage() {
 					setMakerApplications(await ponyoApi.listAdminMakerApplications());
 					break;
 				case "suppliers":
-				setSuppliers(await ponyoApi.listAdminSuppliers());
+				{
+					const [supplierRows, changeRows] = await Promise.all([
+						ponyoApi.listAdminSuppliers(),
+						ponyoApi.listAdminSupplierOfferChanges(),
+					]);
+					setSuppliers(supplierRows);
+					setSupplierOfferChanges(changeRows);
+				}
 				break;
 				case "brands":
 					setBrands(await ponyoApi.listAdminBrands());
@@ -1029,6 +1071,7 @@ export default function AdminPortalPage() {
 		setOrders({ items: [], total: 0, limit: 50, offset: 0 });
 		setProducts({ items: [], total: 0, limit: 100, offset: 0 });
 		setSuppliers([]);
+		setSupplierOfferChanges([]);
 		setCustomers({ items: [], total: 0, limit: 10, offset: 0 });
 		setAdminAccounts([]);
 		setEmailInboxStatus(null);
@@ -1062,6 +1105,22 @@ export default function AdminPortalPage() {
 			setDashboard(await ponyoApi.getAdminDashboard());
 		} catch (requestError) { setError(messageFor(requestError, t)); }
 		finally { setBusyId(""); }
+	}
+
+	async function decideSupplierOfferChange(change: AdminSupplierOfferChange, decision: "approve" | "reject", isPrimary = false) {
+		setBusyId(change.id);
+		setError("");
+		try {
+			await ponyoApi.decideAdminSupplierOfferChange(change.id, { decision, isPrimary });
+			setNotice(decision === "approve"
+				? `${change.productName} supplier terms approved${isPrimary ? " and primary maker selected" : ""}.`
+				: `Changes for ${change.productName} rejected.`);
+			await loadSection("suppliers");
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
 	}
 
 	async function planSupplierOrders(order: AdminOrder) {
@@ -1167,17 +1226,24 @@ export default function AdminPortalPage() {
 			</>}
 			{section === "analytics" && <>
 				<div className="ad-toolbar ad-analytics-toolbar">
-					<label>{ui("analytics_range", "Date range")}
-						<select value={analyticsRange} onChange={(event) => {
-							const range = event.target.value as AdminAnalytics["period"]["range"];
+					<label htmlFor="admin-analytics-range">{ui("analytics_range", "Date range")}
+						<PonyoSelect
+							id="admin-analytics-range"
+							value={analyticsRange}
+							onChange={(value) => {
+							const range = value as AdminAnalytics["period"]["range"];
 							setAnalyticsRange(range);
 							void loadAnalytics(range);
-						}}>
-							<option value="7d">{ui("analytics_7d", "Last 7 days")}</option>
-							<option value="30d">{ui("analytics_30d", "Last 30 days")}</option>
-							<option value="90d">{ui("analytics_90d", "Last 90 days")}</option>
-							<option value="all">{ui("analytics_all", "All time")}</option>
-						</select>
+						}}
+							label={ui("analytics_range", "Date range")}
+							compact
+							options={[
+								{ value: "7d", label: ui("analytics_7d", "Last 7 days") },
+								{ value: "30d", label: ui("analytics_30d", "Last 30 days") },
+								{ value: "90d", label: ui("analytics_90d", "Last 90 days") },
+								{ value: "all", label: ui("analytics_all", "All time") },
+							]}
+						/>
 					</label>
 					<span>{ui("analytics_currency_note", "Currencies are shown separately; no exchange-rate conversion is applied.")}</span>
 				</div>
@@ -1236,7 +1302,7 @@ export default function AdminPortalPage() {
 			</>}
 			{section === "orders" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, orders: { ...current.orders, page: 0 } })); void loadSection("orders", query, 0); } }} placeholder="Order number or customer email" /></label><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, orders: { ...current.orders, page: 0 } })); void loadSection("orders", query, 0); }}>Search orders</button><span>{orders.total} orders</span></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.orders ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CUSTOMER ORDERS</span><h2>Orders</h2></div><span className="ad-count-pill">{orders.total} orders</span><AdminTableCollapseButton collapsed={collapsedTables.orders} onClick={() => toggleTableCollapsed("orders")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>PAYMENT</th><th>FULFILLMENT</th><th>SUPPLIER</th><th>TOTAL</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td><span className="ad-status">{order.paymentStatus}</span></td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.orders.page} pageSize={tablePaging.orders.pageSize} total={orders.total} onPageChange={(page) => changeTablePage("orders", page)} onPageSizeChange={(pageSize) => changeTablePageSize("orders", pageSize)} t={ui} /></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL · {orderDetail.paymentStatus}</span><h2>{orderDetail.orderNumber}</h2><p>{orderDetail.customerEmail} · {orderDetail.fulfillmentStatus.replaceAll("_", " ")}</p></div><button type="button" onClick={() => { setOrderDetail(null); setSelectedOrderId(""); }}>Close</button></div><div className="ad-order-facts"><span>Subtotal <strong>{amount(orderDetail.subtotalAmount, orderDetail.currency, formatPrice)}</strong></span><span>Discount <strong>{amount(orderDetail.discountAmount, orderDetail.currency, formatPrice)}</strong></span><span>Shipping <strong>{amount(orderDetail.shippingAmount, orderDetail.currency, formatPrice)}</strong></span><span>Captured <strong>{amount(orderDetail.capturedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Refunded <strong>{amount(orderDetail.refundedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Total <strong>{amount(orderDetail.totalAmount, orderDetail.currency, formatPrice)}</strong></span></div><div className="ad-detail-columns"><section><h3>Customer order lines</h3>{orderDetail.items.map((line) => <article key={line.id}><span><strong>{line.name}</strong><small>Qty {line.quantity} · {line.supplierOfferId ? "Supplier linked" : "Legacy / not routed"}</small></span><b>{amount(line.unitPrice * line.quantity, line.currency, formatPrice)}</b></article>)}</section><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")} {po.supplierOrderId ? `· Ref ${po.supplierOrderId}` : ""}</small></span><small>{po.items.length} lines</small></article>)}{orderDetail.paymentStatus === "paid" && <button className="ad-row-action" type="button" disabled={busyId === orderDetail.id} onClick={() => { const row = orders.items.find((item) => item.id === orderDetail.id); if (row) void planSupplierOrders(row); }}>{busyId === orderDetail.id ? "Planning…" : "Plan / refresh supplier routing"}</button>}</section><section><h3>Shipments</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
 			{section === "products" && <aside className="ad-product-intake-note" role="note"><strong>{ui("catalog_intake_title", "Product intake status")}</strong><p>{ui("catalog_intake_note", "This catalog lists products already in the database. Supplier accounts update offers and inventory; they do not submit new products. Maker applications are separate. New products need an approved data/import workflow before they appear here for review and publishing.")}</p></aside>}
-			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); } }} placeholder="Product name, SKU or slug" /></label><select value={publishedFilter} onChange={(event) => { setPublishedFilter(event.target.value as typeof publishedFilter); }}><option value="all">All products</option><option value="pending">Unpublished</option><option value="published">Published</option></select><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); }}>Search catalog</button><span>{products.total} products</span></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.products ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CATALOG</span><h2>Products</h2></div><span className="ad-count-pill">{products.total} products</span><AdminTableCollapseButton collapsed={collapsedTables.products} onClick={() => toggleTableCollapsed("products")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION / SHIPPING</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? "ad-status--published" : "ad-status--pending"}`}>{product.published ? "Published" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button><ProductProofEditor product={product} /></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.products.page} pageSize={tablePaging.products.pageSize} total={products.total} onPageChange={(page) => changeTablePage("products", page)} onPageSizeChange={(pageSize) => changeTablePageSize("products", pageSize)} t={ui} /></section></>}
+			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); } }} placeholder="Product name, SKU or slug" /></label><PonyoSelect value={publishedFilter} onChange={(value) => setPublishedFilter(value as typeof publishedFilter)} label="Product publication status" compact options={[{ value: "all", label: "All products" }, { value: "pending", label: "Unpublished" }, { value: "published", label: "Published" }]} /><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); }}>Search catalog</button><span>{products.total} products</span></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.products ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CATALOG</span><h2>Products</h2></div><span className="ad-count-pill">{products.total} products</span><AdminTableCollapseButton collapsed={collapsedTables.products} onClick={() => toggleTableCollapsed("products")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION / SHIPPING</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small><ProductCategoryEditor product={product} categories={productCategories} onSaved={(updated) => setProducts((current) => ({ ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) }))} /></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? "ad-status--published" : "ad-status--pending"}`}>{product.published ? "Published" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button><ProductProofEditor product={product} /></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.products.page} pageSize={tablePaging.products.pageSize} total={products.total} onPageChange={(page) => changeTablePage("products", page)} onPageSizeChange={(pageSize) => changeTablePageSize("products", pageSize)} t={ui} /></section></>}
 			{section === "reservations" && (
 				<>
 					<div className="ad-report-tabs" role="tablist" aria-label={ui("reservation_reports", "Reservation reports")}>
@@ -1302,17 +1368,31 @@ export default function AdminPortalPage() {
 							<AdminTableCollapseButton collapsed={collapsedTables["reservation-entries"]} onClick={() => toggleTableCollapsed("reservation-entries")} t={ui} />
 						</div>
 						<form className="ad-toolbar ad-reservation-entry-filters" onSubmit={(event) => { event.preventDefault(); void loadReservationEntries(0, reservationFilters); }}>
-							<label><span>{t("admin.reservations.filter_product", "Product")}</span>
-								<select value={reservationFilters.productId} onChange={(event) => setReservationFilters((current) => ({ ...current, productId: event.target.value }))}>
-									<option value="">{t("admin.reservations.all_products", "All products")}</option>
-									{reservationProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-								</select>
+							<label htmlFor="admin-reservation-product"><span>{t("admin.reservations.filter_product", "Product")}</span><PonyoSelect
+								id="admin-reservation-product"
+								value={reservationFilters.productId}
+								onChange={(productId) => setReservationFilters((current) => ({ ...current, productId }))}
+								label={t("admin.reservations.filter_product", "Product")}
+								searchable={reservationProducts.length > 8}
+								searchPlaceholder={t("general.search", "Search")}
+								options={[
+									{ value: "", label: t("admin.reservations.all_products", "All products") },
+									...reservationProducts.map((product) => ({ value: product.id, label: product.name })),
+								]}
+							/>
 							</label>
-							<label><span>{t("admin.reservations.filter_country", "Country")}</span>
-								<select value={reservationFilters.country} onChange={(event) => setReservationFilters((current) => ({ ...current, country: event.target.value }))}>
-									<option value="">{t("admin.reservations.all_countries", "All countries")}</option>
-									{reservationCountryTotals.map((entry) => <option key={entry.country} value={entry.country}>{regionName(entry.country, language, entry.country)}</option>)}
-								</select>
+							<label htmlFor="admin-reservation-country"><span>{t("admin.reservations.filter_country", "Country")}</span><PonyoSelect
+								id="admin-reservation-country"
+								value={reservationFilters.country}
+								onChange={(country) => setReservationFilters((current) => ({ ...current, country }))}
+								label={t("admin.reservations.filter_country", "Country")}
+								searchable={reservationCountryTotals.length > 8}
+								searchPlaceholder={t("general.search", "Search")}
+								options={[
+									{ value: "", label: t("admin.reservations.all_countries", "All countries") },
+									...reservationCountryTotals.map((entry) => ({ value: entry.country, label: regionName(entry.country, language, entry.country) })),
+								]}
+							/>
 							</label>
 							<label className="ad-search"><span>⌕</span><input value={reservationFilters.query} onChange={(event) => setReservationFilters((current) => ({ ...current, query: event.target.value }))} placeholder={t("admin.reservations.filter_search", "Search email or product")} maxLength={180} /></label>
 							<button type="submit" disabled={reservationEntriesLoading}>{t("admin.reservations.apply_filters", "Apply filters")}</button>
@@ -1493,7 +1573,20 @@ export default function AdminPortalPage() {
 								<p className="ad-email-message-body">{message.body || ui("email_no_body", "No message text was provided.")}</p>
 							</article>)}</div>
 							<form className="ad-email-reply-form" onSubmit={(event) => void sendEmailReply(event)}>
-								<div className="ad-email-reply-heading"><h4>{ui("email_reply_title", "Reply")}</h4><label>{ui("email_template", "Reply template")}<select value={emailReplyTemplate} onChange={(event) => { const selected = emailReplyTemplates.find((template) => template.id === event.target.value); setEmailReplyTemplate(event.target.value); if (selected) setEmailReplyBody(selected.body); }}><option value="">{ui("email_template_custom", "Write a reply")}</option>{emailReplyTemplates.map((template) => <option value={template.id} key={template.id}>{template.label}</option>)}</select></label></div>
+								<div className="ad-email-reply-heading"><h4>{ui("email_reply_title", "Reply")}</h4><label htmlFor="admin-email-template">{ui("email_template", "Reply template")}<PonyoSelect
+									id="admin-email-template"
+									value={emailReplyTemplate}
+									onChange={(value) => {
+										const selected = emailReplyTemplates.find((template) => template.id === value);
+										setEmailReplyTemplate(value);
+										if (selected) setEmailReplyBody(selected.body);
+									}}
+									label={ui("email_template", "Reply template")}
+									options={[
+										{ value: "", label: ui("email_template_custom", "Write a reply") },
+										...emailReplyTemplates.map((template) => ({ value: template.id, label: template.label })),
+									]}
+								/></label></div>
 								{emailThread.replyFrom && <p className="ad-email-reply-from">{ui("email_replying_from", "Replying from {{email}}", { email: emailThread.replyFrom })}</p>}
 								<label className="ad-email-reply-label" htmlFor="admin-email-reply">{ui("email_reply_body", "Message")}</label>
 								<textarea id="admin-email-reply" value={emailReplyBody} onChange={(event) => setEmailReplyBody(event.target.value)} maxLength={5000} rows={6} required disabled={!emailThread.replyConfigured} placeholder={emailThread.replyConfigured ? ui("email_reply_placeholder", "Write your reply. Templates can be edited before sending.") : ui("email_reply_unavailable", "Configure this address's IMAP and SMTP password to reply.")} />
@@ -1504,8 +1597,27 @@ export default function AdminPortalPage() {
 					</section>
 				</div>
 			</section>}
-			{section === "maker-applications" && <section className={`ad-panel ad-collapsible-table ${collapsedTables["maker-applications"] ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span><AdminTableCollapseButton collapsed={collapsedTables["maker-applications"]} onClick={() => toggleTableCollapsed("maker-applications")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{visibleRows(makerApplications, "maker-applications").map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td><td><select aria-label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} onChange={(event) => void updateMakerApplication(application, event.target.value as MakerApplicationStatus)}><option value="pending">Pending</option><option value="reviewing">Reviewing</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div><AdminTablePagination page={tablePaging["maker-applications"].page} pageSize={tablePaging["maker-applications"].pageSize} total={makerApplications.length} onPageChange={(page) => changeTablePage("maker-applications", page)} onPageSizeChange={(pageSize) => changeTablePageSize("maker-applications", pageSize)} t={ui} /></section>}
-			{section === "suppliers" && <section className={`ad-panel ad-collapsible-table ${collapsedTables.suppliers ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2><p className="ad-partner-difference">{ui("supplier_brand_difference", "A supplier is a sourcing and stock partner for Ponyo. A brand is the customer-facing maker name and story shown with products.")}</p></div><span className="ad-count-pill">{suppliers.length} suppliers</span><AdminTableCollapseButton collapsed={collapsedTables.suppliers} onClick={() => toggleTableCollapsed("suppliers")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{visibleRows(suppliers, "suppliers").map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.suppliers.page} pageSize={tablePaging.suppliers.pageSize} total={suppliers.length} onPageChange={(page) => changeTablePage("suppliers", page)} onPageSizeChange={(pageSize) => changeTablePageSize("suppliers", pageSize)} t={ui} /></section>}
+			{section === "maker-applications" && <section className={`ad-panel ad-collapsible-table ${collapsedTables["maker-applications"] ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span><AdminTableCollapseButton collapsed={collapsedTables["maker-applications"]} onClick={() => toggleTableCollapsed("maker-applications")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{visibleRows(makerApplications, "maker-applications").map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td>			<td><PonyoSelect label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} compact onChange={(value) => void updateMakerApplication(application, value as MakerApplicationStatus)} options={[{ value: "pending", label: "Pending" }, { value: "reviewing", label: "Reviewing" }, { value: "accepted", label: "Accepted" }, { value: "declined", label: "Declined" }]} /></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div><AdminTablePagination page={tablePaging["maker-applications"].page} pageSize={tablePaging["maker-applications"].pageSize} total={makerApplications.length} onPageChange={(page) => changeTablePage("maker-applications", page)} onPageSizeChange={(pageSize) => changeTablePageSize("maker-applications", pageSize)} t={ui} /></section>}
+			{section === "suppliers" && <>
+				<section className="ad-panel">
+					<div className="ad-panel-heading"><div><span className="ad-eyebrow">PONYO APPROVAL REQUIRED</span><h2>Supplier change requests</h2><p>Capacity, wholesale cost, MOQ and lead time remain unchanged on the storefront until approved.</p></div><span className="ad-count-pill">{supplierOfferChanges.length} pending</span></div>
+					{supplierOfferChanges.length ? <div className="ad-detail-columns">{supplierOfferChanges.map((change) => {
+						const projectedRetail = Math.floor((change.proposed.costAmount * 120 + 50) / 100);
+						return <article className="ad-panel" key={change.id}>
+							<div className="ad-panel-heading"><div><span className="ad-eyebrow">{change.supplierName} · {change.variantSku}</span><h3>{change.productName}</h3><p>Submitted {date(change.submittedAt)}</p></div><span className="ad-status ad-status--pending">Pending</span></div>
+							<p><strong>Current:</strong> capacity {change.current.productionCapacity}, wholesale {amount(change.current.costAmount, change.currency, formatPrice)}, MOQ {change.current.minimumOrderQuantity}, lead time {change.current.leadTimeDays} days{change.current.isPrimary ? " · current primary" : ""}</p>
+							<p><strong>Proposed:</strong> capacity {change.proposed.productionCapacity}, wholesale {amount(change.proposed.costAmount, change.currency, formatPrice)}, MOQ {change.proposed.minimumOrderQuantity}, lead time {change.proposed.leadTimeDays} days</p>
+							<p>Retail if selected as primary: <strong>{amount(projectedRetail, change.currency, formatPrice)}</strong> (wholesale + 20%).</p>
+							<div className="ad-row-actions">
+								<button className="ad-row-action" type="button" disabled={busyId === change.id} onClick={() => void decideSupplierOfferChange(change, "approve", change.current.isPrimary)}>{change.current.isPrimary ? "Approve & keep primary" : "Approve terms"}</button>
+								{!change.current.isPrimary && <button className="ad-row-action" type="button" disabled={busyId === change.id} onClick={() => void decideSupplierOfferChange(change, "approve", true)}>Approve &amp; make primary</button>}
+								<button className="ad-row-action" type="button" disabled={busyId === change.id} onClick={() => void decideSupplierOfferChange(change, "reject")}>Reject</button>
+							</div>
+						</article>;
+					})}</div> : <div className="ad-empty">No supplier changes are waiting for review.</div>}
+				</section>
+				<section className={`ad-panel ad-collapsible-table ${collapsedTables.suppliers ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER DIRECTORY</span><h2>Supplier relationships</h2><p className="ad-partner-difference">{ui("supplier_brand_difference", "A supplier is a sourcing and stock partner for Ponyo. A brand is the customer-facing maker name and story shown with products.")}</p></div><span className="ad-count-pill">{suppliers.length} suppliers</span><AdminTableCollapseButton collapsed={collapsedTables.suppliers} onClick={() => toggleTableCollapsed("suppliers")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>SUPPLIER</th><th>CODE</th><th>ACCOUNTS</th><th>APPROVED OFFERS</th><th>TYPE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{visibleRows(suppliers, "suppliers").map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.contactEmail ?? "No contact email"}</small></td><td>{supplier.code}</td><td>{supplier.accountCount}</td><td>{supplier.offerCount}</td><td>{supplier.isDemo ? "Demo" : "Partner"}</td><td><span className={`ad-status ${supplier.active ? "ad-status--published" : "ad-status--pending"}`}>{supplier.active ? "Active" : "Paused"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === supplier.id} onClick={() => void toggleSupplier(supplier)}>{supplier.active ? "Pause" : "Activate"}</button></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.suppliers.page} pageSize={tablePaging.suppliers.pageSize} total={suppliers.length} onPageChange={(page) => changeTablePage("suppliers", page)} onPageSizeChange={(pageSize) => changeTablePageSize("suppliers", pageSize)} t={ui} /></section>
+			</>}
 			{section === "newsletter" && <>
 				<div className="ad-toolbar">
 					<label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, newsletter: { ...current.newsletter, page: 0 } })); void loadSection("newsletter", query, 0); } }} placeholder={ui("newsletter_search", "Search email")} /></label>

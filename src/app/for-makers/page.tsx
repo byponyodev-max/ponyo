@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { LocalizedText } from "@/components/layout/localization-provider";
@@ -52,7 +53,21 @@ export default function ForMakersPage() {
         <p><LocalizedText translationKey="maker.for_makers.hero.body" fallback="Ponyo is a curated home for exceptional plush and character makers. We introduce thoughtful creations to people who value the story and care behind them." /></p>
         <Link className="shop-button shop-button-orange" href="#maker-application"><LocalizedText translationKey="maker.for_makers.hero.cta" fallback="Share your work" /> <span aria-hidden="true">↓</span></Link>
       </div>
-      <div className="maker-hero-art" aria-hidden="true"><span className="maker-orbit maker-orbit--one" /><span className="maker-orbit maker-orbit--two" /><span className="maker-hero-star">✦</span><span className="maker-hero-stamp"><LocalizedText translationKey="static.maker.stamp" fallback="MADE WITH INTENTION" /></span><span className="maker-hero-caption"><LocalizedText translationKey="static.maker.caption" fallback="A place for your next chapter" /></span></div>
+      <div className="maker-hero-art" aria-hidden="true">
+        <span className="maker-orbit maker-orbit--one" />
+        <span className="maker-orbit maker-orbit--two" />
+        <span className="maker-hero-star">✦</span>
+        <span className="maker-hero-star maker-hero-star--secondary">✧</span>
+        <span className="maker-hero-sparkle maker-hero-sparkle--one">✦</span>
+        <span className="maker-hero-sparkle maker-hero-sparkle--two">✧</span>
+        <span className="maker-hero-sparkle maker-hero-sparkle--three">✦</span>
+        <span className="maker-hero-sparkle maker-hero-sparkle--four">✧</span>
+        <span className="maker-hero-sparkle maker-hero-sparkle--five">✦</span>
+        <span className="maker-hero-sparkle maker-hero-sparkle--six">✧</span>
+        <Image className="maker-hero-jellyfish" src="/ponyo-jellyfish.svg" alt="" width={72} height={72} />
+        <span className="maker-hero-stamp"><LocalizedText translationKey="static.maker.stamp" fallback="MADE WITH INTENTION" /></span>
+        <span className="maker-hero-caption"><LocalizedText translationKey="static.maker.caption" fallback="A place for your next chapter" /></span>
+      </div>
     </section>
 
     <section className="maker-how store-container" aria-labelledby="maker-how-title">

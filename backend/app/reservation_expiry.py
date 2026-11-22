@@ -11,15 +11,14 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 
 import stripe
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.db import SessionLocal
 from app.config import settings
 from app.email_queue import enqueue_email_notification
 from app.inventory import restore_variant_stock, settle_supplier_stock
-from app.models import Order, OrderItem, OrderStatusHistory, OutboxEvent, ProductVariant
+from app.models import Order, OrderItem, OrderStatusHistory, OutboxEvent, Product, ProductReservation, ProductVariant
 from app.payments import record_transaction
 
 logger = logging.getLogger("ponyo.reservation_expiry")
@@ -174,12 +173,91 @@ async def expire_reservations(
     return released
 
 
+async def expire_product_reservation_campaigns(
+    db: AsyncSession,
+    now: datetime | None = None,
+) -> int:
+    """Close campaigns that missed their configured deadline and notify reservers."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    today = now.date()
+    product_ids = list((await db.scalars(
+        select(Product.id)
+        .where(
+            Product.production_status == "collecting",
+            Product.reservation_deadline.is_not(None),
+            Product.reservation_deadline < today,
+        )
+        .order_by(Product.reservation_deadline, Product.id)
+        .limit(BATCH_SIZE)
+    )).all())
+    await db.rollback()
+    closed = 0
+    for product_id in product_ids:
+        try:
+            product = await db.scalar(select(Product).where(
+                Product.id == product_id,
+                Product.production_status == "collecting",
+                Product.reservation_deadline < today,
+            ).with_for_update())
+            if product is None:
+                await db.rollback()
+                continue
+            count = await db.scalar(select(func.count()).select_from(ProductReservation).where(
+                ProductReservation.product_id == product.id,
+            )) or 0
+            if product.reservation_target is not None and count >= product.reservation_target:
+                product.reservations_open = False
+                product.production_status = "target_reached"
+                product.reservation_minimum_reached_at = product.reservation_minimum_reached_at or now
+                db.add(OutboxEvent(event_type="product.reservation_minimum_reached", payload={
+                    "productId": str(product.id),
+                    "productName": product.name,
+                    "reservationCount": count,
+                    "target": product.reservation_target,
+                }))
+                await db.commit()
+                closed += 1
+                continue
+
+            product.reservations_open = False
+            product.production_status = "target_missed"
+            product.reservation_target_missed_at = now
+            reservations = list((await db.scalars(
+                select(ProductReservation).where(ProductReservation.product_id == product.id)
+                .order_by(ProductReservation.created_at, ProductReservation.id)
+            )).all())
+            product_url = f"{settings.storefront_base_url.rstrip('/')}/products/{product.slug}"
+            for reservation in reservations:
+                event = OutboxEvent(
+                    event_type="product.reservation_target_missed",
+                    payload={"productId": str(product.id), "reservationId": str(reservation.id)},
+                )
+                enqueue_email_notification(
+                    db,
+                    event,
+                    template="reservation_target_missed",
+                    recipient=reservation.email,
+                    payload={"productName": product.name, "productUrl": product_url},
+                    notification_key=f"reservation_target_missed:{reservation.id}",
+                )
+            await db.commit()
+            closed += 1
+        except Exception as error:
+            await db.rollback()
+            logger.warning("Product reservation deadline processing failed exception_type=%s", type(error).__name__)
+    return closed
+
+
 async def recover_expired_reservations(session_factory=SessionLocal) -> None:
-    """Optional lifespan worker; cancellation closes its dedicated session."""
+    """Recover checkout reservations and process product campaign deadlines."""
     while True:
         try:
             async with session_factory() as db:
-                await expire_reservations(db)
+                await expire_product_reservation_campaigns(db)
+                if settings.stripe_secret_key:
+                    await expire_reservations(db)
         except Exception as error:
             logger.warning("Reservation recovery retry exception_type=%s", type(error).__name__)
         await asyncio.sleep(POLL_INTERVAL)
