@@ -10,8 +10,11 @@ import {
 	ponyoApi,
 	type SupplierIdentity,
 	type SupplierListing,
+	type SupplierProductSubmission,
 	type SupplierPurchaseOrder,
+	type ProductCategory,
 } from "@/services/ponyo-api.client";
+import { PonyoSelect } from "@/components/ui/ponyo-select";
 
 type OrderFilter = "all" | "needs_action" | "confirmed" | "review";
 type Decision = "confirmed" | "rejected";
@@ -76,7 +79,11 @@ export default function SupplierPortalPage() {
 	const [identity, setIdentity] = useState<SupplierIdentity | null>(null);
 	const [orders, setOrders] = useState<SupplierPurchaseOrder[]>([]);
 	const [listings, setListings] = useState<SupplierListing[]>([]);
+	const [productSubmissions, setProductSubmissions] = useState<SupplierProductSubmission[]>([]);
+	const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
 	const [listingDrafts, setListingDrafts] = useState<Record<string, SupplierListingDraft>>({});
+	const [submissionCategoryId, setSubmissionCategoryId] = useState("");
+	const [submissionCurrency, setSubmissionCurrency] = useState("JPY");
 	const [section, setSection] = useState<PortalSection>("orders");
 	const [selectedId, setSelectedId] = useState("");
 	const [detail, setDetail] = useState<SupplierPurchaseOrder | null>(null);
@@ -86,6 +93,7 @@ export default function SupplierPortalPage() {
 	const [refreshing, setRefreshing] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [savingOfferId, setSavingOfferId] = useState("");
+	const [submittingProduct, setSubmittingProduct] = useState(false);
 	const [loginEmail, setLoginEmail] = useState("");
 	const [loginPassword, setLoginPassword] = useState("");
 	const [decision, setDecision] = useState<Decision | null>(null);
@@ -120,9 +128,23 @@ export default function SupplierPortalPage() {
 		}
 	}
 
+	async function refreshProductSubmissions() {
+		try {
+			const [submissions, categories] = await Promise.all([
+				ponyoApi.listSupplierProductSubmissions(),
+				ponyoApi.listProductCategories(),
+			]);
+			setProductSubmissions(submissions);
+			setProductCategories(categories);
+			setSubmissionCategoryId((current) => current || categories.find((category) => category.parentId)?.id || "");
+		} catch (requestError) {
+			setError(errorMessage(requestError));
+		}
+	}
+
 	async function refreshPortal() {
 		setRefreshing(true);
-		await Promise.all([refreshOrders(false), refreshListings()]);
+		await Promise.all([refreshOrders(false), refreshListings(), refreshProductSubmissions()]);
 		setRefreshing(false);
 	}
 
@@ -132,15 +154,20 @@ export default function SupplierPortalPage() {
 			if (!active) return;
 			setIdentity(profile);
 			try {
-				const [rows, approvedListings] = await Promise.all([
+				const [rows, approvedListings, submissions, categories] = await Promise.all([
 					ponyoApi.listSupplierPurchaseOrders(),
 					ponyoApi.listSupplierListings(),
+					ponyoApi.listSupplierProductSubmissions(),
+					ponyoApi.listProductCategories(),
 				]);
 				if (active) {
 					setOrders(rows);
 					setSelectedId(rows[0]?.id ?? "");
 					setListings(approvedListings);
 					setListingDrafts(Object.fromEntries(approvedListings.map((listing) => [listing.offerId, listingDraft(listing)])));
+					setProductSubmissions(submissions);
+					setProductCategories(categories);
+					setSubmissionCategoryId(categories.find((category) => category.parentId)?.id ?? "");
 				}
 			} catch (requestError) {
 				if (active) setError(errorMessage(requestError));
@@ -200,12 +227,31 @@ export default function SupplierPortalPage() {
 			setIdentity(profile);
 			setLoginPassword("");
 			setNotice(`Welcome to your Ponyo workspace, ${profile.supplier.name}.`);
-			await Promise.all([refreshOrders(false), refreshListings()]);
+			await Promise.all([refreshOrders(false), refreshListings(), refreshProductSubmissions()]);
 		} catch (requestError) {
 			setError(errorMessage(requestError));
 		} finally {
 			setSubmitting(false);
 			setLoading(false);
+		}
+	}
+
+	async function handleProductSubmission(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setSubmittingProduct(true);
+		setError("");
+		const formData = new FormData(event.currentTarget);
+		formData.set("categoryId", submissionCategoryId);
+		formData.set("currency", submissionCurrency);
+		try {
+			const result = await ponyoApi.submitSupplierProduct(formData);
+			setNotice(`${result.name} was sent to Ponyo for product review.`);
+			event.currentTarget.reset();
+			await refreshProductSubmissions();
+		} catch (requestError) {
+			setError(errorMessage(requestError));
+		} finally {
+			setSubmittingProduct(false);
 		}
 	}
 
@@ -337,6 +383,29 @@ export default function SupplierPortalPage() {
 			{section === "products" ? <>
 				<div className="sp-section-heading" id="supplier-products"><div><span className="sp-eyebrow">YOUR APPROVED PONYO LISTINGS</span><h2>Products &amp; inventory</h2></div><span className="sp-order-total">{listings.length} listings</span></div>
 				<div className="sp-listing-note"><span aria-hidden="true">✦</span><p>Submit production capacity, wholesale cost, MOQ and lead-time changes for Ponyo review. Approved wholesale costs set the public retail price at 20% above wholesale; no changes reach the storefront before approval.</p></div>
+				<section className="sp-product-submission-card">
+					<div className="sp-section-heading"><div><span className="sp-eyebrow">NEW PONYO PRODUCT</span><h2>Submit a product draft</h2><p>Products stay unpublished until Ponyo approves and publishes them.</p></div></div>
+					<form className="sp-product-submission-form" onSubmit={(event) => void handleProductSubmission(event)}>
+						<label>Product name<input name="name" required minLength={2} maxLength={240} /></label>
+						<label>Category<PonyoSelect label="Product category" value={submissionCategoryId} onChange={setSubmissionCategoryId} options={productCategories.filter((category) => category.parentId || category.slug === "wall-decor").map((category) => ({ value: category.id, label: category.name }))} /></label>
+						<label className="sp-product-submission-wide">Product description<textarea name="description" required minLength={20} maxLength={5000} rows={4} /></label>
+						<label>Materials<input name="materials" required minLength={2} maxLength={2000} /></label>
+						<label>Product type<input name="productType" maxLength={100} /></label>
+						<label>Wholesale price currency<PonyoSelect label="Wholesale currency" value={submissionCurrency} onChange={setSubmissionCurrency} options={["JPY", "USD", "EUR", "GBP", "KRW", "IDR"].map((currency) => ({ value: currency, label: currency }))} /></label>
+						<label>Wholesale cost · smallest currency unit<input name="costAmount" type="number" min="1" step="1" required /><small>JPY uses whole yen; USD and EUR use cents.</small></label>
+						<label>Initial production capacity<input name="productionCapacity" type="number" min="0" step="1" required /></label>
+						<label>Minimum order quantity<input name="minimumOrderQuantity" type="number" min="1" step="1" required /></label>
+						<label>Lead time · days<input name="leadTimeDays" type="number" min="0" step="1" required /></label>
+						<label>Size tier<input name="sizeTier" maxLength={40} placeholder="e.g. Small, Medium, XL" /></label>
+						<label>Dimensions<input name="dimensions" maxLength={80} placeholder="e.g. 30 × 20 × 15 cm" /></label>
+						<label className="sp-product-submission-wide">Product photos<input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required /><small>Upload 1–4 JPEG, PNG, or WebP photos, up to 5 MB each.</small></label>
+						<button className="sp-primary-button sp-product-submission-wide" type="submit" disabled={submittingProduct || !submissionCategoryId}>{submittingProduct ? "Submitting product…" : "Submit product for review"}<span aria-hidden="true">↗</span></button>
+					</form>
+				</section>
+				<section className="sp-submissions-section">
+					<div className="sp-section-heading"><div><span className="sp-eyebrow">PRODUCT REVIEW TRACKER</span><h2>Your product submissions</h2></div><span className="sp-order-total">{productSubmissions.length} submissions</span></div>
+					{productSubmissions.length ? <div className="sp-submission-list">{productSubmissions.map((submission) => <article key={submission.id}><div><strong>{submission.name}</strong><small>{formatDate(submission.submittedAt)} · {submission.imageCount} photos</small>{submission.reviewNote && <p>{submission.reviewNote}</p>}</div><span className={`sp-status sp-status--${submission.status}`}>{statusLabel(submission.status)}</span></article>)}</div> : <div className="sp-empty-state"><span>✧</span><strong>No product submissions yet</strong><p>Send your first product draft for Ponyo to review.</p></div>}
+				</section>
 				{listings.length ? <div className="sp-listing-grid">{listings.map((listing) => {
 					const draft = listingDrafts[listing.offerId] ?? listingDraft(listing);
 					return <article className="sp-listing-card" key={listing.offerId}>

@@ -297,6 +297,7 @@ def _fetch_selected_messages(
 
 async def sync_portal_messages(db: AsyncSession) -> int:
     """Normalize existing inbox bodies and make storefront messages available."""
+    settings = get_settings()
     await _normalize_existing_html_messages(db)
     imported = 0
     contacts = await db.scalars(select(ContactRequest).order_by(ContactRequest.created_at).limit(5000))

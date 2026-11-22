@@ -114,11 +114,13 @@ The app's current local preview uses PostgreSQL in a Docker named volume. The pr
 
 ## 8. How a product is added today
 
-There is **no create-product intake form or supplier-to-admin product approval queue**. New records currently require a development seed or an authorized data/import workflow; the Admin portal can review and publish existing records. Maker applications and the Supplier Portal are not product-submission paths.
+The partner path is **Maker application → acceptance and onboarding invitation → maker onboarding review → brand and inactive supplier setup → Supplier Portal activation → supplier product draft → admin approval → separate publication**. Acceptance does not activate a supplier, and onboarding approval does not publish a product. Supplier accounts are bound through `SupplierAccount`, so an existing customer account may also receive supplier access without changing its customer role.
 
-Before publication, prepare verified product/maker facts and images, variant/SKU and approved primary-maker terms, capacity/MOQ/lead time, shipping proof/destinations, reservation target/deadline, and reviewed Japanese/Korean product translations. Supplier cost/capacity changes require Ponyo approval; retail price uses approved wholesale cost +20%. Reservations are non-binding; checkout and payments remain disabled.
+Admin product approval creates an unpublished product, default variant, supplier offer, and inventory record. New partner products have checkout disabled by default: Admin can publish a preview, then separately enable checkout once availability and operations are ready. The Admin publication action checks Japanese and Korean translations before making the product visible. Supplier cost/capacity changes continue to require Ponyo approval; retail price uses approved wholesale cost +20%. New supplier product images use the separate `SUPABASE_PRODUCT_IMAGES_BUCKET`; provision it as a public Supabase Storage bucket and keep the service-role key backend-only. Maker-application photos remain in their private bucket.
 
-**Time per product:** no measured turnaround is recorded, and the current data/import process is manual rather than self-service. Do not promise a duration yet. Time one complete pilot from receipt of ready assets/specifications through review, translation, and publication; then use that measured result as the estimate.
+**Before launch:** configure and verify the public product-image bucket, SMTP delivery of both onboarding invitations, token expiry and activation, product translation support, and the database migration. Checkout/payment availability remains governed by the existing product and checkout configuration; product publication alone is not proof that payment is enabled.
+
+**Time per product:** no measured turnaround is recorded. Time one complete pilot from supplier draft through review, translation, and publication before setting an estimate.
 
 ## Walkthrough and maintenance
 

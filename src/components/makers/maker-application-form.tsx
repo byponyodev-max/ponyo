@@ -13,6 +13,7 @@ type ApplicationPhoto = { name: string; file: File; dataUrl: string };
 export function MakerApplicationForm() {
   const { t } = useLocalization();
   const photoInput = useRef<HTMLInputElement>(null);
+  const successMessage = useRef<HTMLDivElement>(null);
   const [photos, setPhotos] = useState<ApplicationPhoto[]>([]);
   const [photoMessage, setPhotoMessage] = useState("");
   const [preparingPhotos, setPreparingPhotos] = useState(false);
@@ -22,6 +23,15 @@ export function MakerApplicationForm() {
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!submitted || !successMessage.current) return;
+    successMessage.current.focus({ preventScroll: true });
+    successMessage.current.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "center",
+    });
+  }, [submitted]);
 
   async function preparePhotos(files: FileList | null) {
     const selected = Array.from(files ?? []);
@@ -141,7 +151,7 @@ export function MakerApplicationForm() {
   }
 
   if (submitted) {
-    return <div className="maker-application-success" role="status">
+    return <div className="maker-application-success" ref={successMessage} role="status" tabIndex={-1}>
       <span aria-hidden="true">✦</span><p className="eyebrow">{t("maker.application.success.eyebrow", "APPLICATION RECEIVED")}</p>
       <h2>{t("maker.application.success.title", "Thank you for sharing your work.")}</h2>
       <p>{t("maker.application.success.body", "Your application is saved for Ponyo’s team to review. Sending an application does not guarantee selection or create a partnership.")}</p>

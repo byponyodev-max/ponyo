@@ -4215,3 +4215,78 @@
         font-size: 12px;
     }
 }
+
+.ad-submission-review,
+.ad-onboarding-review {
+    margin-bottom: 24px;
+}
+
+.ad-submission-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+    gap: 18px;
+}
+
+.ad-submission-card {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid #eee1d9;
+    border-radius: 18px;
+    background: #fffdfb;
+}
+
+.ad-submission-card .ad-panel-heading {
+    align-items: flex-start;
+    margin: 0;
+}
+
+.ad-submission-card h3 {
+    margin: 5px 0;
+}
+
+.ad-submission-card p {
+    color: #76675f;
+    line-height: 1.55;
+}
+
+.ad-submission-card details {
+    margin: 14px 0;
+    color: #5c4c43;
+}
+
+.ad-submission-card summary {
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.ad-submission-images {
+    display: flex;
+    gap: 8px;
+    overflow: auto;
+    margin-bottom: 16px;
+}
+
+.ad-submission-images img {
+    width: 76px;
+    height: 76px;
+    flex: 0 0 76px;
+    border-radius: 12px;
+    object-fit: cover;
+}
+
+.ad-submission-card .ad-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+    .ad-submission-card {
+        padding: 16px;
+    }
+
+    .ad-submission-card .ad-panel-heading {
+        flex-wrap: wrap;
+    }
+}

@@ -67,6 +67,58 @@ def _detail_panel(rows: list[tuple[str, str]]) -> str:
 def _content(notification: EmailNotification) -> tuple[str, str, str]:
     payload = notification.payload
     template = notification.template
+    if template in {
+        "maker_onboarding_invitation",
+        "supplier_portal_invitation",
+        "maker_onboarding_review_requested",
+        "supplier_product_review_requested",
+    }:
+        maker_name = str(payload.get("makerName", "maker")).strip()[:180]
+        invite_url = str(payload.get("inviteUrl", payload.get("reviewUrl", ""))).strip()
+        parsed_url = urlsplit(invite_url)
+        if parsed_url.scheme != "https" and not (
+            parsed_url.scheme == "http" and parsed_url.hostname in {"localhost", "127.0.0.1"}
+        ):
+            invite_url = ""
+        if template == "maker_onboarding_invitation":
+            subject = "Your Ponyo maker application was accepted"
+            title = "Let’s get your partnership started."
+            intro = f"Good news, {maker_name} — your maker application has been accepted."
+            action = "Complete onboarding"
+            footnote = "Acceptance is the first step. Your supplier account and products will only be activated after review."
+        elif template == "supplier_portal_invitation":
+            subject = "Your Ponyo Supplier Portal invitation"
+            title = "Your Supplier Portal is ready."
+            intro = f"Your Ponyo partnership setup for {maker_name} is approved. Activate your Supplier Portal access to continue."
+            action = "Activate Supplier Portal"
+            footnote = "This one-time invitation expires in 14 days. Your supplier account becomes active when you accept."
+        elif template == "maker_onboarding_review_requested":
+            subject = f"Maker onboarding ready for review: {maker_name}"
+            title = "A maker partner is ready for review."
+            intro = f"{maker_name} submitted partner onboarding details for Ponyo review."
+            action = "Review onboarding"
+            footnote = "Review the partnership information in the Admin Portal before creating the brand and supplier records."
+        else:
+            product_name = str(payload.get("productName", "a product")).strip()[:240]
+            subject = f"Supplier product ready for review: {product_name}"
+            title = "A supplier product draft is ready."
+            intro = f"{maker_name} submitted {product_name} for Ponyo product review."
+            action = "Review product draft"
+            footnote = "Approval creates an unpublished catalog product. Review its details and photos before approving."
+        text = (
+            f"Hello,\n\n{intro}\n\n"
+            + (f"Continue here: {invite_url}\n\n" if invite_url else "")
+            + f"{footnote}\n\nWith care, The Ponyo team"
+        )
+        html_body = ponyo_branded_email_html(
+            eyebrow="YOUR PONYO PARTNERSHIP",
+            title=title,
+            intro=intro,
+            action_label=action if invite_url else None,
+            action_url=invite_url or None,
+            footnote=footnote,
+        )
+        return subject, text, html_body
     if template == "admin_email_reply":
         subject = str(payload["subject"])[:998]
         text = str(payload["body"])

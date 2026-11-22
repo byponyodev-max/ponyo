@@ -26,11 +26,12 @@ NEW_COLUMNS = {
 LATER_SUPPLIER_TABLES = {
     "supplier_accounts", "supplier_purchase_orders", "supplier_purchase_order_items",
     "supplier_confirmations", "supplier_offer_change_requests",
+    "maker_onboardings", "supplier_product_submissions",
 }
 LATER_COLUMNS = {
     "products": {
         "reservation_deadline", "production_status", "production_approved_at",
-        "preorder_invites_sent_at", "reservation_target_missed_at",
+        "preorder_invites_sent_at", "reservation_target_missed_at", "checkout_enabled",
     },
     "suppliers": {"created_at"},
     "supplier_offers": {"is_primary"},

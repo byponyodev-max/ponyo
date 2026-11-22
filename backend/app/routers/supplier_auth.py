@@ -14,8 +14,8 @@ from app.rate_limit import enforce_rate_limit
 from app.schemas import AuthCredentials
 from app.security import (
     clear_session_cookie,
+    get_authenticated_customer,
     require_csrf,
-    require_roles,
     session_identity,
     set_session_cookie,
     verify_password,
@@ -56,8 +56,6 @@ async def supplier_login(
         raise HTTPException(401, "Supplier email or password is incorrect.")
     if not customer.email_verified:
         raise HTTPException(403, "Please verify your email before signing in.")
-    if customer.role != "supplier":
-        raise HTTPException(403, "This sign-in is for supplier accounts only.")
     identity = await supplier_identity(db, customer)
     set_session_cookie(response, customer.id, customer.auth_version)
     response.set_cookie(
@@ -74,7 +72,7 @@ async def supplier_login(
 
 @router.get("/me", response_model=dict)
 async def supplier_me(
-    customer: Customer = Depends(require_roles("supplier")),
+    customer: Customer = Depends(get_authenticated_customer),
     db: AsyncSession = Depends(get_db),
 ):
     return {"data": await supplier_identity(db, customer)}

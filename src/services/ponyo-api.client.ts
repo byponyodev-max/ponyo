@@ -122,6 +122,65 @@ export type SupplierListingUpdate = {
 	leadTimeDays: number;
 };
 
+export type SupplierProductSubmission = {
+	id: string;
+	name: string;
+	status: string;
+	reviewNote: string | null;
+	submittedAt: string;
+	imageCount: number;
+};
+
+export type MakerOnboarding = {
+	id: string;
+	applicationId: string;
+	makerName: string;
+	contactPerson: string;
+	email: string;
+	country: string;
+	city: string;
+	status: string;
+	brandStory: string | null;
+	philosophy: string | null;
+	process: string | null;
+	specialties: string[];
+	productCategories: string[];
+	productionCapacity: number | null;
+	shippingMethod: string | null;
+	shippingResponsibility: string | null;
+	returnPolicy: string | null;
+	exclusivityTerms: string | null;
+	reviewNote: string | null;
+	submittedAt: string | null;
+};
+
+export type AdminSupplierProductSubmission = {
+	id: string;
+	supplierId: string;
+	supplierName: string;
+	brandId: string;
+	brandName: string;
+	categoryId: string;
+	categoryName: string;
+	name: string;
+	description: string;
+	materials: string;
+	currency: string;
+	costAmount: number;
+	retailPriceAmount: number;
+	productionCapacity: number;
+	minimumOrderQuantity: number;
+	leadTimeDays: number;
+	productType: string | null;
+	sizeTier: string | null;
+	dimensions: string | null;
+	images: string[];
+	status: string;
+	reviewNote: string | null;
+	submittedAt: string;
+	productId: string | null;
+};
+
 export type AdminIdentity = Pick<
 	CustomerProfile,
 	"id" | "firstName" | "lastName" | "email"
@@ -196,6 +255,7 @@ export type AdminProduct = {
 	categorySlug: string | null;
 	brandName: string;
 	published: boolean;
+	checkoutEnabled: boolean;
 	createdAt: string;
 	image: string;
 	variantCount: number;
@@ -1111,6 +1171,52 @@ export const ponyoApi = {
 		),
 	listSupplierListings: (limit = 100) =>
 		apiRequest<SupplierListing[]>(`/supplier-catalog/offers?limit=${limit}`),
+	listSupplierProductSubmissions: () =>
+		apiRequest<SupplierProductSubmission[]>("/supplier-catalog/product-submissions"),
+	submitSupplierProduct: (formData: FormData) =>
+		apiRequest<{ id: string; name: string; status: string }>("/supplier-catalog/product-submissions", {
+			method: "POST",
+			body: formData,
+		}),
+	getMakerOnboarding: (token: string) =>
+		apiRequest<{ makerName: string; contactPerson: string; email: string; status: string }>(
+			`/maker-onboarding/${encodeURIComponent(token)}`,
+			{},
+			false,
+		),
+	submitMakerOnboarding: (
+		token: string,
+		input: {
+			brandStory: string;
+			philosophy: string;
+			process: string;
+			specialties: string[];
+			productCategories: string[];
+			productionCapacity: number;
+			shippingMethod: string;
+			shippingResponsibility: "maker" | "ponyo" | "shared";
+			returnPolicy: string;
+			exclusivityTerms: string;
+			acceptTerms: true;
+		},
+	) =>
+		apiRequest<{ status: string }>(`/maker-onboarding/${encodeURIComponent(token)}`, {
+			method: "POST",
+			body: JSON.stringify(input),
+		}),
+	acceptSupplierInvitation: async (input: {
+		token: string;
+		firstName: string;
+		lastName: string;
+		password?: string;
+	}) => {
+		const identity = await apiRequest<SupplierIdentity>("/supplier-auth/invitations/accept", {
+			method: "POST",
+			body: JSON.stringify(input),
+		});
+		cachedCsrfToken = "";
+		return identity;
+	},
 	updateSupplierListing: (offerId: string, input: SupplierListingUpdate) =>
 		apiRequest<SupplierListing>(
 			`/supplier-catalog/offers/${encodeURIComponent(offerId)}`,
@@ -1282,6 +1388,11 @@ export const ponyoApi = {
 				body: JSON.stringify({ published }),
 			},
 		),
+	setAdminProductCheckout: (id: string, enabled: boolean) =>
+		apiRequest<AdminProduct>(
+			`/admin/products/${encodeURIComponent(id)}/checkout`,
+			{ method: "PATCH", body: JSON.stringify({ enabled }) },
+		),
 	listAdminSuppliers: () => apiRequest<AdminSupplier[]>("/admin/suppliers"),
 	listAdminBrands: () => apiRequest<AdminBrand[]>("/admin/brands"),
 	updateAdminBrandProfile: (id: string, input: Partial<AdminBrandProfile>) =>
@@ -1291,6 +1402,20 @@ export const ponyoApi = {
 		),
 	listAdminMakerApplications: () =>
 		apiRequest<AdminMakerApplication[]>("/admin/maker-applications"),
+	listAdminMakerOnboardings: () =>
+		apiRequest<MakerOnboarding[]>("/admin/maker-onboardings"),
+	decideAdminMakerOnboarding: (id: string, decision: "approve" | "reject", note?: string) =>
+		apiRequest<{ id: string; status: string; brandId?: string; supplierId?: string }>(
+			`/admin/maker-onboardings/${encodeURIComponent(id)}/decision`,
+			{ method: "PATCH", body: JSON.stringify({ decision, note }) },
+		),
+	listAdminSupplierProductSubmissions: () =>
+		apiRequest<AdminSupplierProductSubmission[]>("/admin/supplier-product-submissions"),
+	decideAdminSupplierProductSubmission: (id: string, decision: "approve" | "reject", note?: string) =>
+		apiRequest<{ id: string; status: string; productId?: string; published?: boolean }>(
+			`/admin/supplier-product-submissions/${encodeURIComponent(id)}/decision`,
+			{ method: "PATCH", body: JSON.stringify({ decision, note }) },
+		),
 	setAdminMakerApplicationStatus: (id: string, status: MakerApplicationStatus) =>
 		apiRequest<{ id: string; status: MakerApplicationStatus }>(
 			`/admin/maker-applications/${encodeURIComponent(id)}/status`,

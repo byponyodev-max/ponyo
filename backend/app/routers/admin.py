@@ -4,6 +4,7 @@ import csv
 import hashlib
 import logging
 import re
+import secrets
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO, StringIO
 from uuid import UUID, uuid4
@@ -37,12 +38,14 @@ from app.models import (
     EmailInboxMessage,
     EmailInboxSyncState,
     MakerApplication,
+    MakerOnboarding,
     NewsletterSubscription,
     Order,
     OrderItem,
     OutboxEvent,
     Product,
     ProductCategory,
+    ProductImage,
     ProductInterest,
     ProductReservation,
     ProductVariant,
@@ -55,6 +58,7 @@ from app.models import (
     SupplierOffer,
     SupplierPurchaseOrder,
     SupplierPurchaseOrderItem,
+    SupplierProductSubmission,
     utc_now,
 )
 from app.rate_limit import enforce_rate_limit
@@ -65,8 +69,11 @@ from app.schemas import (
     AdminEmailReplyRequest,
     AdminEmailThreadArchiveRequest,
     AdminMakerApplicationStatusRequest,
+    AdminOnboardingDecision,
+    AdminProductSubmissionDecision,
     AdminNewsletterCampaignRequest,
     AdminProductCategoryRequest,
+    AdminProductCheckoutRequest,
     AdminProductProofRequest,
     AdminProductPublicationRequest,
     AdminProductReservationSettings,
@@ -78,6 +85,7 @@ from app.security import hash_password, require_csrf, require_roles
 from app.translations import TranslationUnavailableError, ensure_product_translations
 from app.inventory import refresh_synced_variant
 from app.maker_application_storage import MakerPhotoStorageError, signed_maker_application_photo_url
+from app.product_image_storage import ProductImageStorageError, public_product_image_url
 from app.supplier_pricing import retail_price_for_wholesale_cost
 
 router = APIRouter(prefix="/admin", tags=["admin marketplace operations"])
@@ -278,6 +286,7 @@ def product_summary(product: Product) -> dict:
         "categorySlug": product.category.slug if product.category else None,
         "brandName": product.brand.name if product.brand else product.supplier_name,
         "published": product.published,
+        "checkoutEnabled": product.checkout_enabled,
         "createdAt": product.created_at.isoformat(),
         "image": product.images[0].url if product.images else product.image_url,
         "variantCount": len(variants),
@@ -788,7 +797,40 @@ async def set_product_publication(product_id: UUID, payload: AdminProductPublica
             await ensure_product_translations(product, db)
         except TranslationUnavailableError as error:
             raise HTTPException(503, "Product cannot be published until Japanese and Korean translations are ready.") from error
+    submission = await db.scalar(select(SupplierProductSubmission).where(
+        SupplierProductSubmission.product_id == product.id,
+    ).with_for_update())
+    if submission:
+        if published and submission.status != "approved":
+            raise HTTPException(409, "Only an approved supplier submission can be published.")
+        if published:
+            submission.status = "published"
+        elif submission.status == "published":
+            submission.status = "approved"
     product.published = published
+    await db.commit()
+    await db.refresh(product)
+    return {"data": product_summary(product)}
+
+
+@router.patch("/products/{product_id}/checkout", response_model=dict)
+async def set_product_checkout(
+    product_id: UUID,
+    payload: AdminProductCheckoutRequest,
+    request: Request,
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-product-checkout", 30, 60)
+    product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update().options(
+        selectinload(Product.variants), selectinload(Product.category), selectinload(Product.brand), selectinload(Product.images),
+    ))
+    if product is None:
+        raise HTTPException(404, "Product not found.")
+    if payload.enabled and not product.published:
+        raise HTTPException(409, "Publish the product before enabling checkout.")
+    product.checkout_enabled = payload.enabled
     await db.commit()
     await db.refresh(product)
     return {"data": product_summary(product)}
@@ -1579,9 +1621,313 @@ async def set_maker_application_status(
     ).with_for_update())
     if application is None:
         raise HTTPException(404, "Maker application not found.")
+    previous_status = application.status
     application.status = payload.status
+    onboarding = await db.scalar(select(MakerOnboarding).where(
+        MakerOnboarding.application_id == application.id,
+    ).with_for_update())
+    if payload.status == "accepted" and (
+        onboarding is None
+        or (
+            onboarding.status == "invited"
+            and (onboarding.invite_expires_at is None or onboarding.invite_expires_at <= utc_now())
+        )
+    ):
+        mail_settings = get_settings()
+        if not mail_settings.contact_email_configured:
+            raise HTTPException(503, "Transactional email is not configured.")
+        token = secrets.token_urlsafe(32)
+        if onboarding is None:
+            onboarding = MakerOnboarding(application_id=application.id)
+            db.add(onboarding)
+        onboarding.status = "invited"
+        onboarding.invite_token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        onboarding.invite_expires_at = utc_now() + timedelta(days=14)
+        onboarding.invite_used_at = None
+        invite_url = f"{mail_settings.storefront_base_url.rstrip('/')}/maker-onboarding?token={token}"
+        enqueue_email_notification(
+            db,
+            OutboxEvent(
+                event_type="maker.onboarding_invitation_requested",
+                payload={"applicationId": str(application.id)},
+            ),
+            template="maker_onboarding_invitation",
+            recipient=application.email,
+            payload={"makerName": application.maker_name, "inviteUrl": invite_url},
+            notification_key=f"maker_onboarding_invitation:{application.id}:{onboarding.invite_expires_at.isoformat()}",
+        )
+    elif previous_status != "accepted" and payload.status == "accepted" and onboarding:
+        raise HTTPException(409, "This maker already has an onboarding record that needs review.")
     await db.commit()
-    return {"data": {"id": str(application.id), "status": application.status}}
+    return {"data": {"id": str(application.id), "status": application.status, "onboardingStatus": onboarding.status if onboarding else None}}
+
+
+@router.get("/maker-onboardings", response_model=dict)
+async def list_maker_onboardings(
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+    status_filter: str | None = Query(default=None, alias="status", pattern="^(invited|in_progress|pending_review|approved|rejected)$"),
+):
+    query = (
+        select(MakerOnboarding, MakerApplication)
+        .join(MakerApplication, MakerApplication.id == MakerOnboarding.application_id)
+        .order_by(MakerOnboarding.created_at.desc(), MakerOnboarding.id)
+    )
+    if status_filter:
+        query = query.where(MakerOnboarding.status == status_filter)
+    rows = (await db.execute(query)).all()
+    return {"data": [{
+        "id": str(onboarding.id),
+        "applicationId": str(application.id),
+        "makerName": application.maker_name,
+        "contactPerson": application.contact_person,
+        "email": application.email,
+        "country": application.country,
+        "city": application.city,
+        "status": onboarding.status,
+        "brandStory": onboarding.brand_story,
+        "philosophy": onboarding.philosophy,
+        "process": onboarding.process,
+        "specialties": onboarding.specialties,
+        "productCategories": onboarding.product_categories,
+        "productionCapacity": onboarding.production_capacity,
+        "shippingMethod": onboarding.shipping_method,
+        "shippingResponsibility": onboarding.shipping_responsibility,
+        "returnPolicy": onboarding.return_policy,
+        "exclusivityTerms": onboarding.exclusivity_terms,
+        "reviewNote": onboarding.review_note,
+        "submittedAt": onboarding.submitted_at.isoformat() if onboarding.submitted_at else None,
+    } for onboarding, application in rows]}
+
+
+@router.get("/supplier-product-submissions", response_model=dict)
+async def list_supplier_product_submissions(
+    _admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+    status_filter: str | None = Query(default=None, alias="status", pattern="^(draft|submitted|approved|rejected|published)$"),
+):
+    query = (
+        select(SupplierProductSubmission, Supplier, Brand, ProductCategory)
+        .join(Supplier, Supplier.id == SupplierProductSubmission.supplier_id)
+        .join(Brand, Brand.id == SupplierProductSubmission.brand_id)
+        .join(ProductCategory, ProductCategory.id == SupplierProductSubmission.category_id)
+        .order_by(SupplierProductSubmission.submitted_at.desc(), SupplierProductSubmission.id)
+    )
+    if status_filter:
+        query = query.where(SupplierProductSubmission.status == status_filter)
+    rows = (await db.execute(query)).all()
+    data = []
+    try:
+        for submission, supplier, brand, category in rows:
+            data.append({
+                "id": str(submission.id),
+                "supplierId": str(supplier.id),
+                "supplierName": supplier.name,
+                "brandId": str(brand.id),
+                "brandName": brand.name,
+                "categoryId": str(category.id),
+                "categoryName": category.name,
+                "name": submission.name,
+                "description": submission.description,
+                "materials": submission.materials,
+                "currency": submission.currency,
+                "costAmount": submission.cost_amount,
+                "retailPriceAmount": retail_price_for_wholesale_cost(submission.cost_amount),
+                "productionCapacity": submission.production_capacity,
+                "minimumOrderQuantity": submission.minimum_order_quantity,
+                "leadTimeDays": submission.lead_time_days,
+                "productType": submission.product_type,
+                "sizeTier": submission.size_tier,
+                "dimensions": submission.dimensions,
+                "images": [public_product_image_url(path) for path in submission.image_paths],
+                "status": submission.status,
+                "reviewNote": submission.review_note,
+                "submittedAt": submission.submitted_at.isoformat(),
+                "productId": str(submission.product_id) if submission.product_id else None,
+            })
+    except ProductImageStorageError as error:
+        raise HTTPException(503, "Product image storage is temporarily unavailable.") from error
+    return {"data": data}
+
+
+@router.patch("/supplier-product-submissions/{submission_id}/decision", response_model=dict)
+async def decide_supplier_product_submission(
+    submission_id: UUID,
+    payload: AdminProductSubmissionDecision,
+    request: Request,
+    admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-product-submission-decision", 30, 60)
+    submission = await db.scalar(select(SupplierProductSubmission).where(
+        SupplierProductSubmission.id == submission_id,
+    ).with_for_update())
+    if not submission:
+        raise HTTPException(404, "Supplier product submission not found.")
+    if submission.status != "submitted":
+        raise HTTPException(409, "Only submitted products can be reviewed.")
+    submission.review_note = payload.note
+    submission.reviewed_at = utc_now()
+    submission.reviewed_by = admin.id
+    if payload.decision == "reject":
+        submission.status = "rejected"
+        await db.commit()
+        return {"data": {"id": str(submission.id), "status": submission.status}}
+
+    supplier = await db.get(Supplier, submission.supplier_id)
+    brand = await db.get(Brand, submission.brand_id)
+    category = await db.get(ProductCategory, submission.category_id)
+    if not supplier or not brand or not category or not category.active:
+        raise HTTPException(409, "The supplier, brand, or product category is no longer available.")
+    if submission.product_id:
+        raise HTTPException(409, "A product has already been created for this submission.")
+    if not submission.image_paths:
+        raise HTTPException(409, "The product submission has no photos.")
+    try:
+        image_urls = [public_product_image_url(path) for path in submission.image_paths]
+    except ProductImageStorageError as error:
+        raise HTTPException(503, "Product image storage is temporarily unavailable.") from error
+    product = Product(
+        slug=f"{re.sub(r'[^a-z0-9]+', '-', submission.name.lower()).strip('-')[:150] or 'product'}-{submission.id.hex[:8]}",
+        name=submission.name,
+        description=submission.description,
+        currency=submission.currency,
+        price_amount=retail_price_for_wholesale_cost(submission.cost_amount),
+        availability="available",
+        category_id=category.id,
+        brand_id=brand.id,
+        category_name=category.name,
+        product_type=submission.product_type,
+        supplier_name=supplier.name,
+        image_url=image_urls[0],
+        image_alt=submission.name,
+        tags=[category.slug],
+        size_tier=submission.size_tier,
+        dimensions=submission.dimensions,
+        dispatch_time=f"{submission.lead_time_days} days",
+        materials=submission.materials,
+        published=False,
+        checkout_enabled=False,
+    )
+    db.add(product)
+    await db.flush()
+    variant = ProductVariant(
+        product_id=product.id,
+        title="Default",
+        currency=submission.currency,
+        price_amount=product.price_amount,
+        stock_quantity=submission.production_capacity,
+        active=True,
+    )
+    db.add(variant)
+    await db.flush()
+    offer = SupplierOffer(
+        supplier_id=supplier.id,
+        variant_id=variant.id,
+        supplier_sku=f"SUB-{submission.id.hex[:24].upper()}",
+        cost_amount=submission.cost_amount,
+        currency=submission.currency,
+        minimum_order_quantity=submission.minimum_order_quantity,
+        lead_time_days=submission.lead_time_days,
+        is_primary=True,
+        active=True,
+    )
+    db.add(offer)
+    await db.flush()
+    db.add(SupplierInventory(offer_id=offer.id, on_hand=submission.production_capacity, reserved=0))
+    for sort_order, image_url in enumerate(image_urls):
+        db.add(ProductImage(product_id=product.id, url=image_url, alt=submission.name, sort_order=sort_order))
+    submission.product_id = product.id
+    submission.status = "approved"
+    await db.commit()
+    return {"data": {
+        "id": str(submission.id),
+        "status": submission.status,
+        "productId": str(product.id),
+        "published": product.published,
+    }}
+
+
+@router.patch("/maker-onboardings/{onboarding_id}/decision", response_model=dict)
+async def decide_maker_onboarding(
+    onboarding_id: UUID,
+    payload: AdminOnboardingDecision,
+    request: Request,
+    admin: Customer = Depends(require_roles("admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    require_csrf(request)
+    await enforce_rate_limit(request, "admin-maker-onboarding-decision", 30, 60)
+    onboarding = await db.scalar(select(MakerOnboarding).where(
+        MakerOnboarding.id == onboarding_id,
+    ).with_for_update())
+    if not onboarding:
+        raise HTTPException(404, "Maker onboarding not found.")
+    if onboarding.status != "pending_review":
+        raise HTTPException(409, "Only submitted onboarding can be reviewed.")
+    onboarding.reviewed_at = utc_now()
+    onboarding.reviewed_by = admin.id
+    onboarding.review_note = payload.note
+    if payload.decision == "reject":
+        onboarding.status = "rejected"
+        await db.commit()
+        return {"data": {"id": str(onboarding.id), "status": onboarding.status}}
+
+    application = await db.get(MakerApplication, onboarding.application_id)
+    if not application or not onboarding.brand_story or not onboarding.specialties or not onboarding.product_categories:
+        raise HTTPException(409, "The onboarding record is incomplete.")
+    if onboarding.brand_id or onboarding.supplier_id:
+        raise HTTPException(409, "Partner records have already been created.")
+    slug_base = re.sub(r"[^a-z0-9]+", "-", application.maker_name.lower()).strip("-") or "maker"
+    brand = Brand(
+        slug=f"{slug_base[:160]}-{application.id.hex[:8]}",
+        name=application.maker_name[:180],
+        maker_story=onboarding.brand_story,
+        philosophy=onboarding.philosophy,
+        process=onboarding.process,
+        location=", ".join(part for part in (application.city, application.country) if part),
+        specialties=onboarding.specialties,
+        website=application.website or None,
+        social_media=application.social_media or None,
+    )
+    supplier = Supplier(
+        code=f"SUP-{application.id.hex[:16].upper()}",
+        name=application.maker_name[:180],
+        contact_email=application.email,
+        active=False,
+    )
+    db.add_all([brand, supplier])
+    await db.flush()
+    mail_settings = get_settings()
+    if not mail_settings.contact_email_configured:
+        raise HTTPException(503, "Transactional email is not configured.")
+    token = secrets.token_urlsafe(32)
+    onboarding.brand_id = brand.id
+    onboarding.supplier_id = supplier.id
+    onboarding.supplier_invite_token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    onboarding.supplier_invite_expires_at = utc_now() + timedelta(days=14)
+    onboarding.supplier_invite_used_at = None
+    onboarding.status = "approved"
+    invite_url = f"{mail_settings.storefront_base_url.rstrip('/')}/supplier-activate?token={token}"
+    enqueue_email_notification(
+        db,
+        OutboxEvent(
+            event_type="supplier.portal_invitation_requested",
+            payload={"onboardingId": str(onboarding.id), "supplierId": str(supplier.id)},
+        ),
+        template="supplier_portal_invitation",
+        recipient=application.email,
+        payload={"makerName": application.maker_name, "inviteUrl": invite_url},
+        notification_key=f"supplier_portal_invitation:{onboarding.id}:{onboarding.supplier_invite_expires_at.isoformat()}",
+    )
+    await db.commit()
+    return {"data": {
+        "id": str(onboarding.id),
+        "status": onboarding.status,
+        "brandId": str(brand.id),
+        "supplierId": str(supplier.id),
+    }}
 
 
 @router.patch("/suppliers/{supplier_id}/status", response_model=dict)

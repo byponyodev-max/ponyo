@@ -13,7 +13,7 @@ from app.db import get_db
 from app.models import Customer, Supplier, SupplierAccount, SupplierPurchaseOrder
 from app.rate_limit import enforce_rate_limit
 from app.schemas import SupplierAccountRequest, SupplierDecisionRequest
-from app.security import require_csrf, require_roles
+from app.security import get_authenticated_customer, require_csrf, require_roles
 from app.supplier_orders import (confirm_purchase_order, generate_purchase_orders, load_order,
                                  load_purchase_order, now_utc, purchase_order_payload, refresh_fulfillment)
 
@@ -42,7 +42,7 @@ async def visible_po(db: AsyncSession, po_id: UUID, actor: Customer):
 
 
 @router.get("", response_model=dict)
-async def list_purchase_orders(actor: Customer = Depends(require_roles("supplier", "admin")),
+async def list_purchase_orders(actor: Customer = Depends(get_authenticated_customer),
                                db: AsyncSession = Depends(get_db), limit: int = Query(default=50, ge=1, le=100),
                                offset: int = Query(default=0, ge=0)):
     supplier_id = await scoped_supplier(db, actor)
@@ -61,8 +61,8 @@ async def link_supplier_account(supplier_id: UUID, payload: SupplierAccountReque
     customer = await db.scalar(select(Customer).where(Customer.id == payload.customerId).with_for_update())
     if not supplier or not supplier.active:
         raise HTTPException(404, "Supplier not found.")
-    if not customer or customer.role != "supplier" or not customer.email_verified:
-        raise HTTPException(422, "Choose an existing verified supplier-role account.")
+    if not customer or not customer.email_verified or customer.role == "admin":
+        raise HTTPException(422, "Choose an existing verified customer account.")
     binding = await db.get(SupplierAccount, customer.id)
     if binding and binding.supplier_id != supplier_id:
         raise HTTPException(409, "This account is already assigned to a different supplier.")
@@ -87,7 +87,7 @@ async def plan_supplier_orders(order_id: UUID, request: Request, _admin: Custome
 
 
 @router.get("/{po_id}", response_model=dict)
-async def get_purchase_order(po_id: UUID, actor: Customer = Depends(require_roles("supplier", "admin")), db: AsyncSession = Depends(get_db)):
+async def get_purchase_order(po_id: UUID, actor: Customer = Depends(get_authenticated_customer), db: AsyncSession = Depends(get_db)):
     po = await visible_po(db, po_id, actor)
     # Only the assigned supplier/admin can access the delivery address.
     return {"data": purchase_order_payload(po, forwarding=True)}
@@ -95,7 +95,7 @@ async def get_purchase_order(po_id: UUID, actor: Customer = Depends(require_role
 
 @router.post("/{po_id}/confirmation", response_model=dict)
 async def supplier_confirmation(po_id: UUID, payload: SupplierDecisionRequest, request: Request,
-                                actor: Customer = Depends(require_roles("supplier", "admin")), db: AsyncSession = Depends(get_db)):
+                                actor: Customer = Depends(get_authenticated_customer), db: AsyncSession = Depends(get_db)):
     require_csrf(request)
     await enforce_rate_limit(request, "supplier-confirmation", 30, 60)
     visible = await visible_po(db, po_id, actor)

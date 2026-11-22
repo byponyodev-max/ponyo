@@ -1,14 +1,26 @@
+from io import BytesIO
+from uuid import UUID
+
 import pytest
+from PIL import Image
+from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy import select
 
+from app.config import settings
 from app.models import (
+    Brand,
     Customer,
+    MakerApplication,
+    MakerOnboarding,
+    Product,
+    ProductCategory,
     ProductVariant,
     Supplier,
     SupplierAccount,
     SupplierInventory,
     SupplierOffer,
+    SupplierProductSubmission,
 )
 from test_api import add_product, csrf_token, seed_customer_session, test_client
 
@@ -186,3 +198,132 @@ async def test_supplier_catalog_is_supplier_scoped_and_protects_reserved_stock(t
     )
     assert customer_id
     assert (await client.get("/v1/supplier-catalog/offers")).status_code == 403
+
+
+async def test_supplier_product_submission_requires_review_before_product_is_created(test_client, monkeypatch):
+    client, factory = test_client
+    monkeypatch.setattr(settings, "smtp_host", "mail.example.test")
+    monkeypatch.setattr(settings, "smtp_from_email", "partners@byponyo.com")
+    customer_id = await seed_customer_session(client, factory, email="new-maker@example.com")
+    async with factory() as db:
+        application = MakerApplication(
+            maker_name="New Maker Studio",
+            contact_person="New Maker",
+            email="new-maker@example.com",
+            country="Japan",
+            city="Tokyo",
+            product_url="https://example.test/portfolio",
+            product_description="Handmade soft toys.",
+            proven_desire_evidence="Customer interest has been documented.",
+            materials="Cotton and recycled filling.",
+            price_range="¥1,000–¥2,000",
+            ponyo_exclusivity="Non-exclusive",
+            status="accepted",
+        )
+        brand = Brand(slug="new-maker-studio", name="New Maker Studio")
+        supplier = Supplier(code="NEW-MAKER", name="New Maker Studio", active=True)
+        category = ProductCategory(slug="character-plush", name="Character Plush", active=True)
+        db.add_all([application, brand, supplier, category])
+        await db.flush()
+        db.add(MakerOnboarding(
+            application_id=application.id,
+            status="approved",
+            brand_id=brand.id,
+            supplier_id=supplier.id,
+        ))
+        db.add(SupplierAccount(customer_id=customer_id, supplier_id=supplier.id))
+        category_id = category.id
+        await db.commit()
+    monkeypatch.setattr(settings, "supabase_url", "https://storage.example.test")
+    monkeypatch.setattr(settings, "supabase_service_role_key", SecretStr("test-service-key"))
+
+    async def upload_images(submission_id, images):
+        assert len(images) == 1
+        return [f"supplier-submissions/{submission_id}/image.jpg"]
+
+    monkeypatch.setattr("app.routers.supplier_catalog.upload_product_images", upload_images)
+    image = BytesIO()
+    Image.new("RGB", (20, 20), "pink").save(image, format="PNG")
+    response = await client.post(
+        "/v1/supplier-catalog/product-submissions",
+        headers={"X-CSRF-Token": await csrf_token(client)},
+        data={
+            "categoryId": str(category_id),
+            "name": "Pocket Moon Plush",
+            "description": "A small handmade plush for collectors and thoughtful gifts.",
+            "materials": "Cotton and recycled filling",
+            "currency": "JPY",
+            "costAmount": "1000",
+            "productionCapacity": "12",
+            "minimumOrderQuantity": "2",
+            "leadTimeDays": "14",
+            "productType": "Collectible plush",
+            "sizeTier": "Small",
+            "dimensions": "12 cm",
+        },
+        files=[("images", ("pocket-moon.png", image.getvalue(), "image/png"))],
+    )
+    assert response.status_code == 201, response.text
+    submission_id = UUID(response.json()["data"]["id"])
+    assert (await client.get("/v1/supplier-catalog/product-submissions")).json()["data"][0]["status"] == "submitted"
+    async with factory() as db:
+        submission = await db.get(SupplierProductSubmission, submission_id)
+        assert submission.product_id is None
+
+    client.cookies.clear()
+    admin_id = await seed_customer_session(client, factory, email="product-review-admin@example.com")
+    async with factory() as db:
+        admin = await db.get(Customer, admin_id)
+        admin.role = "admin"
+        await db.commit()
+    decision = await client.patch(
+        f"/v1/admin/supplier-product-submissions/{submission_id}/decision",
+        headers={"X-CSRF-Token": await csrf_token(client)},
+        json={"decision": "approve"},
+    )
+    assert decision.status_code == 200, decision.text
+    assert decision.json()["data"]["published"] is False
+    async with factory() as db:
+        product = await db.get(Product, UUID(decision.json()["data"]["productId"]))
+        submission = await db.get(SupplierProductSubmission, submission_id)
+        variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id))
+        offer = await db.scalar(select(SupplierOffer).where(SupplierOffer.variant_id == variant.id))
+        inventory = await db.scalar(select(SupplierInventory).where(SupplierInventory.offer_id == offer.id))
+        assert submission.status == "approved"
+        assert product.published is False
+        assert product.price_amount == 1200
+        assert variant.stock_quantity == 12
+        assert offer.cost_amount == 1000
+        assert inventory.on_hand == 12
+
+    async def translations_ready(_product, _db):
+        return None
+
+    monkeypatch.setattr("app.routers.admin.ensure_product_translations", translations_ready)
+    publication = await client.patch(
+        f"/v1/admin/products/{decision.json()['data']['productId']}/publication",
+        headers={"X-CSRF-Token": await csrf_token(client)},
+        json={"published": True},
+    )
+    assert publication.status_code == 200, publication.text
+    async with factory() as db:
+        product = await db.get(Product, UUID(decision.json()["data"]["productId"]))
+        submission = await db.get(SupplierProductSubmission, submission_id)
+        assert product.published is True
+        assert product.checkout_enabled is False
+        assert submission.status == "published"
+    product_id = decision.json()["data"]["productId"]
+    preview = await client.get(f"/v1/products/{product_id}")
+    assert preview.status_code == 200
+    assert preview.json()["data"]["availability"] == "unavailable"
+    assert preview.json()["data"]["availabilityStatus"] == "Coming Soon"
+    checkout = await client.patch(
+        f"/v1/admin/products/{product_id}/checkout",
+        headers={"X-CSRF-Token": await csrf_token(client)},
+        json={"enabled": True},
+    )
+    assert checkout.status_code == 200, checkout.text
+    assert checkout.json()["data"]["checkoutEnabled"] is True
+    purchasable = await client.get(f"/v1/products/{product_id}")
+    assert purchasable.json()["data"]["availability"] == "available"
+    assert purchasable.json()["data"]["availabilityStatus"] is None

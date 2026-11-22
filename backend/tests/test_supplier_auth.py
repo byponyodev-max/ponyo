@@ -58,12 +58,17 @@ async def test_supplier_login_me_and_logout_are_scoped_to_active_supplier_accoun
 	assert (await client.get("/v1/supplier-auth/me")).status_code == 401
 
 
-async def test_supplier_login_rejects_customer_unassigned_unverified_and_bad_credentials(test_client):
+async def test_supplier_login_supports_customer_accounts_with_a_supplier_assignment(test_client):
 	client, factory = test_client
 	await supplier_account(factory, role="customer")
-	assert (await login(client)).status_code == 403
+	response = await login(client)
+	assert response.status_code == 200
+	assert response.json()["data"]["supplier"]["name"] == "Studio Test"
+	assert (await client.get("/v1/supplier-auth/me")).status_code == 200
+	assert (await client.get("/v1/auth/me")).status_code == 200
 	assert (await login(client, password="incorrect-password")).status_code == 401
 
+	client.cookies.clear()
 	async with factory() as db:
 		unassigned_supplier = Supplier(code="STUDIO-UNASSIGNED", name="Unassigned", active=True)
 		unassigned = Customer(

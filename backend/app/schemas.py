@@ -517,6 +517,11 @@ class AdminProductPublicationRequest(BaseModel):
     published: bool
 
 
+class AdminProductCheckoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool
+
+
 class AdminProductCategoryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     categoryId: UUID
@@ -584,6 +589,57 @@ class AdminBrandProfileRequest(BaseModel):
 class AdminMakerApplicationStatusRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     status: Literal["pending", "reviewing", "accepted", "declined"]
+
+
+class MakerOnboardingSubmit(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    brandStory: str = Field(min_length=20, max_length=4000)
+    philosophy: str = Field(min_length=10, max_length=3000)
+    process: str = Field(min_length=10, max_length=3000)
+    specialties: list[str] = Field(min_length=1, max_length=20)
+    productCategories: list[str] = Field(min_length=1, max_length=10)
+    productionCapacity: int = Field(gt=0, strict=True)
+    shippingMethod: str = Field(min_length=5, max_length=500)
+    shippingResponsibility: Literal["maker", "ponyo", "shared"]
+    returnPolicy: str = Field(min_length=10, max_length=3000)
+    exclusivityTerms: str = Field(min_length=10, max_length=3000)
+    acceptTerms: Literal[True]
+
+
+class SupplierInvitationAccept(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    token: str = Field(min_length=32, max_length=200)
+    firstName: str = Field(min_length=1, max_length=120)
+    lastName: str = Field(default="", max_length=120)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
+class SupplierProductSubmissionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    categoryId: UUID
+    name: str = Field(min_length=2, max_length=240)
+    description: str = Field(min_length=20, max_length=5000)
+    materials: str = Field(min_length=2, max_length=2000)
+    currency: str = Field(min_length=3, max_length=3, pattern="^[A-Z]{3}$")
+    costAmount: int = Field(gt=0, strict=True)
+    productionCapacity: int = Field(ge=0, strict=True)
+    minimumOrderQuantity: int = Field(gt=0, strict=True)
+    leadTimeDays: int = Field(ge=0, strict=True)
+    productType: str | None = Field(default=None, max_length=100)
+    sizeTier: str | None = Field(default=None, max_length=40)
+    dimensions: str | None = Field(default=None, max_length=80)
+
+
+class AdminOnboardingDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    decision: Literal["approve", "reject"]
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class AdminProductSubmissionDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    decision: Literal["approve", "reject"]
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class AdminSupplierStatusRequest(BaseModel):

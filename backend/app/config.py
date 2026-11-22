@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_service_role_key: SecretStr = SecretStr("")
     supabase_maker_applications_bucket: str = "maker-application-photos"
+    supabase_product_images_bucket: str = "ponyo-product-images"
     translation_provider: Literal["disabled", "libretranslate"] = "libretranslate"
     translation_timeout_seconds: int = 8
     libretranslate_url: str = "http://localhost:5000"
@@ -146,6 +147,14 @@ class Settings(BaseSettings):
             self.supabase_url
             and self.supabase_service_role_key.get_secret_value().strip()
             and self.supabase_maker_applications_bucket.strip()
+        )
+
+    @property
+    def product_image_storage_configured(self) -> bool:
+        return bool(
+            self.supabase_url
+            and self.supabase_service_role_key.get_secret_value().strip()
+            and self.supabase_product_images_bucket.strip()
         )
 
     @property

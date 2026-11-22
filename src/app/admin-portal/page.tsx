@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 import { aggregateReservationsByCountry, filterAndSortDemandProducts, type DemandSortOrder } from "@/lib/admin-reservation-report";
-import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminListPage, type AdminNewsletterPage, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier, type AdminSupplierOfferChange, type AdminWaitlistEntryPage, type AdminWaitlistProduct, type ProductCategory } from "@/services/ponyo-api.client";
+import { ApiNotConfiguredError, ApiRequestError, ponyoApi, type AdminAccount, type AdminAnalytics, type AdminBrand, type AdminCustomer, type AdminDashboard, type AdminEmailInboxStatus, type AdminEmailInboxSummary, type AdminEmailThread, type AdminEmailThreadDetail, type AdminIdentity, type AdminListPage, type AdminNewsletterPage, type AdminOrder, type AdminOrderDetail, type AdminProduct, type AdminReservationPage, type AdminSupplier, type AdminSupplierOfferChange, type AdminWaitlistEntryPage, type AdminWaitlistProduct, type AdminSupplierProductSubmission, type MakerOnboarding, type ProductCategory } from "@/services/ponyo-api.client";
 import { BrandProfileEditor, ProductCategoryEditor, ProductProofEditor, ReservationSettingsEditor } from "@/components/admin/catalog-editors";
 import { PonyoSelect } from "@/components/ui/ponyo-select";
 import type { AdminMakerApplication, MakerApplicationStatus } from "@/services/ponyo-api.client";
@@ -353,6 +353,8 @@ export default function AdminPortalPage() {
 	const [emailReplyIdempotencyKey, setEmailReplyIdempotencyKey] = useState("");
 	const [emailReplyIdempotencyScope, setEmailReplyIdempotencyScope] = useState("");
 	const [makerApplications, setMakerApplications] = useState<AdminMakerApplication[]>([]);
+	const [makerOnboardings, setMakerOnboardings] = useState<MakerOnboarding[]>([]);
+	const [productSubmissions, setProductSubmissions] = useState<AdminSupplierProductSubmission[]>([]);
 	const [customers, setCustomers] = useState<AdminListPage<AdminCustomer>>({ items: [], total: 0, limit: 10, offset: 0 });
 	const [newsletterSubscribers, setNewsletterSubscribers] = useState<AdminNewsletterPage>({ items: [], total: 0, subscribedCount: 0, limit: 10, offset: 0 });
 	const [newsletterCampaignSubject, setNewsletterCampaignSubject] = useState("");
@@ -479,12 +481,14 @@ export default function AdminPortalPage() {
 				case "products":
 					{
 						const size = pageSize ?? tablePaging.products.pageSize;
-						const [productPage, categories] = await Promise.all([
+						const [productPage, categories, submissions] = await Promise.all([
 							ponyoApi.listAdminProducts(search, publishedFilter === "all" ? undefined : publishedFilter === "published", size, page * size),
 							ponyoApi.listProductCategories(),
+							ponyoApi.listAdminSupplierProductSubmissions(),
 						]);
 						setProducts(productPage);
 						setProductCategories(categories);
+						setProductSubmissions(submissions);
 						setTablePaging((current) => ({ ...current, products: { page, pageSize: size } }));
 					}
 				break;
@@ -519,7 +523,14 @@ export default function AdminPortalPage() {
 					}
 					break;
 				case "maker-applications":
-					setMakerApplications(await ponyoApi.listAdminMakerApplications());
+					{
+						const [applications, onboardings] = await Promise.all([
+							ponyoApi.listAdminMakerApplications(),
+							ponyoApi.listAdminMakerOnboardings(),
+						]);
+						setMakerApplications(applications);
+						setMakerOnboardings(onboardings);
+					}
 					break;
 				case "suppliers":
 				{
@@ -1096,6 +1107,19 @@ export default function AdminPortalPage() {
 		finally { setBusyId(""); }
 	}
 
+	async function toggleProductCheckout(product: AdminProduct) {
+		setBusyId(product.id);
+		try {
+			const updated = await ponyoApi.setAdminProductCheckout(product.id, !product.checkoutEnabled);
+			setProducts((current) => ({ ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) }));
+			setNotice(`${product.name} checkout ${updated.checkoutEnabled ? "enabled" : "disabled"}.`);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
+	}
+
 	async function toggleSupplier(supplier: AdminSupplier) {
 		setBusyId(supplier.id);
 		try {
@@ -1139,11 +1163,65 @@ export default function AdminPortalPage() {
 	async function updateMakerApplication(application: AdminMakerApplication, status: MakerApplicationStatus) {
 		setBusyId(application.id);
 		try {
-			await ponyoApi.setAdminMakerApplicationStatus(application.id, status);
+			const result = await ponyoApi.setAdminMakerApplicationStatus(application.id, status);
 			setMakerApplications((current) => current.map((item) => item.id === application.id ? { ...item, status } : item));
-			setNotice(ui("application_updated", "Application status updated for {{name}}.", { name: application.makerName }));
+			setNotice(status === "accepted"
+				? `Application accepted for ${application.makerName}. The onboarding invitation was queued.`
+				: ui("application_updated", "Application status updated for {{name}}.", { name: application.makerName }));
+			if (result.status === "accepted") await loadSection("maker-applications");
 		} catch (requestError) { setError(messageFor(requestError, t)); }
 		finally { setBusyId(""); }
+	}
+
+	async function decideMakerOnboarding(onboarding: MakerOnboarding, decision: "approve" | "reject") {
+		setBusyId(onboarding.id);
+		setError("");
+		try {
+			await ponyoApi.decideAdminMakerOnboarding(onboarding.id, decision);
+			setNotice(decision === "approve"
+				? `${onboarding.makerName}’s partner setup is approved. A separate Supplier Portal invitation was queued.`
+				: `${onboarding.makerName}’s onboarding was rejected.`);
+			await Promise.all([
+				loadSection("maker-applications"),
+				loadSection("suppliers"),
+				loadSection("brands"),
+			]);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
+	}
+
+	async function decideProductSubmission(submission: AdminSupplierProductSubmission, decision: "approve" | "reject") {
+		setBusyId(submission.id);
+		setError("");
+		try {
+			await ponyoApi.decideAdminSupplierProductSubmission(submission.id, decision);
+			setNotice(decision === "approve"
+				? `${submission.name} was approved as an unpublished product. Review its translations and publish it when ready.`
+				: `${submission.name} was rejected.`);
+			await loadSection("products");
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
+	}
+
+	async function publishApprovedSubmission(submission: AdminSupplierProductSubmission) {
+		if (!submission.productId) return;
+		setBusyId(submission.id);
+		setError("");
+		try {
+			await ponyoApi.setAdminProductPublication(submission.productId, true);
+			setNotice(`${submission.name} was published to the storefront.`);
+			await Promise.all([loadSection("products"), ponyoApi.getAdminDashboard().then(setDashboard)]);
+		} catch (requestError) {
+			setError(messageFor(requestError, t));
+		} finally {
+			setBusyId("");
+		}
 	}
 
 	if (loading) return <main className="ad-boot"><Image src="/ponyo-jellyfish.svg" alt="" width={44} height={44} /><span>{ui("loading", "Opening Ponyo control room…")}</span></main>;
@@ -1301,8 +1379,28 @@ export default function AdminPortalPage() {
 				</>}
 			</>}
 			{section === "orders" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, orders: { ...current.orders, page: 0 } })); void loadSection("orders", query, 0); } }} placeholder="Order number or customer email" /></label><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, orders: { ...current.orders, page: 0 } })); void loadSection("orders", query, 0); }}>Search orders</button><span>{orders.total} orders</span></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.orders ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CUSTOMER ORDERS</span><h2>Orders</h2></div><span className="ad-count-pill">{orders.total} orders</span><AdminTableCollapseButton collapsed={collapsedTables.orders} onClick={() => toggleTableCollapsed("orders")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>PAYMENT</th><th>FULFILLMENT</th><th>SUPPLIER</th><th>TOTAL</th></tr></thead><tbody>{orders.items.map((order) => <tr key={order.id} className={selectedOrderId === order.id ? "is-selected" : ""} onClick={() => { setSelectedOrderId(order.id); setOrderDetail(null); }}><td><strong>{order.orderNumber}</strong><small>{date(order.createdAt)}</small></td><td>{order.customerEmail}</td><td><span className="ad-status">{order.paymentStatus}</span></td><td>{order.fulfillmentStatus.replaceAll("_", " ")}</td><td>{order.supplierFulfillmentStatus.replaceAll("_", " ")}</td><td>{amount(order.totalAmount, order.currency, formatPrice)}</td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.orders.page} pageSize={tablePaging.orders.pageSize} total={orders.total} onPageChange={(page) => changeTablePage("orders", page)} onPageSizeChange={(pageSize) => changeTablePageSize("orders", pageSize)} t={ui} /></section>{orderDetail && <section className="ad-panel ad-order-detail"><div className="ad-panel-heading"><div><span className="ad-eyebrow">ORDER DETAIL · {orderDetail.paymentStatus}</span><h2>{orderDetail.orderNumber}</h2><p>{orderDetail.customerEmail} · {orderDetail.fulfillmentStatus.replaceAll("_", " ")}</p></div><button type="button" onClick={() => { setOrderDetail(null); setSelectedOrderId(""); }}>Close</button></div><div className="ad-order-facts"><span>Subtotal <strong>{amount(orderDetail.subtotalAmount, orderDetail.currency, formatPrice)}</strong></span><span>Discount <strong>{amount(orderDetail.discountAmount, orderDetail.currency, formatPrice)}</strong></span><span>Shipping <strong>{amount(orderDetail.shippingAmount, orderDetail.currency, formatPrice)}</strong></span><span>Captured <strong>{amount(orderDetail.capturedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Refunded <strong>{amount(orderDetail.refundedAmount, orderDetail.currency, formatPrice)}</strong></span><span>Total <strong>{amount(orderDetail.totalAmount, orderDetail.currency, formatPrice)}</strong></span></div><div className="ad-detail-columns"><section><h3>Customer order lines</h3>{orderDetail.items.map((line) => <article key={line.id}><span><strong>{line.name}</strong><small>Qty {line.quantity} · {line.supplierOfferId ? "Supplier linked" : "Legacy / not routed"}</small></span><b>{amount(line.unitPrice * line.quantity, line.currency, formatPrice)}</b></article>)}</section><section><h3>Supplier purchase orders</h3>{orderDetail.supplierFulfillments.map((po) => <article key={po.purchaseOrderId}><span><strong>{po.purchaseOrderNumber} · {po.supplier}</strong><small>{po.status.replaceAll("_", " ")} {po.supplierOrderId ? `· Ref ${po.supplierOrderId}` : ""}</small></span><small>{po.items.length} lines</small></article>)}{orderDetail.paymentStatus === "paid" && <button className="ad-row-action" type="button" disabled={busyId === orderDetail.id} onClick={() => { const row = orders.items.find((item) => item.id === orderDetail.id); if (row) void planSupplierOrders(row); }}>{busyId === orderDetail.id ? "Planning…" : "Plan / refresh supplier routing"}</button>}</section><section><h3>Shipments</h3>{orderDetail.shipments.map((shipment) => <article key={shipment.id}><span><strong>{shipment.number} · {shipment.carrier}</strong><small>{shipment.status.replaceAll("_", " ")} · {shipment.trackingNumber}</small></span>{shipment.trackingUrl && <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">Track ↗</a>}</article>)}{!orderDetail.shipments.length && <p className="ad-detail-empty">No shipment records yet.</p>}</section></div></section>}</>}
-			{section === "products" && <aside className="ad-product-intake-note" role="note"><strong>{ui("catalog_intake_title", "Product intake status")}</strong><p>{ui("catalog_intake_note", "This catalog lists products already in the database. Supplier accounts update offers and inventory; they do not submit new products. Maker applications are separate. New products need an approved data/import workflow before they appear here for review and publishing.")}</p></aside>}
-			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); } }} placeholder="Product name, SKU or slug" /></label><PonyoSelect value={publishedFilter} onChange={(value) => setPublishedFilter(value as typeof publishedFilter)} label="Product publication status" compact options={[{ value: "all", label: "All products" }, { value: "pending", label: "Unpublished" }, { value: "published", label: "Published" }]} /><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); }}>Search catalog</button><span>{products.total} products</span></div><section className={`ad-panel ad-collapsible-table ${collapsedTables.products ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CATALOG</span><h2>Products</h2></div><span className="ad-count-pill">{products.total} products</span><AdminTableCollapseButton collapsed={collapsedTables.products} onClick={() => toggleTableCollapsed("products")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION / SHIPPING</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small><ProductCategoryEditor product={product} categories={productCategories} onSaved={(updated) => setProducts((current) => ({ ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) }))} /></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? "ad-status--published" : "ad-status--pending"}`}>{product.published ? "Published" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button><ProductProofEditor product={product} /></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.products.page} pageSize={tablePaging.products.pageSize} total={products.total} onPageChange={(page) => changeTablePage("products", page)} onPageSizeChange={(pageSize) => changeTablePageSize("products", pageSize)} t={ui} /></section></>}
+			{section === "products" && <aside className="ad-product-intake-note" role="note"><strong>Supplier product review</strong><p>Supplier drafts are reviewed here. Approving a draft creates an unpublished catalog product; publish it separately after the listing and translations are ready.</p></aside>}
+			{section === "products" && <section className="ad-panel ad-submission-review">
+				<div className="ad-panel-heading"><div><span className="ad-eyebrow">SUPPLIER PRODUCT INTAKE</span><h2>Product submissions</h2><p>New products remain hidden until an admin reviews and publishes them.</p></div><span className="ad-count-pill">{productSubmissions.filter((submission) => submission.status === "submitted").length} awaiting review</span></div>
+				{productSubmissions.length ? <div className="ad-submission-grid">{productSubmissions.map((submission) => <article className="ad-submission-card" key={submission.id}>
+					<div className="ad-submission-images">{submission.images.map((image, index) => <Image key={`${submission.id}-${index}`} src={image} alt={`${submission.name} product ${index + 1}`} width={100} height={100} unoptimized />)}</div>
+					<div className="ad-panel-heading"><div><span className="ad-eyebrow">{submission.supplierName} · {submission.brandName}</span><h3>{submission.name}</h3><p>{submission.categoryName} · Submitted {date(submission.submittedAt)}</p></div><span className={`ad-status ad-status--${submission.status === "published" ? "published" : submission.status === "submitted" ? "pending" : "manual_review"}`}>{submission.status.replaceAll("_", " ")}</span></div>
+					<p>{submission.description}</p>
+					<p><strong>Materials:</strong> {submission.materials} · <strong>MOQ:</strong> {submission.minimumOrderQuantity} · <strong>Lead time:</strong> {submission.leadTimeDays} days · <strong>Capacity:</strong> {submission.productionCapacity}</p>
+					<p><strong>Wholesale cost:</strong> {amount(submission.costAmount, submission.currency, formatPrice)} · <strong>Retail after 20% markup:</strong> {amount(submission.retailPriceAmount, submission.currency, formatPrice)}</p>
+					{submission.reviewNote && <p><strong>Review note:</strong> {submission.reviewNote}</p>}
+					<div className="ad-row-actions">
+						{submission.status === "submitted" && <>
+							<button className="ad-row-action" type="button" disabled={busyId === submission.id} onClick={() => void decideProductSubmission(submission, "approve")}>Approve as unpublished</button>
+							<button className="ad-row-action" type="button" disabled={busyId === submission.id} onClick={() => void decideProductSubmission(submission, "reject")}>Reject</button>
+						</>}
+						{submission.status === "approved" && submission.productId && <button className="ad-row-action" type="button" disabled={busyId === submission.id} onClick={() => void publishApprovedSubmission(submission)}>Publish product</button>}
+						{submission.status === "approved" && <span>Created as an unpublished catalog product.</span>}
+						{submission.status === "published" && <span>Published; checkout can be enabled separately from the catalog.</span>}
+					</div>
+				</article>)}</div> : <div className="ad-empty">No supplier product drafts are waiting.</div>}
+			</section>}
+			{section === "products" && <><div className="ad-toolbar"><label className="ad-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); } }} placeholder="Product name, SKU or slug" /></label><PonyoSelect value={publishedFilter} onChange={(value) => setPublishedFilter(value as typeof publishedFilter)} label="Product publication status" compact options={[{ value: "all", label: "All products" }, { value: "pending", label: "Unpublished" }, { value: "published", label: "Published" }]} /><button type="button" onClick={() => { setTablePaging((current) => ({ ...current, products: { ...current.products, page: 0 } })); void loadSection("products", query, 0); }}>Search catalog</button><span>{products.total} products</span></div>			<section className={`ad-panel ad-collapsible-table ${collapsedTables.products ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">CATALOG</span><h2>Products</h2></div><span className="ad-count-pill">{products.total} products</span><AdminTableCollapseButton collapsed={collapsedTables.products} onClick={() => toggleTableCollapsed("products")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>PRODUCT</th><th>BRAND / CATEGORY</th><th>VARIANTS</th><th>STOCK</th><th>PRICE</th><th>STATUS</th><th>ACTION / SHIPPING</th></tr></thead><tbody>{productView.map((product) => <tr key={product.id}><td><div className="ad-product-cell"><Image src={product.image} alt="" width={48} height={48} /><span><strong>{product.name}</strong><small>{product.sku}</small></span></div></td><td>{product.brandName}<small>{product.categoryName}</small><ProductCategoryEditor product={product} categories={productCategories} onSaved={(updated) => setProducts((current) => ({ ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) }))} /></td><td>{product.variantCount}</td><td>{product.stockQuantity}</td><td>{amount(product.priceAmount, product.currency, formatPrice)}</td><td><span className={`ad-status ${product.published ? product.checkoutEnabled ? "ad-status--published" : "ad-status--pending" : "ad-status--pending"}`}>{product.published ? product.checkoutEnabled ? "Published · checkout on" : "Published preview" : "Unpublished"}</span></td><td><button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void togglePublication(product)}>{product.published ? "Unpublish" : "Publish"}</button>{product.published && <button className="ad-row-action" type="button" disabled={busyId === product.id} onClick={() => void toggleProductCheckout(product)}>{product.checkoutEnabled ? "Disable checkout" : "Enable checkout"}</button>}<ProductProofEditor product={product} /></td></tr>)}</tbody></table></div><AdminTablePagination page={tablePaging.products.page} pageSize={tablePaging.products.pageSize} total={products.total} onPageChange={(page) => changeTablePage("products", page)} onPageSizeChange={(pageSize) => changeTablePageSize("products", pageSize)} t={ui} /></section></>}
 			{section === "reservations" && (
 				<>
 					<div className="ad-report-tabs" role="tablist" aria-label={ui("reservation_reports", "Reservation reports")}>
@@ -1598,6 +1696,27 @@ export default function AdminPortalPage() {
 				</div>
 			</section>}
 			{section === "maker-applications" && <section className={`ad-panel ad-collapsible-table ${collapsedTables["maker-applications"] ? "is-collapsed" : ""}`}><div className="ad-panel-heading"><div><span className="ad-eyebrow">INDEPENDENT MAKERS</span><h2>Applications to review</h2><p>Private applicant details are visible only in this admin workspace.</p></div><span className="ad-count-pill">{makerApplications.length} applications</span><AdminTableCollapseButton collapsed={collapsedTables["maker-applications"]} onClick={() => toggleTableCollapsed("maker-applications")} t={ui} /></div><div className="ad-table-wrap"><table className="ad-table"><thead><tr><th>MAKER</th><th>CONTACT</th><th>PRODUCT</th><th>APPLICATION DETAILS</th><th>STATUS</th></tr></thead><tbody>{visibleRows(makerApplications, "maker-applications").map((application) => <tr key={application.id}><td><strong>{application.makerName}</strong><small>{application.country} · {application.city}</small><small>{date(application.createdAt)}</small></td><td><strong>{application.contactPerson}</strong><a href={`mailto:${application.email}`}>{application.email}</a>{application.website && <a href={application.website} target="_blank" rel="noreferrer noopener">Website ↗</a>}{application.socialMedia && <a href={application.socialMedia} target="_blank" rel="noreferrer noopener">Social ↗</a>}</td><td><a href={application.productUrl} target="_blank" rel="noreferrer noopener">{application.productUrl} ↗</a><small>{application.priceRange}</small></td><td><details className="ad-application-details"><summary>Materials, evidence &amp; photos</summary><p>{application.productDescription}</p><p><strong>Demand evidence:</strong> {application.provenDesireEvidence}</p><p><strong>Materials:</strong> {application.materials}</p><p><strong>Ponyo exclusivity:</strong> {application.ponyoExclusivity}</p><div className="maker-photo-preview">{application.productPhotos.map((photo, index) => <span key={index}><Image src={photo} alt={`${application.makerName} product example ${index + 1}`} width={100} height={100} unoptimized /></span>)}</div></details></td>			<td><PonyoSelect label={`Application status for ${application.makerName}`} value={application.status} disabled={busyId === application.id} compact onChange={(value) => void updateMakerApplication(application, value as MakerApplicationStatus)} options={[{ value: "pending", label: "Pending" }, { value: "reviewing", label: "Reviewing" }, { value: "accepted", label: "Accepted" }, { value: "declined", label: "Declined" }]} /></td></tr>)}</tbody></table>{!makerApplications.length && <div className="ad-empty">No maker applications have been submitted.</div>}</div><AdminTablePagination page={tablePaging["maker-applications"].page} pageSize={tablePaging["maker-applications"].pageSize} total={makerApplications.length} onPageChange={(page) => changeTablePage("maker-applications", page)} onPageSizeChange={(pageSize) => changeTablePageSize("maker-applications", pageSize)} t={ui} /></section>}
+			{section === "maker-applications" && <section className="ad-panel ad-onboarding-review">
+				<div className="ad-panel-heading"><div><span className="ad-eyebrow">PARTNER SETUP</span><h2>Maker onboarding</h2><p>Acceptance is separate from supplier activation. Review terms before creating partner records.</p></div><span className="ad-count-pill">{makerOnboardings.filter((onboarding) => onboarding.status === "pending_review").length} awaiting review</span></div>
+				{makerOnboardings.length ? <div className="ad-submission-grid">{makerOnboardings.map((onboarding) => <article className="ad-submission-card" key={onboarding.id}>
+					<div className="ad-panel-heading"><div><span className="ad-eyebrow">{onboarding.email} · {onboarding.country}</span><h3>{onboarding.makerName}</h3><p>{onboarding.contactPerson} · {onboarding.city}</p></div><span className={`ad-status ad-status--${onboarding.status === "approved" ? "published" : onboarding.status === "pending_review" ? "pending" : "manual_review"}`}>{onboarding.status.replaceAll("_", " ")}</span></div>
+					<details><summary>Review partner details</summary>
+						<p><strong>Brand story:</strong> {onboarding.brandStory || "Not provided"}</p>
+						<p><strong>Philosophy:</strong> {onboarding.philosophy || "Not provided"}</p>
+						<p><strong>Process:</strong> {onboarding.process || "Not provided"}</p>
+						<p><strong>Specialties:</strong> {onboarding.specialties.join(", ") || "Not provided"} · <strong>Categories:</strong> {onboarding.productCategories.join(", ") || "Not provided"}</p>
+						<p><strong>Capacity/month:</strong> {onboarding.productionCapacity ?? "Not provided"} · <strong>Shipping:</strong> {onboarding.shippingResponsibility || "Not provided"} · {onboarding.shippingMethod || ""}</p>
+						<p><strong>Returns:</strong> {onboarding.returnPolicy || "Not provided"}</p>
+						<p><strong>Exclusivity:</strong> {onboarding.exclusivityTerms || "Not provided"}</p>
+					</details>
+					{onboarding.reviewNote && <p><strong>Review note:</strong> {onboarding.reviewNote}</p>}
+					{onboarding.status === "pending_review" && <div className="ad-row-actions">
+						<button className="ad-row-action" type="button" disabled={busyId === onboarding.id} onClick={() => void decideMakerOnboarding(onboarding, "approve")}>Approve partner setup &amp; invite supplier</button>
+						<button className="ad-row-action" type="button" disabled={busyId === onboarding.id} onClick={() => void decideMakerOnboarding(onboarding, "reject")}>Reject onboarding</button>
+					</div>}
+					{onboarding.status === "approved" && <p>Brand and inactive supplier records are linked. The supplier becomes active only after accepting the separate invitation.</p>}
+				</article>)}</div> : <div className="ad-empty">No maker onboarding invitations have been issued.</div>}
+			</section>}
 			{section === "suppliers" && <>
 				<section className="ad-panel">
 					<div className="ad-panel-heading"><div><span className="ad-eyebrow">PONYO APPROVAL REQUIRED</span><h2>Supplier change requests</h2><p>Capacity, wholesale cost, MOQ and lead time remain unchanged on the storefront until approved.</p></div><span className="ad-count-pill">{supplierOfferChanges.length} pending</span></div>

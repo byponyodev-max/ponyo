@@ -9,13 +9,46 @@ from app.config import EmailInboxMailboxSettings, settings
 from app.email_notifications import _send_transactional_email
 from app.email_queue import send_one
 from app.mailbox_sync import FetchedMessage, MailboxSyncError, _parse_remote_message, _plain_email_body, sync_mailbox_once
-from app.models import ContactRequest, EmailInboxMessage, EmailInboxSyncState, EmailNotification
+from app.models import ContactRequest, EmailInboxMessage, EmailInboxSyncState, EmailNotification, MakerApplication
 from test_admin_dashboard import admin_session
 from test_api import (
     csrf_token,
     safe_auth_email_and_cookies as safe_auth_email_and_cookies,
     test_client as test_client,
 )
+
+
+@pytest.mark.asyncio
+async def test_maker_application_is_available_in_admin_email_inbox(test_client):
+    client, factory = test_client
+    await admin_session(client, factory, email="maker-inbox-admin@example.com")
+    async with factory() as db:
+        application = MakerApplication(
+            maker_name="Inbox Test Studio",
+            contact_person="Test Maker",
+            email="maker@example.com",
+            country="Japan",
+            city="Tokyo",
+            product_url="https://example.test/plush",
+            product_description="A hand-sewn plush character.",
+            proven_desire_evidence="The last edition sold out.",
+            materials="Cotton and recycled filling.",
+            price_range="JPY 1000–2000",
+            ponyo_exclusivity="We are open to an exclusive colorway.",
+        )
+        db.add(application)
+        await db.commit()
+        application_id = application.id
+
+    response = await client.get("/v1/admin/email/inbox")
+    assert response.status_code == 200, response.text
+    thread = next(
+        item for item in response.json()["data"]["items"]
+        if item["threadKey"] == f"maker:{application_id}"
+    )
+    assert thread["source"] == "maker_application"
+    assert thread["fromEmail"] == "maker@example.com"
+    assert "Inbox Test Studio" in thread["preview"]
 
 
 @pytest.mark.asyncio

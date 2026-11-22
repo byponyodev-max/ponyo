@@ -77,6 +77,36 @@ def test_product_availability_notification_is_branded_and_uses_safe_product_link
     assert "availability waitlist" in html
 
 
+@pytest.mark.parametrize(
+    ("template", "payload", "expected_subject", "expected_action"),
+    [
+        (
+            "maker_onboarding_review_requested",
+            {"makerName": "Little Moon Studio", "reviewUrl": "https://shop.example.test/admin-portal"},
+            "Maker onboarding ready for review: Little Moon Studio",
+            "Review onboarding",
+        ),
+        (
+            "supplier_product_review_requested",
+            {
+                "makerName": "Little Moon Studio",
+                "productName": "Pocket Moon Plush",
+                "reviewUrl": "https://shop.example.test/admin-portal",
+            },
+            "Supplier product ready for review: Pocket Moon Plush",
+            "Review product draft",
+        ),
+    ],
+)
+def test_partner_review_notifications_have_safe_admin_links(template, payload, expected_subject, expected_action):
+    notification = EmailNotification(template=template, payload=payload)
+    subject, text, html = _content(notification)
+    assert subject == expected_subject
+    assert expected_action in html
+    assert "https://shop.example.test/admin-portal" in text
+    assert 'href="https://shop.example.test/admin-portal"' in html
+
+
 def test_newsletter_campaign_email_escapes_body_and_includes_unsubscribe_link():
     notification = EmailNotification(
         template="newsletter_campaign",

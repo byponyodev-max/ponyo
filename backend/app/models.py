@@ -210,6 +210,7 @@ class Product(Base):
     preorder_invites_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reservation_target_missed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    checkout_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     variants: Mapped[list[ProductVariant]] = relationship(back_populates="product", cascade="all, delete-orphan")
     category: Mapped[ProductCategory | None] = relationship()
@@ -646,6 +647,90 @@ class SupplierAccount(Base):
 
     customer_id: Mapped[UUID] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), primary_key=True)
     supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id", ondelete="RESTRICT"), index=True)
+
+
+class MakerOnboarding(Base):
+    __tablename__ = "maker_onboardings"
+    __table_args__ = (
+        UniqueConstraint("application_id", name="uq_maker_onboardings_application"),
+        CheckConstraint(
+            "status IN ('invited', 'in_progress', 'pending_review', 'approved', 'rejected')",
+            name="ck_maker_onboardings_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    application_id: Mapped[UUID] = mapped_column(
+        ForeignKey("maker_applications.id", ondelete="CASCADE"), index=True,
+    )
+    status: Mapped[str] = mapped_column(String(24), default="invited", index=True)
+    invite_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    invite_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    invite_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    brand_story: Mapped[str | None] = mapped_column(Text, nullable=True)
+    philosophy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    process: Mapped[str | None] = mapped_column(Text, nullable=True)
+    specialties: Mapped[list[str]] = mapped_column(JSON, default=list)
+    product_categories: Mapped[list[str]] = mapped_column(JSON, default=list)
+    production_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    shipping_method: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    shipping_responsibility: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    return_policy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    exclusivity_terms: Mapped[str | None] = mapped_column(Text, nullable=True)
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    brand_id: Mapped[UUID | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"), nullable=True)
+    supplier_id: Mapped[UUID | None] = mapped_column(ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True)
+    supplier_invite_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    supplier_invite_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    supplier_invite_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    supplier_account_id: Mapped[UUID | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class SupplierProductSubmission(Base):
+    __tablename__ = "supplier_product_submissions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'submitted', 'approved', 'rejected', 'published')",
+            name="ck_supplier_product_submissions_status",
+        ),
+        CheckConstraint("cost_amount > 0", name="ck_supplier_product_submissions_cost"),
+        CheckConstraint("production_capacity >= 0", name="ck_supplier_product_submissions_capacity"),
+        CheckConstraint("minimum_order_quantity > 0", name="ck_supplier_product_submissions_minimum"),
+        CheckConstraint("lead_time_days >= 0", name="ck_supplier_product_submissions_lead_time"),
+        UniqueConstraint("product_id", name="uq_supplier_product_submissions_product"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id", ondelete="RESTRICT"), index=True)
+    brand_id: Mapped[UUID] = mapped_column(ForeignKey("brands.id", ondelete="RESTRICT"), index=True)
+    category_id: Mapped[UUID] = mapped_column(ForeignKey("product_categories.id", ondelete="RESTRICT"), index=True)
+    name: Mapped[str] = mapped_column(String(240))
+    description: Mapped[str] = mapped_column(Text)
+    materials: Mapped[str] = mapped_column(Text)
+    currency: Mapped[str] = mapped_column(String(3))
+    cost_amount: Mapped[int] = mapped_column(Integer)
+    production_capacity: Mapped[int] = mapped_column(Integer)
+    minimum_order_quantity: Mapped[int] = mapped_column(Integer)
+    lead_time_days: Mapped[int] = mapped_column(Integer)
+    product_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    size_tier: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    dimensions: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    image_paths: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(20), default="submitted", index=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    product_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True,
+    )
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class SupplierPurchaseOrder(Base):
