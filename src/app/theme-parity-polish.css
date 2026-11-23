@@ -3694,15 +3694,6 @@ body {
     .product-detail-layout {
         grid-template-columns: 1fr;
     }
-    body:has(.product-page) .mobile-tab-bar {
-        display: none;
-    }
-    body:has(.product-page) {
-        padding-bottom: 0;
-    }
-    .mobile-sticky-purchase {
-        bottom: 0;
-    }
     .mobile-sticky-purchase .product-home-shortcut {
         display: grid;
     }

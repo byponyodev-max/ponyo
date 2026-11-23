@@ -51,7 +51,18 @@ test("collection headers use an editorial eyebrow and retain their artwork on mo
 
 test("mobile product gallery meets the header and detail accordions have no white cards", () => {
     const styles = read("src/app/maker-reservation.css");
-    assert.match(styles, /@media \(max-width: 767px\)\s*\{[\s\S]*?body:has\(\.product-page\) \.store-main\.product-page\s*\{\s*padding-top:\s*0;/);
+    const headerStyles = read("src/app/theme-parity-polish.css");
+    assert.match(headerStyles, /body:has\(\.store-header\.is-mobile-sticky\) \.store-main\s*\{\s*padding-top:\s*56px;/);
+    assert.doesNotMatch(styles, /body:has\(\.product-page\) \.store-main\.product-page\s*\{\s*padding-top:\s*0;/);
     assert.match(styles, /\.product-page \.product-details-accordion\s*\{[^}]*width:\s*100%;[^}]*background:\s*transparent;/);
     assert.match(styles, /\.product-page \.product-details-accordion details,\s*\.product-page \.product-details-accordion details\[open\]\s*\{[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/);
+});
+
+test("mobile quick navigation stays visible on product pages above the sticky purchase bar", () => {
+    const themeStyles = read("src/app/theme-parity-polish.css");
+    const productStyles = read("src/app/maker-reservation.css");
+    assert.doesNotMatch(themeStyles, /body:has\(\.product-page\) \.mobile-tab-bar\s*\{\s*display:\s*none;/);
+    assert.match(productStyles, /body:has\(\.product-page\)\s*\{\s*padding-bottom:\s*calc\(67px \+ env\(safe-area-inset-bottom\)\);/);
+    assert.match(productStyles, /body:has\(\.product-page \.mobile-sticky-purchase\)\s*\{\s*padding-bottom:\s*calc\(134px \+ env\(safe-area-inset-bottom\)\);/);
+    assert.match(productStyles, /\.product-page \.mobile-sticky-purchase\s*\{\s*bottom:\s*67px;/);
 });
