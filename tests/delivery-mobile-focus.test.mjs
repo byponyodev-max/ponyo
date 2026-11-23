@@ -26,6 +26,13 @@ test("choosing a country closes the dialog and dismisses the shipping notice", (
     assert.doesNotMatch(selection, /await/);
 });
 
+test("delivery chooser is portaled above the fixed mobile navigation", () => {
+    const component = read("../src/components/layout/delivery-region-banner.tsx");
+    const css = read("../src/app/theme-parity-polish.css");
+    assert.match(component, /createPortal\([\s\S]*?delivery-location-backdrop[\s\S]*?document\.body/);
+    assert.match(css, /\.delivery-location-backdrop\s*\{[^}]*z-index:\s*12000;/);
+});
+
 test("product search has a zoom-safe font and focuses without scrolling the page", () => {
     const css = read("../src/app/theme-parity-polish.css");
     assert.match(css, /\.predictive-search-popover \.predictive-search-form input\s*\{[^}]*font-size: 16px;[^}]*min-width: 0;/);

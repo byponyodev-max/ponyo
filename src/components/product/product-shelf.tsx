@@ -14,7 +14,6 @@ type ProductShelfProps = {
   href?: string;
   linkLabel?: string;
   className?: string;
-  badges?: Record<string, string>;
   rail?: boolean;
   compact?: boolean;
   id?: string;
@@ -29,7 +28,6 @@ export function ProductShelf({
   href = "/shop",
   linkLabel = "Shop all →",
   className = "",
-  badges,
   rail = false,
   compact = false,
   id,
@@ -63,7 +61,7 @@ export function ProductShelf({
         <Link className="view-all" href={href}>{localizedLinkLabel}</Link>
         {decoration}
       </div>
-      <ProductGrid products={products} badges={badges} rail={rail} compact={compact} />
+      <ProductGrid products={products} rail={rail} compact={compact} />
     </section>
   );
 }

@@ -8,6 +8,7 @@ import { ProductPurchasePanel } from "@/components/product/product-purchase-pane
 import { ProductActionPanel, ProductReviews } from "@/components/product/product-community";
 import { ProductGrid } from "@/components/product/product-grid";
 import { ProductGallery } from "@/components/product/product-gallery";
+import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
 import { withProductVariantDemo } from "@/lib/product-variant-demo";
 import { getLocalizedProductById, getLocalizedProducts } from "@/services/localized-products.server";
 import { selectRelatedProducts } from "@/lib/related-products";
@@ -60,12 +61,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     product.weightGrams !== null && product.weightGrams !== undefined ? `${product.weightGrams} g` : null,
   ].filter(Boolean))).join(" · ");
   const proofFacts = [
-    { key: "maker", labelKey: "product.proof.maker", label: "Maker", value: makerName },
-    { key: "story", labelKey: "product.proof.story", label: "Maker story", value: makerStory },
-    { key: "materials", labelKey: "product.proof.materials", label: "Materials", value: product.materials },
-    { key: "size", labelKey: "product.proof.size_weight", label: "Size & weight", value: sizeAndWeight || null },
-    { key: "edition", labelKey: "product.proof.edition", label: "Edition", value: product.editionCount ? `${product.editionCount}` : null },
-    { key: "delivery", labelKey: "product.proof.delivery", label: "Estimated delivery", value: product.estimatedDeliveryDate ?? product.dispatchTime },
+    { key: "story", labelKey: "product.proof.story", label: "Maker story", mark: "❝", value: makerStory },
+    { key: "maker", labelKey: "product.proof.maker", label: "Maker", mark: "♡", value: makerName },
+    { key: "materials", labelKey: "product.proof.materials", label: "Materials", mark: "✿", value: product.materials },
+    { key: "size", labelKey: "product.proof.size_weight", label: "Size & weight", mark: "↔", value: sizeAndWeight || null },
+    { key: "edition", labelKey: "product.proof.edition", label: "Edition", mark: "✦", value: product.editionCount ? `${product.editionCount}` : null },
+    { key: "delivery", labelKey: "product.proof.delivery", label: "Estimated delivery", mark: "☼", value: product.estimatedDeliveryDate ?? product.dispatchTime },
   ];
 
   return (
@@ -92,25 +93,33 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               </div>
             </div>
             <dl className="product-proof-grid">
-              {proofFacts.map((fact) => <div className="product-proof-fact" key={fact.key}>
-                <dt><LocalizedText translationKey={fact.labelKey} fallback={fact.label} /></dt>
+              {proofFacts.map((fact) => <div className={`product-proof-fact product-proof-fact--${fact.key}`} key={fact.key}>
+                <dt><span className="product-proof-fact-mark" aria-hidden="true">{fact.mark}</span><LocalizedText translationKey={fact.labelKey} fallback={fact.label} /></dt>
                 <dd>{fact.value || <LocalizedText translationKey="product.proof.not_provided" fallback="Not provided by the maker yet." />}</dd>
               </div>)}
             </dl>
             <Link className="product-proof-size-guide" href="/size-guide"><LocalizedText translationKey="product.proof.size_guide" fallback="Explore the Ponyo Size Guide" /> <span aria-hidden="true">→</span></Link>
           </section>
-          {product.makerSlug && <Link className="product-brand-story" href={`/makers/${encodeURIComponent(product.makerSlug)}`}>
-            <span className="product-brand-story-seal" aria-hidden="true">✧</span>
-            <div className="product-brand-story-copy">
-              <p className="eyebrow"><LocalizedText translationKey="product.proof.brand_spotlight" fallback="BRAND SPOTLIGHT" /></p>
-              <h2>{makerName ?? product.brandName ?? product.supplierName}</h2>
-              <p>{makerStory ?? <LocalizedText translationKey="product.proof.brand_spotlight_note" fallback="Meet the maker and discover more of their work." />}</p>
-            </div>
-            <span className="product-brand-story-link"><LocalizedText translationKey="product.proof.visit_maker" fallback="Meet the maker" /> <span aria-hidden="true">→</span></span>
-          </Link>}
         </div>
         <div className="product-detail-copy"><ProductPurchasePanel product={displayProduct} />{storefrontFeatures.commerce && <p className="product-payment-caption"><LocalizedText as="span" translationKey="pages.product.payment_caption" fallback="Secure checkout powered by Ponyo." /></p>}{(storefrontFeatures.productReservations || hasWaitlist || product.reservationsOpen) && <ProductActionPanel productId={product.id} productName={product.name} shippingCountries={product.shippingCountries} reservationsOpen={product.reservationsOpen === true} reservationDeadline={product.reservationDeadline} productionStatus={product.productionStatus} />}</div>
       </section>
+      {product.makerSlug && <Link className="product-brand-story" href={`/makers/${encodeURIComponent(product.makerSlug)}`}>
+        <span className="product-brand-story-seal" aria-hidden="true">✧</span>
+        <div className="product-brand-story-copy">
+          <p className="eyebrow"><LocalizedText translationKey="product.proof.brand_spotlight" fallback="BRAND SPOTLIGHT" /></p>
+          <h2>{makerName ?? product.brandName ?? product.supplierName}</h2>
+          <p>{makerStory ?? <LocalizedText translationKey="product.proof.brand_spotlight_note" fallback="Meet the maker and discover more of their work." />}</p>
+        </div>
+        <div className="product-brand-story-actions">
+          <span className="product-brand-story-link"><LocalizedText translationKey="product.proof.visit_maker" fallback="Meet the maker" /> <span aria-hidden="true">→</span></span>
+          <div className="product-brand-story-art" aria-hidden="true">
+            <span className="product-brand-story-jellyfish product-brand-story-jellyfish--silver"><JellyfishArtwork id="product-maker-silver" tone="silver" direction={1} /></span>
+            <span className="product-brand-story-jellyfish product-brand-story-jellyfish--gold"><JellyfishArtwork id="product-maker-gold" tone="gold" direction={-1} /></span>
+            <span className="product-brand-story-sparkle product-brand-story-sparkle--one">✦</span>
+            <span className="product-brand-story-sparkle product-brand-story-sparkle--two">✧</span>
+          </div>
+        </div>
+      </Link>}
       {storefrontFeatures.productReviews && <ProductReviews productId={product.id} />}
       {related.length > 0 && <section className="related-products store-container"><div className="section-head"><div><p className="eyebrow"><LocalizedText as="span" translationKey="pages.product.related_eyebrow" fallback="A FEW MORE TO LOVE" /></p><h2><LocalizedText as="span" translationKey="pages.product.related_title" fallback="You may also like" /></h2></div><Link className="text-link" href={`/shop?category=${product.categoryName.toLowerCase().replaceAll(" ", "-")}`}><LocalizedText as="span" translationKey="pages.product.see_all" fallback="See all →" /></Link></div><ProductGrid products={related} /></section>}
     </SiteFrame>

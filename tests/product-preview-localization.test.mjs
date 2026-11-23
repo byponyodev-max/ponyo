@@ -45,6 +45,7 @@ function loadProductsRoute({ apiBase = "", translations = async () => ({}) } = {
 			}
 			if (id === "@/services/product.service") return productService;
 			if (id === "@/services/ponyo-api.client") return { PONYO_API_BASE_URL: apiBase };
+			if (id === "@/lib/product-categories") return { PRODUCT_CATEGORY_DEFINITIONS: [] };
 			if (id === "@/services/preview-product-translations") return translationCatalog;
 			if (id === "@/services/app-translations.server") {
 				return {
@@ -60,6 +61,7 @@ function loadProductsRoute({ apiBase = "", translations = async () => ({}) } = {
 	const route = compile("../src/app/api/products/route.ts", {
 		exports: {},
 		URL,
+		URLSearchParams,
 		require: (id) => {
 			if (id === "next/server") {
 				return {
@@ -156,6 +158,20 @@ test("reviewed Japanese and Korean preview translations cover every catalog fiel
 		);
 		assert.equal(cachedProduct.description, service.translationCatalog.reviewedPreviewTranslations[locale]["haneul-bunny"].description);
 		assert.ok(providerCalls > 0, "the mocked provider should handle cache misses");
+	}
+});
+
+test("the products API searches localized Japanese and Korean product text", async () => {
+	const service = loadProductsRoute();
+
+	for (const [locale, query] of [["ja", "うさぎ"], ["ko", "토끼"]]) {
+		const params = new URLSearchParams({ locale, q: query, limit: "100" });
+		const response = await service.GET(new Request(`http://localhost/api/products?${params}`));
+		const payload = await response.json();
+
+		assert.equal(response.status, 200);
+		assert.ok(payload.data.length > 0, `expected localized results for ${locale}`);
+		assert.ok(payload.data.every((product) => `${product.name} ${product.description} ${product.categoryName}`.includes(query)));
 	}
 });
 

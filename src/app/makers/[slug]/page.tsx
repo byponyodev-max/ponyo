@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { LocalizedText } from "@/components/layout/localization-provider";
-import { ProductGrid } from "@/components/product/product-grid";
+import { MakerProfileCollection } from "@/components/makers/maker-profile-collection";
 import { getLocalizedProducts } from "@/services/localized-products.server";
 import { PONYO_API_BASE_URL, ApiRequestError, ApiNotConfiguredError, ponyoApi } from "@/services/ponyo-api.client";
+import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -50,25 +50,69 @@ export default async function MakerProfilePage({ params }: { params: Promise<{ s
 
   const { maker, products } = profileData;
   const makerMaterials = [...new Set(products.map((product) => product.materials?.trim()).filter((material): material is string => Boolean(material)))];
+  const makerInitial = maker.name.trim().charAt(0).toUpperCase() || "P";
   return <SiteFrame className="store-page maker-profile-page">
-    <section className="maker-profile-hero store-container">
-      <div className="maker-profile-portrait">
-        {maker.profileImageUrl
-          ? <Image src={maker.profileImageUrl} alt={`${maker.name} maker profile`} width={560} height={560} unoptimized />
-          : <span aria-label={`${maker.name} profile visual`}>{maker.name.slice(0, 1).toUpperCase()}<i aria-hidden="true">✦</i></span>}
+    <section className="maker-profile-hero">
+      <div className="maker-profile-visual">
+        <div className="maker-profile-portrait">
+          <span className="maker-profile-monogram" aria-label={`${maker.name} maker mark`}>{makerInitial}<i aria-hidden="true">✦</i></span>
+        </div>
+        <span className="maker-profile-jellyfish maker-profile-jellyfish--silver" aria-hidden="true"><JellyfishArtwork id="maker-profile-silver" tone="silver" direction={1} /></span>
+        <span className="maker-profile-jellyfish maker-profile-jellyfish--gold" aria-hidden="true"><JellyfishArtwork id="maker-profile-gold" tone="gold" direction={-1} /></span>
+        <span className="maker-profile-sparkle maker-profile-sparkle--one" aria-hidden="true">✦</span>
+        <span className="maker-profile-sparkle maker-profile-sparkle--two" aria-hidden="true">✧</span>
+        <span className="maker-profile-seal" aria-hidden="true"><LocalizedText translationKey="maker.profile.seal" fallback="MADE WITH CARE" /></span>
       </div>
-      <div className="maker-profile-copy"><p className="eyebrow"><LocalizedText translationKey="maker.profile.eyebrow" fallback="PONYO MAKER PROFILE" /></p><h1>{maker.name}</h1>{maker.location && <p className="maker-profile-location">{maker.location}</p>}<p>{maker.story || <LocalizedText translationKey="maker.profile.story_missing" fallback="This maker has not provided a story for publication yet." />}</p><a href="#maker-collection-title"><LocalizedText translationKey="maker.profile.collection_cta" fallback="Browse this maker’s collection" /> <span aria-hidden="true">↓</span></a>{maker.website && <a href={maker.website} target="_blank" rel="noreferrer noopener"><LocalizedText translationKey="maker.profile.website_cta" fallback="Maker website" /> <span aria-hidden="true">↗</span></a>}</div>
-      <span className="maker-profile-seal" aria-hidden="true"><LocalizedText translationKey="maker.profile.seal" fallback="MADE WITH CARE" /></span>
+      <div className="maker-profile-copy">
+        <p className="eyebrow"><LocalizedText translationKey="maker.profile.eyebrow" fallback="PONYO MAKER PROFILE" /></p>
+        <h1>{maker.name}</h1>
+        {maker.location && <p className="maker-profile-location"><span aria-hidden="true">✦</span>{maker.location}</p>}
+        <p>{maker.story || <LocalizedText translationKey="maker.profile.story_missing" fallback="This maker has not provided a story for publication yet." />}</p>
+        <div className="maker-profile-stats">
+          <span><strong>{String(products.length).padStart(2, "0")}</strong><small><LocalizedText translationKey={products.length === 1 ? "maker.profile.collection.piece_one" : "maker.profile.collection.piece_other"} fallback={products.length === 1 ? "piece" : "pieces"} /></small></span>
+          <span><strong>{String(maker.specialties.length).padStart(2, "0")}</strong><small><LocalizedText translationKey="maker.profile.specialties.label" fallback="Specialties" /></small></span>
+        </div>
+        <div className="maker-profile-actions">
+          <a className="maker-profile-collection-cta" href="#maker-collection-title"><LocalizedText translationKey="maker.profile.collection_cta" fallback="Browse this maker’s collection" /> <span aria-hidden="true">↓</span></a>
+          {maker.website && <a className="maker-profile-website" href={maker.website} target="_blank" rel="noreferrer noopener"><LocalizedText translationKey="maker.profile.website_cta" fallback="Maker website" /> <span aria-hidden="true">↗</span></a>}
+        </div>
+      </div>
     </section>
     <section className="maker-profile-details store-container">
-      <article><p className="eyebrow"><LocalizedText translationKey="maker.profile.philosophy.label" fallback="PHILOSOPHY" /></p><h2><LocalizedText translationKey="maker.profile.philosophy.title" fallback="What guides their work" /></h2><p>{maker.philosophy || <LocalizedText translationKey="maker.profile.philosophy.missing" fallback="Maker philosophy has not been provided yet." />}</p></article>
-      <article><p className="eyebrow"><LocalizedText translationKey="maker.profile.process.label" fallback="CRAFTSMANSHIP" /></p><h2><LocalizedText translationKey="maker.profile.process.title" fallback="From idea to plush" /></h2><p>{maker.process || <LocalizedText translationKey="maker.profile.process.missing" fallback="Making process details have not been provided yet." />}</p></article>
-      <article><p className="eyebrow"><LocalizedText translationKey="maker.profile.materials.label" fallback="MATERIALS" /></p><h2><LocalizedText translationKey="maker.profile.materials.title" fallback="Materials in their collection" /></h2>{makerMaterials.length ? <ul>{makerMaterials.map((material) => <li key={material}>{material}</li>)}</ul> : <p><LocalizedText translationKey="maker.profile.materials.missing" fallback="Material details have not been provided for this maker’s products yet." /></p>}</article>
-      <article><p className="eyebrow"><LocalizedText translationKey="maker.profile.specialties.label" fallback="SPECIALTIES" /></p><h2><LocalizedText translationKey="maker.profile.specialties.title" fallback="What they make" /></h2>{maker.specialties.length ? <ul>{maker.specialties.map((item) => <li key={item}>{item}</li>)}</ul> : <p><LocalizedText translationKey="maker.profile.specialties.missing" fallback="Product specialties have not been provided yet." /></p>}</article>
+      <article>
+        <span className="maker-profile-detail-number" aria-hidden="true">01</span>
+        <p className="eyebrow"><LocalizedText translationKey="maker.profile.philosophy.label" fallback="PHILOSOPHY" /></p>
+        <h2><LocalizedText translationKey="maker.profile.philosophy.title" fallback="What guides their work" /></h2>
+        <p>{maker.philosophy || <LocalizedText translationKey="maker.profile.philosophy.missing" fallback="Maker philosophy has not been provided yet." />}</p>
+      </article>
+      <article>
+        <span className="maker-profile-detail-number" aria-hidden="true">02</span>
+        <p className="eyebrow"><LocalizedText translationKey="maker.profile.process.label" fallback="CRAFTSMANSHIP" /></p>
+        <h2><LocalizedText translationKey="maker.profile.process.title" fallback="From idea to plush" /></h2>
+        <p>{maker.process || <LocalizedText translationKey="maker.profile.process.missing" fallback="Making process details have not been provided yet." />}</p>
+      </article>
+      <article>
+        <span className="maker-profile-detail-number" aria-hidden="true">03</span>
+        <p className="eyebrow"><LocalizedText translationKey="maker.profile.materials.label" fallback="MATERIALS" /></p>
+        <h2><LocalizedText translationKey="maker.profile.materials.title" fallback="Materials in their collection" /></h2>
+        {makerMaterials.length
+          ? <ul>{makerMaterials.map((material) => <li key={material}>{material}</li>)}</ul>
+          : <p><LocalizedText translationKey="maker.profile.materials.missing" fallback="Material details have not been provided for this maker’s products yet." /></p>}
+      </article>
+      <article>
+        <span className="maker-profile-detail-number" aria-hidden="true">04</span>
+        <p className="eyebrow"><LocalizedText translationKey="maker.profile.specialties.label" fallback="SPECIALTIES" /></p>
+        <h2><LocalizedText translationKey="maker.profile.specialties.title" fallback="What they make" /></h2>
+        {maker.specialties.length
+          ? <ul>{maker.specialties.map((item) => <li key={item}>{item}</li>)}</ul>
+          : <p><LocalizedText translationKey="maker.profile.specialties.missing" fallback="Product specialties have not been provided yet." /></p>}
+      </article>
     </section>
-    <section className="maker-profile-collection store-container" aria-labelledby="maker-collection-title">
-      <header><div><p className="eyebrow"><LocalizedText translationKey="maker.profile.collection.eyebrow" fallback="FOUND ON PONYO" /></p><h2 id="maker-collection-title"><LocalizedText translationKey="maker.profile.collection.title" fallback="Their collection" /></h2></div><span>{products.length} <LocalizedText translationKey={products.length === 1 ? "maker.profile.collection.piece_one" : "maker.profile.collection.piece_other"} fallback={products.length === 1 ? "piece" : "pieces"} /></span></header>
-      {products.length ? <ProductGrid products={products} /> : <p className="maker-profile-empty"><LocalizedText translationKey="maker.profile.collection.empty" fallback="This maker has no published products in the Ponyo catalog yet." /></p>}
-    </section>
+    {products.length
+      ? <MakerProfileCollection products={products} />
+      : <section className="maker-profile-collection store-container" aria-labelledby="maker-collection-title">
+        <header><div><p className="eyebrow"><LocalizedText translationKey="maker.profile.collection.eyebrow" fallback="FOUND ON PONYO" /></p><h2 id="maker-collection-title"><LocalizedText translationKey="maker.profile.collection.title" fallback="Their collection" /></h2></div></header>
+        <p className="maker-profile-empty"><LocalizedText translationKey="maker.profile.collection.empty" fallback="This maker has no published products in the Ponyo catalog yet." /></p>
+      </section>}
   </SiteFrame>;
 }

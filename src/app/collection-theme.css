@@ -1044,7 +1044,7 @@
 
 .collections-featured-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 15px;
 }
 
@@ -1350,6 +1350,11 @@
         padding: 13px;
         border-radius: 15px;
     }
+    .collections-feature-card:last-child:nth-child(odd) {
+        width: calc(50% - 5px);
+        grid-column: 1 / -1;
+        justify-self: center;
+    }
     .collections-feature-copy>strong {
         font-size: 16px;
     }
@@ -1413,7 +1418,7 @@
 
 @media (min-width: 768px) and (max-width: 1023px) {
     .collections-featured-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
     }
     .collections-feature-card {
@@ -1476,6 +1481,537 @@
     .collection-page .collection-layout {
         grid-template-columns: 248px minmax(0, 1fr);
         gap: 38px;
+    }
+}
+
+.collection-page .collection-heading {
+    min-height: 340px;
+    border: 1px solid rgb(169 132 75 / 48%);
+    border-radius: 30px 14px 30px 14px;
+    box-shadow: inset 0 0 0 5px rgb(255 255 255 / 35%), inset 0 0 0 6px rgb(169 132 75 / 18%), 0 24px 58px rgb(54 37 25 / 16%);
+}
+
+.collection-heading-eyebrow {
+    width: fit-content;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #80602e;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .24em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.collection-heading-eyebrow>span {
+    color: #bc934d;
+    font-size: 16px;
+}
+
+.collection-heading-image {
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.collection-heading-image img {
+    filter: saturate(.88) contrast(1.02);
+    transition: transform .7s cubic-bezier(.2, .75, .2, 1), filter .4s ease;
+}
+
+.collection-heading:hover .collection-heading-image img {
+    filter: saturate(1);
+    transform: scale(1.035);
+}
+
+.collection-heading-image::before {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(90deg, rgb(55 38 26 / 10%), transparent 44%), linear-gradient(0deg, rgb(39 26 19 / 20%), transparent 58%);
+    content: "";
+    pointer-events: none;
+}
+
+.collection-heading-image-stamp {
+    width: 82px;
+    height: 82px;
+    position: absolute;
+    z-index: 2;
+    right: 24px;
+    bottom: 24px;
+    border: 1px solid rgb(246 226 183 / 76%);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgb(49 34 25 / 76%);
+    box-shadow: 0 8px 24px rgb(28 17 10 / 25%), inset 0 0 0 4px rgb(246 226 183 / 13%);
+    color: #f5e5c4;
+    text-align: center;
+    transform: rotate(7deg);
+}
+
+.collection-heading-image-stamp>span {
+    color: #d7b574;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.collection-heading-image-stamp strong {
+    margin-top: 3px;
+    font-family: var(--font-display, Georgia, serif);
+    font-size: 11px;
+    letter-spacing: .13em;
+}
+
+.collection-heading-image-stamp small {
+    margin-top: 2px;
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+}
+
+.collection-page .collection-heading-copy {
+    position: relative;
+    z-index: 1;
+    padding: clamp(32px, 4vw, 58px);
+}
+
+.collection-page .collection-heading h1 {
+    width: fit-content;
+    max-width: 100%;
+    position: relative;
+    padding-bottom: 15px;
+    font-family: var(--font-display, Georgia, serif);
+    font-size: clamp(42px, 4.7vw, 66px);
+    font-weight: 600;
+    letter-spacing: -.045em;
+    line-height: 1.02;
+}
+
+.collection-page .collection-heading h1::after {
+    width: 56px;
+    height: 2px;
+    position: absolute;
+    bottom: 0;
+    left: 2px;
+    background: linear-gradient(90deg, #a87b38, #e1c47d, transparent);
+    content: "";
+}
+
+.collection-page .collection-heading-copy>p {
+    max-width: 42ch;
+    color: #725b49;
+    font-size: 14px;
+    line-height: 1.75;
+}
+
+.collection-page .collection-tone-cushions,
+.collection-page .collection-tone-designer-cushions,
+.collection-page .collection-tone-character-pillows {
+    background:
+        radial-gradient(ellipse at 9% 0, rgb(255 255 255 / 74%), transparent 42%),
+        linear-gradient(120deg, #f5ecdf, #eadbc6 58%, #d7bea0) !important;
+    color: #4a3530;
+}
+
+.collection-page .collection-tone-soft-furniture,
+.collection-page .collection-tone-chairs,
+.collection-page .collection-tone-seating {
+    background:
+        radial-gradient(ellipse at 12% 0, rgb(255 255 255 / 66%), transparent 44%),
+        linear-gradient(120deg, #e9e4d4, #d6cfb7 60%, #bdb493) !important;
+    color: #493328;
+}
+
+.collection-page .collection-tone-beds,
+.collection-page .collection-tone-new-arrivals,
+.collection-page .collection-tone-new-arrival {
+    background:
+        radial-gradient(ellipse at 12% 0, rgb(255 255 255 / 70%), transparent 44%),
+        linear-gradient(120deg, #f2e3cc, #e4cba7 60%, #d0ad7b) !important;
+    color: #493328;
+}
+
+.collection-page .collection-tone-wall-decor,
+.collection-page .collection-tone-collectible-plush,
+.collection-page .collection-tone-collectibles {
+    background:
+        radial-gradient(ellipse at 12% 0, rgb(255 255 255 / 14%), transparent 44%),
+        linear-gradient(120deg, #5c4c3a, #46382c 60%, #30251d) !important;
+    color: #fff4e3;
+}
+
+.collection-page .collection-tone-oversized,
+.collection-page .collection-tone-giant-plush,
+.collection-page .collection-tone-oversized-soft-objects,
+.collection-page .collection-tone-domina-xl {
+    background:
+        radial-gradient(ellipse at 12% 0, rgb(255 255 255 / 64%), transparent 44%),
+        linear-gradient(120deg, #f5e8cb, #f2dfb6 60%, #e8d4a9) !important;
+    color: #574326;
+}
+
+.collection-page .collection-tone-premium,
+.collection-page .collection-tone-rare {
+    background:
+        radial-gradient(ellipse at 12% 0, rgb(255 255 255 / 58%), transparent 44%),
+        linear-gradient(120deg, #eadcc5, #d9c19a 60%, #c2a170) !important;
+    color: #483526;
+}
+
+.collection-page .collection-tone-rare-finds {
+    background:
+        radial-gradient(ellipse at 12% 0, rgb(213 173 101 / 19%), transparent 44%),
+        linear-gradient(120deg, #4c3a2d, #36271f 60%, #241a15) !important;
+    color: #fff4df;
+}
+
+.collection-page .collection-tone-all {
+    background:
+        radial-gradient(ellipse at 9% 0, rgb(255 255 255 / 78%), transparent 42%),
+        linear-gradient(120deg, #f8f0e2, #eee0c7 58%, #dfc7a6) !important;
+    color: #4a3530;
+}
+
+.collection-page .collection-tone-wall-decor .collection-heading-copy>p,
+.collection-page .collection-tone-collectible-plush .collection-heading-copy>p,
+.collection-page .collection-tone-collectibles .collection-heading-copy>p,
+.collection-page .collection-tone-rare-finds .collection-heading-copy>p {
+    color: #eee0c7;
+    opacity: .88;
+}
+
+.collection-page .collection-tone-wall-decor .collection-heading-eyebrow,
+.collection-page .collection-tone-collectible-plush .collection-heading-eyebrow,
+.collection-page .collection-tone-collectibles .collection-heading-eyebrow,
+.collection-page .collection-tone-rare-finds .collection-heading-eyebrow {
+    color: #e6ca8c;
+}
+
+.collection-page .collection-tone-plush-toys,
+.collection-page .collection-tone-character-plush,
+.collection-page .collection-tone-bears,
+.collection-page .collection-tone-bunnies,
+.collection-page .collection-tone-cats,
+.collection-page .collection-tone-characters,
+.collection-page .collection-tone-pandas,
+.collection-page .collection-tone-penguins,
+.collection-page .collection-tone-puppies,
+.collection-page .collection-tone-trending {
+    background:
+        radial-gradient(ellipse at 12% 0, rgb(255 255 255 / 72%), transparent 44%),
+        linear-gradient(120deg, #f2e7dc, #eadbce 60%, #e2d1c5) !important;
+    color: #4a3530;
+}
+
+@media (max-width: 767px) {
+    .collection-page .collection-heading {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 178px;
+        border-radius: 24px 12px 24px 12px;
+        box-shadow: inset 0 0 0 4px rgb(255 255 255 / 34%), inset 0 0 0 5px rgb(169 132 75 / 22%), 0 14px 34px rgb(54 37 25 / 14%);
+    }
+
+    .collection-page .collection-heading-copy {
+        padding: 25px 22px 20px;
+    }
+
+    .collection-heading-eyebrow {
+        margin-bottom: 12px;
+        font-size: 9px;
+    }
+
+    .collection-page .collection-heading h1 {
+        padding-bottom: 12px;
+        font-size: clamp(34px, 8.6vw, 43px);
+    }
+
+    .collection-page .collection-heading-copy>p {
+        max-width: 36ch;
+        margin-top: 9px;
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .collection-page .collection-heading-image {
+        min-height: 0;
+        grid-column: 1;
+        grid-row: 2;
+        display: block;
+    }
+
+    .collection-page .collection-heading-image::after {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(0deg, rgb(46 33 29 / 18%), transparent 48%);
+        content: "";
+        pointer-events: none;
+    }
+
+    .collection-page .collection-heading-image img {
+        object-position: center 54%;
+    }
+
+    .collection-heading-image-stamp {
+        width: 66px;
+        height: 66px;
+        right: 14px;
+        bottom: 14px;
+    }
+
+    .collection-heading-image-stamp strong {
+        font-size: 9px;
+    }
+
+    .collection-heading-image-stamp small {
+        font-size: 6px;
+    }
+
+    .collection-page .collection-heading .collection-size-chips>span {
+        border: 1px solid #d5bd8a;
+        background: rgb(255 251 242 / 82%);
+        color: #5a4536;
+        box-shadow: inset 0 1px 0 #fff;
+    }
+
+    .collection-page .collection-heading .collection-size-chips a {
+        border-color: #9c793a;
+        background: rgb(255 250 237 / 45%);
+        color: inherit;
+    }
+
+    .collection-page .collection-heading .collection-size-chips a.is-selected {
+        border-color: #493126;
+        background: #493126;
+        color: #fff4df;
+    }
+}
+
+.faq-page {
+    --faq-ink: #fff6e8;
+    --faq-muted: #ddc9bb;
+    --faq-line: rgb(224 194 142 / 28%);
+    --faq-peach: #4a172b;
+    --faq-teal: #4a172b;
+    --faq-lilac: #35131f;
+    background:
+        radial-gradient(ellipse at 4% 32%, rgb(167 94 58 / 14%), transparent 31%),
+        radial-gradient(ellipse at 96% 76%, rgb(194 147 74 / 9%), transparent 32%),
+        #1c100e;
+    color: #fff6e8;
+}
+
+.faq-page .faq-page-header {
+    background:
+        radial-gradient(ellipse at 78% 18%, rgb(222 186 112 / 14%), transparent 29%),
+        radial-gradient(ellipse at 18% 100%, rgb(117 47 56 / 38%), transparent 42%),
+        linear-gradient(118deg, #24110f 0%, #4a172b 53%, #2a1019 100%);
+    box-shadow: inset 0 -1px 0 rgb(222 186 112 / 48%), inset 0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.faq-page .faq-page-header::before,
+.faq-page .faq-page-header::after {
+    border-color: rgb(222 186 112 / 36%);
+}
+
+.faq-page .faq-eyebrow,
+.faq-page .faq-topic-kicker,
+.faq-page .faq-topic-nav-icon,
+.faq-page .faq-nav-arrow,
+.faq-page .faq-art-spark--two,
+.faq-page .faq-topic--shipping .faq-topic-icon,
+.faq-page .shipping-step-number,
+.faq-page .shipping-journey-connector {
+    color: #e4c47f;
+}
+
+.faq-page .faq-eyebrow>span,
+.faq-page .faq-art-spark {
+    color: #f0d99d;
+}
+
+.faq-page .faq-page-header h1,
+.faq-page .faq-service-notes strong,
+.faq-page .faq-topic h2,
+.faq-page .faq-topic summary,
+.faq-page .faq-topic summary .faq-question-text,
+.faq-page .shipping-journey article strong,
+.faq-page .faq-size-table th,
+.faq-page .faq-size-table td,
+.faq-page .faq-contact-cta h2 {
+    color: #fff6e8;
+}
+
+.faq-page .faq-page-header h1 {
+    text-shadow: 0 0 32px rgb(222 186 112 / 18%);
+}
+
+.faq-page .faq-title-mark,
+.faq-page .faq-topic-nav-icon,
+.faq-page .faq-art-icon,
+.faq-page .faq-service-notes article>span,
+.faq-page .faq-service-notes article:nth-child(2)>span,
+.faq-page .faq-service-notes article:nth-child(3)>span,
+.faq-page .faq-topic-icon,
+.faq-page .faq-topic--shipping .faq-topic-icon,
+.faq-page .faq-topic--sizes .faq-topic-icon,
+.faq-page .faq-topic--care .faq-topic-icon,
+.faq-page .faq-topic--help .faq-topic-icon,
+.faq-page .faq-question-count,
+.faq-page .faq-topic summary .faq-toggle,
+.faq-page .faq-topic details[open] summary .faq-toggle,
+.faq-page .shipping-step-icon {
+    border-color: rgb(224 194 142 / 64%);
+    background: linear-gradient(145deg, #f7e9c5, #d8b66b 62%, #b47d3e);
+    color: #3a1c17;
+    box-shadow: 0 5px 16px rgb(17 7 5 / 24%);
+}
+
+.faq-page .faq-page-header>.faq-hero-copy>p,
+.faq-page .faq-service-notes small,
+.faq-page .faq-topic details p,
+.faq-page .shipping-journey article small,
+.faq-page .faq-contact-cta p {
+    color: #ddc9bb;
+}
+
+.faq-page .faq-page-header nav a,
+.faq-page .faq-art-caption {
+    border-color: rgb(224 194 142 / 32%);
+    background: linear-gradient(135deg, rgb(81 39 36 / 94%), rgb(39 21 18 / 96%));
+    color: #fff6e8;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 7%);
+}
+
+.faq-page .faq-page-header nav a:hover {
+    border-color: #e4c47f;
+    background: linear-gradient(135deg, #70403b, #4a172b);
+    box-shadow: 0 8px 22px rgb(17 7 5 / 32%), 0 0 18px rgb(194 147 74 / 13%);
+}
+
+.faq-page .faq-art-orbit {
+    border-color: rgb(224 194 142 / 52%);
+    box-shadow: 0 0 28px rgb(194 147 74 / 12%);
+}
+
+.faq-page .faq-art-orbit--two {
+    border-color: rgb(190 125 103 / 46%);
+}
+
+.faq-page .faq-art-icon {
+    box-shadow: 0 0 26px rgb(194 147 74 / 22%), 0 12px 30px rgb(5 8 17 / 35%);
+}
+
+.faq-page .faq-jellyfish {
+    filter: drop-shadow(0 0 18px rgb(194 147 74 / 18%)) drop-shadow(0 14px 22px rgb(4 7 15 / 35%));
+}
+
+.faq-page .faq-jellyfish--gold {
+    top: 4%;
+    right: 0;
+}
+
+.faq-page .faq-jellyfish--gold-secondary {
+    bottom: 1%;
+    left: -3%;
+    width: clamp(132px, 14vw, 190px);
+    animation-delay: -3.4s;
+    animation-duration: 8.5s;
+}
+
+.faq-page .faq-service-notes article,
+.faq-page .shipping-journey article {
+    border-color: rgb(224 194 142 / 24%);
+    background: linear-gradient(135deg, #4a3029, #2d1b18);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%), 0 11px 26px rgb(4 7 15 / 25%);
+}
+
+.faq-page .faq-topic {
+    border-color: rgb(224 194 142 / 32%);
+    background: linear-gradient(145deg, #5a2430 0%, #351621 100%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%), 0 14px 36px rgb(4 7 15 / 30%);
+}
+
+.faq-page .faq-topic:hover {
+    border-color: rgb(228 196 127 / 66%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 7%), 0 17px 38px rgb(4 7 15 / 38%), 0 0 24px rgb(154 105 64 / 12%);
+}
+
+.faq-page .faq-question-count {
+    color: #3a1c17;
+}
+
+.faq-page .faq-topic details,
+.faq-page .faq-topic details[open] {
+    border-color: rgb(224 194 142 / 20%);
+    background: linear-gradient(135deg, #39211d, #241614);
+}
+
+.faq-page .faq-topic details:hover,
+.faq-page .faq-topic details[open] {
+    border-color: rgb(228 196 127 / 56%);
+    background: linear-gradient(135deg, #4a2828, #351923);
+    box-shadow: 0 8px 22px rgb(4 7 15 / 25%);
+}
+
+.faq-page .faq-topic details[open] summary .faq-question-text {
+    color: #f0d99d;
+}
+
+.faq-page .shipping-journey {
+    border-color: rgb(224 194 142 / 34%);
+    background:
+        radial-gradient(ellipse at 95% 0%, rgb(194 147 74 / 10%), transparent 33%),
+        linear-gradient(120deg, #4a3029, #2d1b18 55%, #351621);
+}
+
+.faq-page .faq-size-table {
+    border-color: rgb(224 194 142 / 30%);
+    background: #2d1b18;
+}
+
+.faq-page .faq-size-table tr+tr {
+    border-color: rgb(224 194 142 / 20%);
+}
+
+.faq-page .faq-contact-cta {
+    border-color: rgb(224 194 142 / 42%);
+    background:
+        radial-gradient(ellipse at 90% 10%, rgb(194 147 74 / 12%), transparent 30%),
+        linear-gradient(120deg, #4a172b, #2d1b18 58%, #351621);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%), 0 16px 38px rgb(4 7 15 / 32%);
+}
+
+.faq-page .faq-contact-cta::before {
+    border-color: rgb(224 194 142 / 34%);
+}
+
+.faq-page .faq-contact-cta .shop-button {
+    border: 1px solid #e4c47f;
+    background: linear-gradient(145deg, #f1dda5, #bd9353);
+    color: #351322;
+    box-shadow: 0 0 22px rgb(191 160 91 / 17%), 0 8px 20px rgb(4 7 15 / 30%);
+}
+
+.faq-page :focus-visible {
+    outline-color: #e4c47f;
+}
+
+@media (max-width: 760px) {
+    .faq-page .faq-jellyfish--gold {
+        top: -9%;
+        right: 3%;
+    }
+
+    .faq-page .faq-jellyfish--gold-secondary {
+        bottom: -7%;
+        left: 2%;
+        width: 118px;
     }
 }
 
@@ -1819,5 +2355,67 @@
     }
     .sort-menu-options {
         animation: none;
+    }
+}
+
+.collection-page .collection-sidebar-details>summary {
+    margin: 0;
+    padding: 1px 5px 12px;
+    border-bottom: 1px solid #f0e2d9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #493126;
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 400;
+    cursor: pointer;
+    list-style: none;
+}
+
+.collection-page .collection-sidebar-details>summary::-webkit-details-marker {
+    display: none;
+}
+
+.collection-page .collection-sidebar-details>summary::before {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    flex: 0 0 9px;
+    background: #ed8a4c;
+    box-shadow: 0 0 0 4px #fbe9dc;
+    content: "";
+    transform: rotate(45deg);
+}
+
+.collection-page .collection-sidebar-details>summary::after {
+    color: #9c5d42;
+    content: "−";
+    font-family: var(--font-nunito), sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.collection-page .collection-sidebar-details:not([open])>summary::after {
+    content: "+";
+}
+
+.collection-page .collection-sidebar-content {
+    padding-top: 12px;
+}
+
+@media (min-width: 1024px) {
+    .collection-page .collection-layout:has(> .collection-sidebar .collection-sidebar-details:not([open])) {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .collection-page .collection-layout:has(> .collection-sidebar .collection-sidebar-details:not([open]))>.collection-sidebar {
+        grid-column: 1;
+    }
+
+    .collection-page .collection-layout:has(> .collection-sidebar .collection-sidebar-details:not([open])) .product-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 }

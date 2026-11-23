@@ -79,7 +79,7 @@ function DesktopCollectiblesMenu() {
 
 const ticker = [
   { text: "NEW: DOMINA GIANT PLUSH UP TO 120 CM", key: "home.announce_2", href: "/pages/domina-xl" },
-  { text: "JOIN RARE DROP ALERTS AND BE FIRST TO KNOW", key: "home.announce_3", href: "/#drops" },
+  { text: "JOIN RARE DROP ALERTS AND BE FIRST TO KNOW", key: "home.announce_3", href: "/rare-alerts" },
   { text: "RARE & LIMITED PLUSH, HAND-PICKED FOR YOU", key: "home.announce_4", href: "/collections/all" },
 ];
 

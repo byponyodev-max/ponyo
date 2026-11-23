@@ -1,6 +1,7 @@
 """Development seed catalog keeps categories populated and sample photos distinct."""
 
 from app.seed import PRODUCT_COLORS, PRODUCTS, PRODUCT_STATUSES
+from app.media import storefront_image_url
 from app.product_categories import PRODUCT_CATEGORY_DEFINITIONS, product_category_slug
 from pathlib import Path
 
@@ -16,23 +17,20 @@ from app.security import verify_password
 from app.translations import get_product_translation, source_hash
 
 
-def test_catalog_has_twenty_three_unique_products_and_ten_lineup_images():
-    assert len(PRODUCTS) == 23
+def test_catalog_has_thirty_seven_unique_products_and_excludes_lineup_images():
+    assert len(PRODUCTS) == 37
     slugs = {product["slug"] for product in PRODUCTS}
-    assert len(slugs) == 23
+    assert len(slugs) == 37
     assert set(PRODUCT_COLORS) == slugs
     assert set(PRODUCT_STATUSES) == slugs
-    lineup = [product for product in PRODUCTS if "/catalog/lineup/" in product["image"]]
-    assert len(lineup) == 10
-    assert len({product["image"] for product in lineup}) == 10
+    assert all("/catalog/lineup/" not in product["image"] for product in PRODUCTS)
     public = Path(__file__).resolve().parents[2] / "public"
-    for product in lineup:
-        assert "demo" in product["tags"]
-        assert product["alt"]
-        assert (public / product["image"].lstrip("/")).is_file()
-        assert PRODUCT_STATUSES[product["slug"]] == "Available"
+    assert (public / "images/catalog/lineup/mochi-cloud.png").is_file()
     assert len({product["image"] for product in PRODUCTS}) == len(PRODUCTS)
     assert all((public / product["image"].lstrip("/")).is_file() for product in PRODUCTS)
+    resolved_images = [storefront_image_url(product["image"]) for product in PRODUCTS]
+    assert len(set(resolved_images)) == len(PRODUCTS)
+    assert all((public / image.lstrip("/")).is_file() for image in resolved_images)
 
 
 def test_demo_products_cover_all_root_categories():
@@ -49,6 +47,35 @@ def test_demo_products_cover_all_root_categories():
         category = definitions[category_slug]
         roots.add(category.parent_slug or category.slug)
     assert roots == {"plush-toys", "oversized", "cushions", "soft-furniture", "wall-decor"}
+
+
+@pytest.mark.asyncio
+async def test_seed_unpublishes_existing_demo_products_from_lineup_images(monkeypatch, tmp_path):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'lineup-seed.db'}")
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    monkeypatch.setattr(seed, "SessionLocal", sessions)
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as db:
+            db.add(Product(
+                slug="legacy-lineup-product",
+                name="Legacy lineup product",
+                price_amount=10000,
+                image_url="/images/catalog/lineup/mochi-cloud.png",
+                tags=["demo"],
+                is_demo=True,
+                published=True,
+            ))
+            await db.commit()
+        await seed.seed_products()
+        async with sessions() as db:
+            product = await db.scalar(select(Product).where(Product.slug == "legacy-lineup-product"))
+            assert product is not None
+            assert product.published is False
+            assert product.image_url == "/images/catalog/lineup/mochi-cloud.png"
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -89,7 +116,7 @@ async def test_seed_products_is_idempotent_without_replenishing_stock(monkeypatc
             await connection.run_sync(Base.metadata.create_all)
         await seed.seed_products()
         async with sessions() as db:
-            product = await db.scalar(select(Product).where(Product.slug == "mochi-cloud"))
+            product = await db.scalar(select(Product).where(Product.slug == "sleepy-miso-cat"))
             assert product.reservations_open is True
             assert product.reservation_target == 50
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id))
@@ -105,6 +132,7 @@ async def test_seed_products_is_idempotent_without_replenishing_stock(monkeypatc
             bad_translation.provider = "libretranslate"
             product.reservations_open = False
             product.reservation_target = 40
+            product.is_demo = False
             xl_product = await db.scalar(select(Product).where(Product.slug == "hoshi-cloud-bear-xl"))
             xl_image = await db.scalar(select(ProductImage).where(
                 ProductImage.product_id == xl_product.id,
@@ -115,14 +143,16 @@ async def test_seed_products_is_idempotent_without_replenishing_stock(monkeypatc
         await seed.seed_products()
         async with sessions() as db:
             for model in (Product, ProductVariant, ProductImage, SupplierOffer, SupplierInventory):
-                assert await db.scalar(select(func.count()).select_from(model)) == 23
-            assert await db.scalar(select(func.count()).select_from(ProductTranslation)) == 46
-            product = await db.scalar(select(Product).where(Product.slug == "mochi-cloud").options(
+                assert await db.scalar(select(func.count()).select_from(model)) == 37
+            assert await db.scalar(select(func.count()).select_from(ProductTranslation)) == 74
+            assert await db.scalar(select(func.count()).select_from(Product).where(Product.is_demo.is_(True))) == 37
+            product = await db.scalar(select(Product).where(Product.slug == "sleepy-miso-cat").options(
                 selectinload(Product.variants), selectinload(Product.category),
                 selectinload(Product.brand), selectinload(Product.images),
             ))
             assert product.reservations_open is False
             assert product.reservation_target == 40
+            assert product.is_demo is True
             assert product.materials == "Polyester plush; polyester fiber fill; embroidered details."
             xl_product = await db.scalar(select(Product).where(Product.slug == "hoshi-cloud-bear-xl"))
             xl_image = await db.scalar(select(ProductImage).where(
@@ -135,7 +165,8 @@ async def test_seed_products_is_idempotent_without_replenishing_stock(monkeypatc
             assert product.estimated_delivery_date.isoformat() == "2027-01-15"
             assert product.only_at_ponyo is True
             assert product.brand.is_demo is True
-            assert product.brand.maker_story.startswith("A fictional studio profile")
+            assert "fictional" not in product.brand.maker_story.lower()
+            assert "demo catalog" not in product.brand.maker_story.lower()
             variant = await db.scalar(select(ProductVariant).where(ProductVariant.product_id == product.id))
             assert variant.stock_quantity == 5
             offer = await db.scalar(select(SupplierOffer).where(SupplierOffer.variant_id == variant.id))
@@ -146,8 +177,8 @@ async def test_seed_products_is_idempotent_without_replenishing_stock(monkeypatc
                 lambda *_args: pytest.fail("Demo product cache must not call LibreTranslate."),
             )
             for locale, expected_name, expected_category, expected_variant_title in (
-                ("ja", "もち雲", "キャラクターぬいぐるみ", "通常版"),
-                ("ko", "모찌 구름", "캐릭터 인형", "기본형"),
+                ("ja", "すやすやミソねこ", "コレクションぬいぐるみ", "通常版"),
+                ("ko", "졸린 미소 고양이", "수집용 인형", "기본형"),
             ):
                 translation = await get_product_translation(product, locale, db)
                 assert translation.name == expected_name

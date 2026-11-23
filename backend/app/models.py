@@ -209,6 +209,7 @@ class Product(Base):
     production_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     preorder_invites_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reservation_target_missed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), index=True)
     published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     checkout_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

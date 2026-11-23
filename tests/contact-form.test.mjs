@@ -380,6 +380,22 @@ test("contact card has accessible fields, stable topics, limits and decorative i
 	);
 });
 
+test("contact page uses polished studio styling for information and form panels", () => {
+	const styles = readFileSync(
+		new URL("../src/app/theme-parity-polish.css", import.meta.url),
+		"utf8",
+	);
+	assert.match(styles, /\.contact-page--studio \.contact-studio-intro/);
+	assert.match(styles, /\.contact-page--studio \.contact-form-card/);
+	assert.match(styles, /\.contact-page--studio \.contact-channel-card/);
+	assert.match(styles, /contact-form-card::before/);
+	assert.match(styles, /contact-care-art::after/);
+	assert.match(styles, /contact-cloud-float/);
+	assert.match(styles, /\.contact-page--studio \.contact-care-scene::before/);
+	assert.match(styles, /\.contact-page--studio \.contact-hero \{/);
+	assert.match(styles, /\.contact-page--studio \.contact-channel-grid \{/);
+});
+
 test("Ponyo topic dropdown supports keyboard selection and required validation", async () => {
 	const form = harness();
 	const closed = form.render();

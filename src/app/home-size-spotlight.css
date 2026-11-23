@@ -1,5 +1,46 @@
 /* Premium size-guide campaign and XL spotlight. */
 
+.domina-band {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.domina-band-intro {
+    width: min(calc(100% - 48px), 780px);
+    margin: 0 auto -2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(10px, 2vw, 22px);
+    color: #744b43;
+    font-family: var(--font-heading), serif;
+    font-size: clamp(20px, 3vw, 34px);
+    font-style: italic;
+    font-weight: 700;
+    letter-spacing: -.025em;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.domina-band-intro span {
+    flex: 0 0 auto;
+    color: #ca9d62;
+    font-family: Georgia, serif;
+    font-size: .55em;
+    font-style: normal;
+}
+
+.domina-band-copy {
+    position: relative;
+    z-index: 3;
+}
+
+.domina-band>figure {
+    position: relative;
+    z-index: 1;
+}
+
 .store-home .rare-spotlight>header,
 .store-home .coming-soon-shelf .section-head {
     position: relative;
@@ -42,7 +83,7 @@
 
 .store-home .size-guide {
     padding-top: 78px;
-    padding-bottom: 82px;
+    padding-bottom: 36px;
 }
 
 .store-home .size-guide header {

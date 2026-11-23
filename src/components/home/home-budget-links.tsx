@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { LocalizedText, useLocalization } from "@/components/layout/localization-provider";
-import { formatCountryBudget, getCountryBudgetProfile } from "@/lib/budget-by-country";
+import { formatCurrencyBudget, getCurrencyBudgetProfile } from "@/lib/budget-by-currency";
 
 export function HomeBudgetLinks() {
-	const { country } = useLocalization();
-	const budget = getCountryBudgetProfile(country);
-	const format = (amount: number) => formatCountryBudget(country, amount);
-	const filter = budget.filterJPY;
+	const { currency } = useLocalization();
+	const budget = getCurrencyBudgetProfile(currency);
+	const format = (amount: number) => formatCurrencyBudget(currency, amount);
+	const filter = budget.catalogPriceJPY;
 
 	return (
 		<div className="budget-links">

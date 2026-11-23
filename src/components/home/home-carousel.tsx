@@ -35,7 +35,18 @@ const newArrivalsSlide: HomeCarouselSlide = {
   description: "Fresh finds from new brands and makers.",
   action: "See what is new",
   href: "/collections/new-arrivals",
-  image: "/images/home-hero/plush-room-hd.png",
+  image: "/images/home-hero/ponyo-hero-dream-room.webp",
+  imageAlt: "",
+};
+
+const xlSlide: HomeCarouselSlide = {
+  key: "xl",
+  kicker: "DOMINA BY PONYO",
+  title: "XL Goodies",
+  description: "Big plush that fills a room, including Domina.",
+  action: "Shop XL Plush",
+  href: "/pages/domina-xl",
+  image: "/images/home-hero/ponyo-hero-castle-dream.webp",
   imageAlt: "",
 };
 
@@ -53,6 +64,7 @@ export function HomeCarousel({ categories }: { categories: HomeCarouselCategory[
       imageAlt: category.imageAlt,
     })),
     newArrivalsSlide,
+    xlSlide,
   ];
   const trackRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef(0);
@@ -63,6 +75,7 @@ export function HomeCarousel({ categories }: { categories: HomeCarouselCategory[
 
   const copyKeys: Record<string, { kicker: string; title: string; description: string; action: string }> = {
     new: { kicker: "home.slides.new_eyebrow", title: "home.pillars.new_title", description: "home.pillars.new_body", action: "home.slides.new_cta" },
+    xl: { kicker: "home.slides.xl_eyebrow", title: "home.pillars.xl_title", description: "home.pillars.xl_body", action: "home.slides.xl_cta" },
   };
 
   const markActive = useCallback(() => {

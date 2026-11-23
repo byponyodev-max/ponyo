@@ -35,7 +35,7 @@ const footerGroups = [
     title: "Support",
     links: [
       ["home.footer.faq", "FAQ & Shipping", "/pages/faq"],
-      ["home.footer.drops", "Rare drop alerts", "/#drops"],
+      ["home.footer.drops", "Rare drop alerts", "/rare-alerts"],
       ["home.footer.contact", "Contact Us", "/pages/contact"],
     ],
   },

@@ -7,9 +7,51 @@
     flex-direction: column;
 }
 
+.store-main .product-grid {
+    grid-auto-rows: 1fr;
+    align-items: stretch;
+}
+
+.store-main .product-grid.marketplace-rail {
+    align-items: stretch;
+}
+
 .store-main .product-card-item>.shop-product-card {
     height: auto;
     flex: 1 0 auto;
+}
+
+.store-main .product-card-item>.shop-product-card .shop-product-title {
+    height: 1.3em;
+    min-height: 1.3em;
+    max-height: 1.3em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    font-size: clamp(13px, 1.05vw, 15px);
+    line-height: 1.3;
+}
+
+.store-main .product-card-item>.shop-product-card .shop-product-meta {
+    height: 1.3em;
+    min-height: 1.3em;
+    max-height: 1.3em;
+    overflow: hidden;
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.store-main .product-card-item>.shop-product-card .shop-product-shipping-status {
+    height: 1.4em;
+    min-height: 1.4em;
+    max-height: 1.4em;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .store-main .product-card-item>.product-card-action-wrap {
@@ -22,8 +64,9 @@
 
 .store-main .product-card-item>.product-card-action-wrap .product-card-action {
     width: 100%;
+    height: 52px;
     min-height: 52px;
-    padding: 8px 4px;
+    padding: 4px 40px 4px 12px;
     position: relative;
     overflow: hidden;
     border: 1px solid #d3b269;
@@ -35,13 +78,13 @@
     background: linear-gradient(135deg, #fffefa, #f8edda 48%, #fffaf0);
     box-shadow: inset 0 1px 0 #fff, 0 2px 0 #e8dcc5, 0 5px 12px rgb(82 55 38 / 8%);
     color: #573b31;
-    font-size: clamp(16px, 1.15vw, 19px);
+    font-size: clamp(13px, .95vw, 16px);
     font-weight: 850;
     letter-spacing: .005em;
     line-height: 1.15;
     text-align: center;
     text-transform: none;
-    white-space: nowrap;
+    white-space: normal;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
@@ -53,14 +96,22 @@
 }
 
 .store-main .product-card-item>.product-card-action-wrap .product-card-action-label {
-    display: block;
+    min-width: 0;
+    flex: 0 1 auto;
+    display: -webkit-box;
     text-align: center;
+    overflow-wrap: anywhere;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 .store-main .product-card-item>.product-card-action-wrap .product-card-action-icon {
     width: 27px;
     height: 27px;
-    position: relative;
+    position: absolute;
+    top: 50%;
+    right: 9px;
     display: grid;
     flex: 0 0 27px;
     place-items: center;
@@ -69,6 +120,7 @@
     background: linear-gradient(145deg, #fffefa, #f1e2c4);
     box-shadow: inset 0 1px 0 #fff, 0 1px 4px rgb(129 92 42 / 14%);
     color: #93662e;
+    transform: translateY(-50%);
 }
 
 .store-main .product-card-item>.product-card-action-wrap .product-card-action-icon.is-email {

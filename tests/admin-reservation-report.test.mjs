@@ -8,6 +8,8 @@ const source = readFileSync(new URL("../src/lib/admin-reservation-report.ts", im
 const adminPage = readFileSync(new URL("../src/app/admin-portal/page.tsx", import.meta.url), "utf8");
 const productPurchasePanel = readFileSync(new URL("../src/components/product/product-purchase-panel.tsx", import.meta.url), "utf8");
 const productCommunity = readFileSync(new URL("../src/components/product/product-community.tsx", import.meta.url), "utf8");
+const productDetailStyles = readFileSync(new URL("../src/app/maker-reservation.css", import.meta.url), "utf8");
+const productDetailPage = readFileSync(new URL("../src/app/products/[id]/page.tsx", import.meta.url), "utf8");
 const apiClient = readFileSync(new URL("../src/services/ponyo-api.client.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -71,11 +73,37 @@ test("admin product rows expose each product's shipping confirmation state and r
 
 test("available destinations reserve while other destinations register separate interest", () => {
   assert.match(productPurchasePanel, /shippingStatus === "deliverable"[\s\S]*product\.reservationsOpen[\s\S]*href="#product-reservation"[\s\S]*href="#product-interest"/);
+  const productCardAction = readFileSync(new URL("../src/components/product/product-card-action.tsx", import.meta.url), "utf8");
+  assert.match(productCardAction, /href=\{`\/products\/\$\{encodeURIComponent\(product\.id\)\}#\$\{target\}`\}/);
   assert.match(productCommunity, /shippingStatus === "deliverable"[\s\S]*<ProductReservationPanel[\s\S]*<ProductInterestPanel/);
+  assert.match(productCommunity, /window\.location\.hash !== `#\$\{targetId\}`[\s\S]*target\.scrollIntoView/);
+  assert.match(productCommunity, /id="product-interest"[^>]*tabIndex=\{-1\}/);
   assert.match(apiClient, /submitProductReservation:[\s\S]*\/products\/\$\{encodeURIComponent\(productId\)\}\/reservations/);
   assert.match(apiClient, /submitProductInterest:[\s\S]*\/products\/\$\{encodeURIComponent\(productId\)\}\/interests/);
   assert.match(productCommunity, /product\.reservation\.title", "Reserve a spot"/);
   assert.match(productCommunity, /product\.interest\.body",[\s\S]*separate from reserving an available item/);
+});
+
+test("product detail layout has refined desktop spacing and compact mobile panels", () => {
+  assert.match(productDetailStyles, /\.product-page \.product-detail-layout \{[^}]*grid-template-columns: minmax\(0, 1\.08fr\) minmax\(390px, \.84fr\)/);
+  assert.match(productDetailStyles, /\.product-page \.product-detail-copy \{[^}]*border-top: 3px solid #c6a24f/);
+  assert.match(productDetailStyles, /@media \(max-width: 767px\) \{[\s\S]*?\.product-page \.product-detail-copy \{[^}]*width: calc\(100% - 24px\)/);
+  assert.match(productDetailStyles, /@media \(max-width: 767px\) \{[\s\S]*?\.product-page \.product-reservation \{[^}]*scroll-margin-top: 88px/);
+  assert.match(productDetailStyles, /\.product-proof-in-gallery \.product-proof-fact--story \{[^}]*grid-column: 1 \/ -1/);
+  assert.match(productDetailStyles, /\.product-page \.product-add-button,[\s\S]*?border: 1px solid #e7c56e;[\s\S]*?border-radius: 999px/);
+  assert.match(productDetailStyles, /\.product-page \.product-details-accordion dl \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(productDetailStyles, /@media \(max-width: 767px\) \{[\s\S]*?\.product-page \.product-details-accordion dl \{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*border-top: 1px solid #d6b458/);
+  assert.match(productDetailStyles, /@media \(max-width: 767px\) \{[\s\S]*?\.product-page \.product-details-accordion dl div \{[^}]*border: 0;[^}]*border-bottom: 1px solid rgb\(198 162 79 \/ 42%\);[^}]*border-radius: 0/);
+  assert.match(productDetailPage, /JellyfishArtwork id="product-maker-silver" tone="silver"/);
+  assert.match(productDetailPage, /JellyfishArtwork id="product-maker-gold" tone="gold"/);
+  assert.match(productDetailStyles, /@keyframes product-exclusive-glow/);
+  assert.match(productDetailStyles, /@keyframes product-jellyfish-float/);
+  assert.match(productDetailStyles, /\.product-page \.product-brand-story \{[^}]*grid-template-columns: 58px minmax\(0, 1fr\) auto/);
+  assert.match(productDetailStyles, /\.product-page \.product-brand-story-actions \{[^}]*display: flex/);
+  assert.match(productDetailStyles, /\.product-page \.product-brand-story-copy > p:not\(\.eyebrow\) \{[^}]*-webkit-line-clamp: 3/);
+  assert.match(productDetailStyles, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.product-brand-story-jellyfish,[\s\S]*?animation: none;/);
+  assert.doesNotMatch(productDetailPage, /product-gallery-jellyfish/);
+  assert.match(productPurchasePanel, /<details><summary>\{t\("product\.details\.title"/);
 });
 
 test("storefront keeps reservation progress without showing the target status message", () => {

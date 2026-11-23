@@ -12,6 +12,7 @@ import { SortSelect } from "@/components/product/sort-select";
 import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
 import { PonyoSelect } from "@/components/ui/ponyo-select";
 import { getLocalizedProducts } from "@/services/localized-products.server";
+import { isDominaXLProduct } from "@/lib/product-categories";
 import locale from "@/locales/en.default.json";
 
 const faq = locale.pg.faq;
@@ -137,7 +138,7 @@ async function AboutPage() {
 }
 
 function FaqPage() {
-  return <div className="store-container faq-page">
+  return <div className="faq-page">
     <header className="faq-page-header">
       <div className="faq-hero-copy">
         <span className="faq-eyebrow"><span aria-hidden="true">✦</span> <PageCopy id="faq.hero_eyebrow" fallback="THE PONYO HELP STUDIO" /></span>
@@ -150,12 +151,15 @@ function FaqPage() {
         <span className="faq-art-orbit faq-art-orbit--two" />
         <span className="faq-art-spark faq-art-spark--one">✦</span>
         <span className="faq-art-spark faq-art-spark--two">✧</span>
+        <span className="faq-art-centerpiece"><JellyfishArtwork id="faq-hero-center" tone="gold" direction={1} /></span>
         <span className="faq-art-icon"><FaqIcon name="help" /></span>
-        <Image src="/ponyo-jellyfish.svg" alt="" width={102} height={102} priority />
+        <span className="faq-jellyfish faq-jellyfish--gold"><JellyfishArtwork id="faq-hero-gold" tone="gold" direction={1} /></span>
+        <span className="faq-jellyfish faq-jellyfish--gold-secondary"><JellyfishArtwork id="faq-hero-gold-secondary" tone="gold" direction={-1} /></span>
         <span className="faq-art-caption"><PageCopy id="faq.hero_art" fallback="A little help, a lot of heart." /></span>
       </div>
     </header>
-    <div className="faq-service-notes" aria-labelledby="faq-service-label">
+    <div className="faq-page-content store-container">
+      <div className="faq-service-notes" aria-labelledby="faq-service-label">
       <PageCopy as="span" id="faq.service_aria" fallback="Helpful shopping information" className="sr-only" htmlId="faq-service-label" />
       <article><span aria-hidden="true"><FaqIcon name="package" /></span><div><strong><PageCopy id="faq.packing" fallback="Thoughtful packing" /></strong><small><PageCopy as="span" id="faq.packing_body" fallback="Every plush is prepared with care." /></small></div></article>
       <article><span aria-hidden="true"><FaqIcon name="pin" /></span><div><strong><PageCopy id="faq.delivery" fallback="Delivery, your way" /></strong><small><PageCopy as="span" id="faq.delivery_body" fallback="Options appear for your address at checkout." /></small></div></article>
@@ -175,6 +179,7 @@ function FaqPage() {
       {group.id === "sizes" && <div className="faq-size-table"><table><caption className="sr-only"><PageCopy as="span" id="faq.size_ranges" fallback="Ponyo plush size ranges" /></caption><tbody>{sizeRows.map(([key, name, range]) => <tr key={key}><th scope="row"><PageCopy id={key === "giant" ? "domina.size_domina_giant" : `domina.size_${key}`} fallback={name} /></th><td><PageCopy id={`domina.range_${key}`} fallback={range} /></td></tr>)}</tbody></table></div>}
     </section>)}</div>
     <section className="faq-contact-cta"><h2><PageCopy id="faq.contact_title" fallback={faq.contact_title} /></h2><p><PageCopy as="span" id="faq.contact_body" fallback={faq.contact_body} /></p><Link className="shop-button shop-button-orange" href="/pages/contact"><PageCopy id="faq.contact_cta" fallback={faq.contact_cta} /></Link></section>
+    </div>
   </div>;
 }
 
@@ -208,6 +213,7 @@ async function ContactPage() {
           <a className="contact-hero-button contact-hero-button--quiet" href="#contact-form"><LocalizedText translationKey="contact.hero_message" fallback="Send us a note" /> <span aria-hidden="true">↗</span></a>
         </div>
       </div>
+      <span className="contact-wind-vortex contact-wind-vortex--hero" aria-hidden="true"><i /><i /><i /></span>
       <span className="contact-hero-seal" aria-hidden="true">PONYO <span>♡</span> CARE</span>
     </section>
 
@@ -247,6 +253,19 @@ async function ContactPage() {
       </div>
     </section>
 
+    <div className="contact-promo-ribbon" aria-hidden="true">
+      <div className="contact-promo-track">
+        {Array.from({ length: 2 }, (_, index) => <span className="contact-promo-group" key={index}>
+          <span><LocalizedText translationKey="contact.care_eyebrow" fallback="A LITTLE PONYO POSTCARD" /></span>
+          <i>✦</i>
+          <span><LocalizedText translationKey="contact.channels_eyebrow" fallback="HERE WHEN YOU NEED US" /></span>
+          <i>✧</i>
+          <span><LocalizedText translationKey="contact.team" fallback="Real people. Thoughtful help." /></span>
+          <i>✦</i>
+        </span>)}
+      </div>
+    </div>
+
     <div className="contact-studio-layout">
       <section className="contact-studio-intro" aria-labelledby="contact-intro-title">
         <span className="contact-studio-eyebrow"><span aria-hidden="true">✦</span> <LocalizedText translationKey="contact.eyebrow" fallback="A LITTLE HELP, A LOT OF HEART" /></span>
@@ -274,6 +293,8 @@ async function ContactPage() {
         <div className="contact-care-art" aria-hidden="true">
           <span className="contact-care-star contact-care-star--one">✦</span>
           <span className="contact-care-star contact-care-star--two">✧</span>
+          <span className="contact-care-star contact-care-star--three">✦</span>
+          <span className="contact-care-star contact-care-star--four">✧</span>
           <span className="contact-care-orbit" />
           <div className="contact-care-jellyfish contact-care-jellyfish--friend"><Image src="/ponyo-jellyfish.svg" alt="" width={126} height={126} /></div>
           <div className="contact-care-jellyfish contact-care-jellyfish--main"><Image src="/ponyo-jellyfish.svg" alt="" width={214} height={214} /></div>
@@ -282,7 +303,7 @@ async function ContactPage() {
           <span className="contact-care-note"><PageCopy id="contact.care_note" fallback="always here to listen" /> <span>♡</span></span>
         </div>
       </div>
-    </section>
+      </section>
   </div>;
 }
 
@@ -323,7 +344,7 @@ async function DominaPage({ searchParams }: { searchParams: Promise<Query> }) {
   const size = firstQueryValue(query.size) ?? "";
   const availability = firstQueryValue(query["filter.v.availability"]) ?? "";
   const sort = firstQueryValue(query.sort_by) ?? "featured";
-  const allProducts = (await getLocalizedProducts()).filter((product) => product.tags?.includes("domina-xl"));
+  const allProducts = (await getLocalizedProducts("limit=100")).filter(isDominaXLProduct);
   const products = allProducts.filter((product) => {
     const productSize = (product.sizeTier ?? product.size ?? "").toLowerCase();
     const sizeMatches = !size || productSize.startsWith(size.toLowerCase());
@@ -347,6 +368,7 @@ async function DominaPage({ searchParams }: { searchParams: Promise<Query> }) {
   };
   return <div className="domina-page">
     <section className="domina-page-hero">
+      <div className="domina-hero-glints" aria-hidden="true">{Array.from({ length: 8 }, (_, index) => <span key={index}>✧</span>)}</div>
       <div className="domina-page-hero-copy">
         <span className="domina-hero-kicker"><span aria-hidden="true">✦</span> <PageCopy id="domina.hero_eyebrow" fallback="PONYO SIGNATURE COLLECTION" /> <span aria-hidden="true">✦</span></span>
         <h1><PageCopy as="span" id="domina.title" fallback="Domina XL" /></h1>
@@ -356,16 +378,16 @@ async function DominaPage({ searchParams }: { searchParams: Promise<Query> }) {
       </div>
       <div className="domina-hero-seal" role="img" aria-labelledby="domina-seal-label"><PageCopy as="span" id="domina.seal_aria" fallback="Ponyo Signature XL edition" className="sr-only" htmlId="domina-seal-label" /><span>THE PONYO</span><strong>XL</strong><span>SIGNATURE EDITION</span></div>
       <div className="domina-hero-media"><Image src="/images/catalog/ponyo-3.png" alt={t("pages.domina.image_alt")} fill priority sizes="(max-width: 767px) 100vw, 60vw" /></div>
-      <span className="domina-jellyfish domina-jellyfish--hero" aria-hidden="true"><JellyfishArtwork id="domina-hero-silver" tone="silver" direction={1} /></span>
+      <span className="domina-jellyfish domina-jellyfish--hero" aria-hidden="true"><JellyfishArtwork id="domina-hero-gold" tone="gold" direction={1} /></span>
     </section>
     <section className="domina-trust store-container" aria-labelledby="domina-details-label"><PageCopy as="span" id="domina.details_aria" fallback="Domina XL details" className="sr-only" htmlId="domina-details-label" />{[["scale", "↕", "See the scale", "Every listing shows its full height, so you can picture it at home."], ["details", "♡", "Product details", "Clear size, materials and care details on every plush."], ["compare", "¥", "Compare prices", "Compare prices in your currency before checkout."], ["delivery", "↗", "Delivery info", "See XL delivery options and estimates for your destination."]].map(([key, icon, title, text]) => <article key={key}><span>{icon}</span><h2><PageCopy as="span" id={`domina.${key}_title`} fallback={title} /></h2><p><PageCopy as="span" id={`domina.${key}_body`} fallback={text} /></p></article>)}</section>
     <section className="store-container domina-products" id="domina-products">
       <header className="domina-products-heading">
-        <svg className="domina-cloud-frame" viewBox="0 0 800 300" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M65 290C28 290 8 268 8 231C8 199 22 179 43 170C27 122 67 83 115 99C118 43 177 20 221 52C251 5 321 3 359 46C408 14 466 22 491 61C539 22 605 42 619 91C672 62 728 94 729 144C772 142 792 175 792 217C792 264 768 290 725 290Z" fill="#fffdf8" stroke="#ddc17b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>
+        <svg className="domina-editorial-frame" viewBox="0 0 800 300" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M28 10H772Q790 10 790 28V272Q790 290 772 290H28Q10 290 10 272V28Q10 10 28 10Z" fill="#2b1b15" stroke="#c9a65f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>
         <div><p className="eyebrow"><PageCopy id="domina.catalog_eyebrow" fallback="THE PONYO XL EDITION" /></p><h2><PageCopy as="span" id="domina.catalog_title" fallback="XL Goodies" /></h2></div>
         <p><PageCopy as="span" id="domina.catalog_body" fallback="Extra-large plush, chosen for their extra-large place in your heart." /></p>
         <span className="domina-jellyfish domina-jellyfish--gold" aria-hidden="true"><JellyfishArtwork id="domina-catalog-gold" tone="gold" direction={-1} /></span>
-        <span className="domina-jellyfish domina-jellyfish--silver" aria-hidden="true"><JellyfishArtwork id="domina-catalog-silver" tone="silver" direction={1} /></span>
+        <span className="domina-jellyfish domina-jellyfish--silver" aria-hidden="true"><JellyfishArtwork id="domina-catalog-pearl" tone="gold" direction={1} /></span>
       </header>
       <div className="domina-catalog-toolbar">
         <form className="domina-catalog-filters" action="/pages/domina-xl" method="get" aria-labelledby="domina-filter-label">
@@ -394,7 +416,7 @@ async function DominaPage({ searchParams }: { searchParams: Promise<Query> }) {
           <SortSelect action="/pages/domina-xl" value={sort} category="" search="" preservedFilters={preservedFilters} options={localizedSortOptions} />
         </div>
       </div>
-      <ProductGrid products={products}/>
+      <ProductGrid products={products} fillSlots={products.length > 0} fillColumns={[2, 3, 4, 4]} promoCount={2} />
       {products.length === 0 && <p className="empty-collection"><PageCopy as="span" id="domina.no_matches" fallback="No plush matches those filters." /> <Link href="/pages/domina-xl"><PageCopy id="domina.clear_filters" fallback="Clear filters" /></Link></p>}
     </section>
   </div>;

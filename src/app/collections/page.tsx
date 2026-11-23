@@ -4,14 +4,18 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { ProductGrid } from "@/components/product/product-grid";
-import { getLocalizedProducts } from "@/services/localized-products.server";
+import { getLocalizedProducts, getProductCategories } from "@/services/localized-products.server";
+import { orderProductCategories, PRODUCT_CATEGORY_ROOT_SLUGS, productCategoryTranslationKey } from "@/lib/product-categories";
+import type { ProductCategory } from "@/services/ponyo-api.client";
 import type { Product } from "@/types/product";
 
-const featuredCollections = [
-	{ titleKey: "static.collections.feature.premium.title", slug: "premium", tag: "premium", eyebrowKey: "static.collections.feature.premium.eyebrow", descriptionKey: "static.collections.feature.premium.body", tone: "premium", fallback: "/images/catalog/ponyo-5.png" },
-	{ titleKey: "static.collections.feature.xl.title", slug: "domina-xl", tag: "domina-xl", eyebrowKey: "static.collections.feature.xl.eyebrow", descriptionKey: "static.collections.feature.xl.body", tone: "xl", fallback: "/images/catalog/ponyo-3.png" },
-	{ titleKey: "static.collections.feature.new.title", slug: "new-arrivals", tag: "new-arrival", eyebrowKey: "static.collections.feature.new.eyebrow", descriptionKey: "static.collections.feature.new.body", tone: "new", fallback: "/images/catalog/ponyo-6.png" },
-] as const;
+const categoryFallbackImages: Record<string, string> = {
+	"plush-toys": "/images/categories/plush-toys.png",
+	oversized: "/images/categories/oversized.png",
+	cushions: "/images/categories/cushions.png",
+	"soft-furniture": "/images/categories/soft-furniture.png",
+	"wall-decor": "/images/categories/wall-decor.png",
+};
 
 const animalCollections = [
 	{ titleKey: "static.collections.animal.bears", slug: "bears", tag: "bear", fallback: "/images/catalog/maker-bear.jpg" },
@@ -27,6 +31,17 @@ function productsForTag(products: Product[], tag: string) {
 	return products.filter((product) => product.tags?.some((item) => item.toLowerCase() === tag) || product.categoryName.toLowerCase() === tag);
 }
 
+function productsForCategory(products: Product[], category: ProductCategory, categories: ProductCategory[]) {
+	const children = categories.filter((item) => item.parentId === category.id);
+	const childIds = new Set(children.map((item) => item.id));
+	return products.filter((product) =>
+		product.categoryId === category.id
+		|| (product.categoryId != null && childIds.has(product.categoryId))
+		|| product.categorySlug === category.slug
+		|| children.some((child) => child.slug === product.categorySlug),
+	);
+}
+
 export async function generateMetadata(): Promise<Metadata> {
 	const t = await getTranslations();
 	return { title: t("static.collections.metadata.title") };
@@ -34,10 +49,44 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CollectionsPage() {
 	const t = await getTranslations();
-	const products = await getLocalizedProducts();
+	const [products, categoryData] = await Promise.all([getLocalizedProducts(), getProductCategories()]);
+	const rootCategorySlugs = new Set<string>(PRODUCT_CATEGORY_ROOT_SLUGS);
+	const categories = orderProductCategories(categoryData).filter((category) =>
+		!category.parentId && rootCategorySlugs.has(category.slug),
+	);
+	const categoryLabel = (category: ProductCategory) => {
+		const key = productCategoryTranslationKey(category.slug);
+		return t.has(key) ? t(key) : category.name;
+	};
 	const heroImages = products.filter((product) => Boolean(product.image)).slice(0, 2);
 	const newArrivals = productsForTag(products, "new-arrival");
 	const featuredProducts = [...newArrivals, ...products.filter((product) => !newArrivals.some((arrival) => arrival.id === product.id))].slice(0, 4);
+	const featuredCards = [
+		...categories.map((category) => {
+			const matching = productsForCategory(products, category, categoryData);
+			const children = categoryData.filter((item) => item.parentId === category.id);
+			return {
+				slug: category.slug,
+				href: `/collections/${category.slug}`,
+				image: categoryFallbackImages[category.slug] ?? matching[0]?.image ?? "/images/catalog/ponyo-5.png",
+				eyebrow: t("static.collections.featured.eyebrow"),
+				title: categoryLabel(category),
+				description: children.length
+					? children.map(categoryLabel).join(" · ")
+					: t.has("home.aisles.wall_decor_sub") ? t("home.aisles.wall_decor_sub") : "Wall art and decor",
+				count: matching.length,
+			};
+		}),
+		{
+			slug: "new-arrivals",
+			href: "/collections/new-arrivals",
+			image: newArrivals[0]?.image ?? "/images/catalog/strawberry-mushroom-plush.webp",
+			eyebrow: t("static.collections.feature.new.eyebrow"),
+			title: t("static.collections.feature.new.title"),
+			description: t("static.collections.feature.new.body"),
+			count: newArrivals.length,
+		},
+	];
 	return (
 		<SiteFrame className="store-page collections-landing-page">
 			<div className="collections-landing">
@@ -57,12 +106,11 @@ export default async function CollectionsPage() {
 
 				<section className="collections-featured" aria-labelledby="collections-featured-title">
 					<div className="collections-section-heading"><div><p className="eyebrow">{t("static.collections.featured.eyebrow")}</p><h2 id="collections-featured-title">{t("static.collections.featured.title")}</h2><p>{t("static.collections.featured.body")}</p></div><Link href="/collections/all">{t("static.collections.featured.view_all")} <span aria-hidden="true">→</span></Link></div>
-					<div className="collections-featured-grid">{featuredCollections.map((collection) => {
-						const matching = productsForTag(products, collection.tag);
-						return <Link className={`collections-feature-card collections-feature-card--${collection.tone}`} href={`/collections/${collection.slug}`} key={collection.slug}>
-							<Image src={matching[0]?.image ?? collection.fallback} alt="" fill sizes="(max-width: 767px) 48vw, 25vw" />
+					<div className="collections-featured-grid">{featuredCards.map((collection) => {
+						return <Link className={`collections-feature-card collections-feature-card--${collection.slug}`} href={collection.href} key={collection.slug}>
+							<Image src={collection.image} alt="" fill quality={90} sizes="(max-width: 767px) 48vw, 16vw" />
 							<span className="collections-feature-shade" />
-							<span className="collections-feature-copy"><small>{t(collection.eyebrowKey)}</small><strong>{t(collection.titleKey)}</strong><span>{t(collection.descriptionKey)}</span><b>{t(matching.length === 1 ? "static.collections.count.one" : "static.collections.count.other", { count: matching.length })} <i aria-hidden="true">→</i></b></span>
+							<span className="collections-feature-copy"><small>{collection.eyebrow}</small><strong>{collection.title}</strong><span>{collection.description}</span><b>{t(collection.count === 1 ? "static.collections.count.one" : "static.collections.count.other", { count: collection.count })} <i aria-hidden="true">→</i></b></span>
 						</Link>;
 					})}</div>
 				</section>

@@ -152,3 +152,12 @@ test("changing delivery country applies defaults while manual language and curre
 		["KR", "en", "JPY"],
 	);
 });
+
+test("location modal keeps the sign-in action in markup but hidden during phase zero", () => {
+	const source = readFileSync(
+		new URL("../src/components/layout/delivery-region-banner.tsx", import.meta.url),
+		"utf8",
+	);
+	assert.match(source, /<Link className="delivery-location-signin" href="\/account" hidden>/);
+	assert.match(source, /delivery\.sign_in_addresses/);
+});

@@ -1,3 +1,5 @@
+import type { Product } from "@/types/product";
+
 export type ProductCategoryDefinition = {
   slug: string;
   name: string;
@@ -28,6 +30,20 @@ export const PRODUCT_CATEGORY_ROOT_SLUGS = [
   "soft-furniture",
   "wall-decor",
 ];
+
+export function isDominaXLProduct(
+  product: Pick<Product, "tags" | "sizeTier" | "size" | "productType" | "categoryName">,
+) {
+  const size = (product.sizeTier ?? product.size ?? "").trim().toLowerCase();
+  const productType = (product.productType ?? "").trim().toLowerCase();
+  const categoryName = product.categoryName.trim().toLowerCase();
+
+  return product.tags?.some((tag) => tag.toLowerCase() === "domina-xl")
+    || size.startsWith("xl")
+    || /\bxl\b/.test(productType)
+    || categoryName.includes("giant")
+    || categoryName.includes("oversized");
+}
 
 export function productCategoryTranslationKey(slug: string) {
   return `shop.category.${slug.replaceAll("-", "_")}`;

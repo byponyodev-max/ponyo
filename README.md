@@ -22,7 +22,7 @@ Optional backend connection: start the local backend from [backend/README.md](ba
 - `/admin-portal` — role-protected marketplace operations for products, shipping destinations, reservations/interests, orders, and admin accounts.
 - `/cart`, `/checkout`, and `/wishlist` — browser-local interaction previews; configured checkout redirects to the backend-provided hosted payment session.
 - `/blogs/news` — Plush Journal landing page.
-- `/pages/about`, `/pages/faq`, `/pages/contact`, `/pages/domina-xl` — storefront information pages.
+- `/pages/about`, `/pages/faq`, `/pages/contact`, `/pages/domina-xl`, `/rare-alerts` — storefront information and Rare Alerts signup pages.
 
 All UI changes should be compared against the Liquid/theme files in `src/ponyo-shopify`; treat that folder as read-only reference. The FastAPI backend now implements catalog, account/session, order history, checkout session, Stripe webhook, newsletter, and contact APIs. Real fulfillment queues, supplier integrations, email delivery, S3 upload/signing, and production AWS rollout still require configuration and additional work before accepting real payments.
 

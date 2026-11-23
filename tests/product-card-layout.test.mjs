@@ -143,6 +143,23 @@ test("product cards show the current price without sale-price claims", () => {
 	assert.doesNotMatch(cardSource, /<del>|discountPercent|compareAtAmount/);
 });
 
+test("product cards and detail pages do not show redundant Premium or Rare labels", () => {
+	const cardSource = read("../src/components/product/product-card.tsx");
+	const productGrid = read("../src/components/product/product-grid.tsx");
+	const productShelf = read("../src/components/product/product-shelf.tsx");
+	const shopPage = read("../src/app/shop/page.tsx");
+	const animalTabs = read("../src/components/home/animal-tabs.tsx");
+	const purchasePanel = read("../src/components/product/product-purchase-panel.tsx");
+	assert.doesNotMatch(cardSource, /product\.label\.(?:premium|rare)|tags\.includes\("(?:premium|rare)"\)/);
+	assert.doesNotMatch(productGrid, /\bbadges\b|badge=\{/);
+	assert.doesNotMatch(productShelf, /\bbadges\b/);
+	assert.doesNotMatch(shopPage, /shop\.badge\.(?:premium|rare)|const badges/);
+	assert.doesNotMatch(animalTabs, /badges=|["']Rare["']/);
+	assert.doesNotMatch(purchasePanel, /product-rarity|product\.label\.rare/);
+	assert.match(cardSource, /product\.label\.new/);
+	assert.match(cardSource, /product\.label\.xl/);
+});
+
 test("product shelves keep unmapped copy without queuing an empty translation key", () => {
 	const calls = [];
 	const { ProductShelf } = load("../src/components/product/product-shelf.tsx", {

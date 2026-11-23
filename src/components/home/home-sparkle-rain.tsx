@@ -36,12 +36,12 @@ export function HomeSparkleRain() {
     let previousTime = 0;
     let lastDrawTime = 0;
     const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    const particleCount = isMobile ? 86 : 148;
+    const particleCount = isMobile ? 140 : 320;
     const frameInterval = isMobile ? 1000 / 30 : 1000 / 45;
 
     const makeParticle = (fromTop: boolean): Particle => {
       const isStreak = Math.random() < 0.075;
-      const isStar = !isStreak && Math.random() < 0.38;
+      const isStar = !isStreak && Math.random() < 0.62;
       return {
         x: Math.random() * width,
         y: fromTop ? -20 - Math.random() * height * 0.3 : Math.random() * height,
@@ -153,8 +153,11 @@ export function HomeSparkleRain() {
 
     const updateVisibility = () => {
       const marker = document.querySelector<HTMLElement>("[data-sparkle-end]");
-      const end = marker ? marker.getBoundingClientRect().top + window.scrollY : height;
-      const fadeFrom = end * 0.45;
+      const end = marker ? marker.getBoundingClientRect().bottom + window.scrollY : height;
+      const fadeDistance = marker
+        ? Math.min(height * 0.22, Math.max(100, marker.offsetHeight * 0.18))
+        : height * 0.25;
+      const fadeFrom = Math.max(0, end - fadeDistance);
       const scrollY = window.scrollY;
       const opacity = scrollY <= fadeFrom ? 1 : Math.max(0, 1 - (scrollY - fadeFrom) / Math.max(1, end - fadeFrom));
       canvas.style.opacity = String(opacity);

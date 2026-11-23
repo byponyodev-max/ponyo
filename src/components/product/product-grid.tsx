@@ -8,23 +8,24 @@ import { sortProductsByDelivery } from "@/lib/product-shipping";
 
 type ProductGridProps = {
   products: Product[];
-  badges?: Record<string, string>;
   rail?: boolean;
   compact?: boolean;
   fillSlots?: boolean;
   fillColumns?: number[];
   promoOffset?: number;
   promoCount?: number;
+  preserveOrder?: boolean;
+  className?: string;
 };
 
 const collectionPromos = [
-  { key: "drops", href: "/#drops", titleKey: "fill.drops_title", bodyKey: "fill.drops_body", actionKey: "fill.drops_cta", title: "Rare drop alerts", body: "Be first to know when rare plush lands.", action: "Get alerts" },
-  { key: "domina", href: "/pages/domina-xl", titleKey: "fill.domina_title", bodyKey: "fill.domina_body", actionKey: "fill.domina_cta", title: "Think bigger", body: "Giant plush up to 120 cm from Domina XL.", action: "Shop XL Goodies" },
+  { key: "drops", href: "/rare-alerts", titleKey: "fill.drops_title", bodyKey: "fill.drops_body", actionKey: "fill.drops_cta", title: "Rare drop alerts", body: "Be first to know when rare plush lands.", action: "Get alerts" },
   { key: "all", href: "/collections/all", titleKey: "fill.all_title", bodyKey: "fill.all_body", actionKey: "fill.all_cta", title: "More to discover", body: "Browse every plush in the marketplace.", action: "Shop all plush" },
+  { key: "domina", href: "/pages/domina-xl", titleKey: "fill.domina_title", bodyKey: "fill.domina_body", actionKey: "fill.domina_cta", title: "Think bigger", body: "Giant plush up to 120 cm from Domina XL.", action: "Shop XL Goodies" },
   { key: "request", href: "/pages/contact", titleKey: "fill.request_title", bodyKey: "fill.request_body", actionKey: "fill.request_cta", title: "Can't find it?", body: "Tell us the plush you're hunting for and we'll look for it.", action: "Request a plush" },
 ];
 
-export function ProductGrid({ products, badges, rail = false, compact = false, fillSlots = false, fillColumns = [2, 3, 4, 5], promoOffset = 0, promoCount = collectionPromos.length }: ProductGridProps) {
+export function ProductGrid({ products, rail = false, compact = false, fillSlots = false, fillColumns = [2, 3, 4, 5], promoOffset = 0, promoCount = collectionPromos.length, preserveOrder = false, className = "" }: ProductGridProps) {
   const { country, t } = useLocalization();
   if (products.length === 0 && !fillSlots) {
     return <p className="empty-state">{t("static.empty.products", "There are no products to show right now. Please check back soon.")}</p>;
@@ -35,12 +36,12 @@ export function ProductGrid({ products, badges, rail = false, compact = false, f
     : fillColumns.map((columns) => (columns - products.length % columns) % columns);
   const fillCount = fillSlots ? Math.min(promoCount, collectionPromos.length, Math.max(...fillCounts)) : 0;
   const orderedPromos = [...collectionPromos.slice(promoOffset), ...collectionPromos.slice(0, promoOffset)];
-  const sortedProducts = sortProductsByDelivery(products, country);
+  const sortedProducts = preserveOrder ? products : sortProductsByDelivery(products, country);
 
   return (
-    <div className={`product-grid${rail ? " marketplace-rail" : ""}`}>
+    <div className={`product-grid${rail ? " marketplace-rail" : ""}${className ? ` ${className}` : ""}`}>
       {sortedProducts.map((product) => (
-        <ProductCard key={product.id} product={product} badge={badges?.[product.slug]} compact={compact} />
+        <ProductCard key={product.id} product={product} compact={compact} />
       ))}
       {orderedPromos.slice(0, fillCount).map((promo, index) => (
         <Link

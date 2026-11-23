@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { regionName } from "@/lib/localization-options";
 
@@ -65,14 +66,14 @@ export function DeliveryRegionBanner() {
 				</div>
 			</div>}
 
-			{modalOpen && <div className="delivery-location-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalOpen(false); }}>
+			{modalOpen && createPortal(<div className="delivery-location-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalOpen(false); }}>
 				<section className="delivery-location-modal" role="dialog" aria-modal="true" aria-labelledby="delivery-location-title">
 					<header className="delivery-location-heading">
 						<h2 id="delivery-location-title">{t("delivery.choose_country", "Choose your location")}</h2>
 						<button type="button" onClick={() => setModalOpen(false)}>{t("general.done", "Done")}</button>
 					</header>
 					<p className="delivery-location-description">{t("delivery.location_description", "Delivery options and delivery speeds may vary by location.")}</p>
-					<Link className="delivery-location-signin" href="/account">{t("delivery.sign_in_addresses", "Sign in to see your addresses")}</Link>
+					<Link className="delivery-location-signin" href="/account" hidden>{t("delivery.sign_in_addresses", "Sign in to see your addresses")}</Link>
 					<div className="delivery-location-current"><span aria-hidden="true">📍</span><span>{t("delivery.deliver_to", "Deliver to")} <b>{selectedCountry.label}</b></span><span className="delivery-country-flag"><CountryFlag code={selectedCountry.code} /></span></div>
 					<label className="delivery-country-search"><span aria-hidden="true">⌕</span><input type="search" aria-label={t("delivery.search_country", "Search countries")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("delivery.search_country", "Search countries")} /></label>
 					<div className="delivery-country-options" role="listbox" aria-label={t("delivery.available_countries", "Available delivery countries")}>
@@ -86,7 +87,7 @@ export function DeliveryRegionBanner() {
 						{filteredCountries.length === 0 && <p>{t("delivery.no_countries", "No countries found. Try another search.")}</p>}
 					</div>
 				</section>
-			</div>}
+			</div>, document.body)}
 		</section>
 	);
 }

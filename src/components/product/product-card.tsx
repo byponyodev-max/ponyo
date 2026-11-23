@@ -10,7 +10,7 @@ import { ProductCardAction } from "@/components/product/product-card-action";
 import type { Product } from "@/types/product";
 
 
-export function ProductCard({ product, badge, compact = false }: { product: Product; badge?: string; compact?: boolean }) {
+export function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
   const { country, formatPrice, language, t } = useLocalization();
   const productName = t(`product.names.${product.slug}`, product.name);
   const tags = product.tags ?? [];
@@ -38,11 +38,8 @@ export function ProductCard({ product, badge, compact = false }: { product: Prod
       : t("product.shipping.unconfirmed", "Shipping destinations not confirmed");
 
   const labels = [...new Set([
-    ...(badge ? [badge] : []),
     ...(statusLabel ? [statusLabel] : []),
     ...(isNew ? [t("product.label.new", "New")] : []),
-    ...(tags.includes("premium") ? [t("product.label.premium", "Premium")] : []),
-    ...(tags.includes("rare") ? [t("product.label.rare", "Rare")] : []),
     ...(isXl ? [t("product.label.xl", "XL")] : []),
   ])];
 
@@ -57,9 +54,8 @@ export function ProductCard({ product, badge, compact = false }: { product: Prod
           </div>
         </div>
         <div className="shop-product-info">
-          <span className="shop-product-title">{productName}</span>
+          <span className="shop-product-title" title={productName}>{productName}</span>
           <div className="shop-product-meta"><span>{categoryLabel}</span></div>
-          {statusLabel && <p className="shop-product-availability">{statusLabel}</p>}
           <p className={`shop-product-shipping-status is-${shippingStatus}`}>{shippingLabel}</p>
           <div className="shop-product-bottom">
             <strong className="shop-product-prices">

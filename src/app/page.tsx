@@ -3,15 +3,15 @@ import Link from "next/link";
 import { SiteFrame } from "@/components/layout/site-frame";
 import { HomeCarousel } from "@/components/home/home-carousel";
 import { HomeSparkleRain } from "@/components/home/home-sparkle-rain";
-import { AnimalTabs } from "@/components/home/animal-tabs";
 import { JellyfishArtwork } from "@/components/home/jellyfish-artwork";
+import { AnimalTabs } from "@/components/home/animal-tabs";
 import { ProductShelf } from "@/components/product/product-shelf";
 import { HomeBudgetLinks } from "@/components/home/home-budget-links";
 import { getLocalizedProducts, getProductCategories } from "@/services/localized-products.server";
 import { LocalizedPrice, LocalizedText } from "@/components/layout/localization-provider";
 import { getTranslations } from "next-intl/server";
 import type { Product } from "@/types/product";
-import { orderProductCategories, PRODUCT_CATEGORY_ROOT_SLUGS, productCategoryTranslationKey } from "@/lib/product-categories";
+import { isDominaXLProduct, orderProductCategories, PRODUCT_CATEGORY_ROOT_SLUGS, productCategoryTranslationKey } from "@/lib/product-categories";
 import type { ProductCategory } from "@/services/ponyo-api.client";
 import locale from "@/locales/en.default.json";
 
@@ -19,7 +19,7 @@ const categoryImages: Record<string, { card: string; hero: string }> = {
   "plush-toys": { card: "/images/categories/plush-toys.png", hero: "/images/home-hero/plush-room-hd.png" },
   oversized: { card: "/images/categories/oversized.png", hero: "/images/home-hero/oversized-room-hd.png" },
   cushions: { card: "/images/categories/cushions.png", hero: "/images/home-hero/decor-room-hd.png" },
-  "soft-furniture": { card: "/images/categories/soft-furniture.png", hero: "/images/home-hero/plush-room-hd.png" },
+  "soft-furniture": { card: "/images/categories/soft-furniture.png", hero: "/images/home-hero/soft-furniture-hero.png" },
   "wall-decor": { card: "/images/categories/wall-decor.png", hero: "/images/home-hero/decor-room-hd.png" },
 };
 
@@ -70,7 +70,7 @@ function AisleCard({ title, description, href, products }: { title: string; desc
 
 export default async function Home() {
   const t = await getTranslations();
-  const [products, categoryData] = await Promise.all([getLocalizedProducts(), getProductCategories()]);
+  const [products, categoryData] = await Promise.all([getLocalizedProducts("limit=100"), getProductCategories()]);
   const productCategories = orderProductCategories(categoryData);
   const categoryLabel = (category: ProductCategory) => {
     const key = productCategoryTranslationKey(category.slug);
@@ -79,7 +79,7 @@ export default async function Home() {
   const parentCategories = PRODUCT_CATEGORY_ROOT_SLUGS
     .map((slug) => productCategories.find((category) => category.slug === slug && !category.parentId))
     .filter((category): category is ProductCategory => Boolean(category));
-  const domina = byTag(products, "domina-xl", 6);
+  const domina = products.filter(isDominaXLProduct).slice(0, 6);
   const premium = byTag(products, "premium", 10);
   const arrivals = byTag(products, "new-arrival", 10);
   const allTrending = products.filter((product) => !product.tags?.includes("new-arrival")).slice(0, 12);
@@ -114,7 +114,9 @@ export default async function Home() {
       <HomeSparkleRain />
       <HomeCarousel categories={aisles} />
 
-      <section className="home-marketplace-intro" aria-labelledby="home-hero-heading">
+      <section className="home-marketplace-intro" aria-labelledby="home-hero-heading" data-sparkle-end>
+        <span className="home-marketplace-jellyfish home-marketplace-jellyfish--left" aria-hidden="true"><JellyfishArtwork id="marketplace-jellyfish-left" tone="blue" direction={-1} /></span>
+        <span className="home-marketplace-jellyfish home-marketplace-jellyfish--right" aria-hidden="true"><JellyfishArtwork id="marketplace-jellyfish-right" tone="gold" direction={1} /></span>
         <span className="home-marketplace-eyebrow"><LocalizedText translationKey="home.marketplace.hero_eyebrow" fallback={locale.mp.hero_eyebrow} /></span>
         <h1 id="home-hero-heading"><LocalizedText as="span" translationKey="home.marketplace.hero_heading" fallback={locale.mp.hero_heading} /> <span><LocalizedText translationKey="home.marketplace.hero_heading_accent" fallback={locale.mp.hero_heading_accent} /></span></h1>
         <p><LocalizedText translationKey="home.marketplace.hero_body" fallback={locale.mp.hero_body} /></p>
@@ -182,7 +184,9 @@ export default async function Home() {
         <Link className="size-guide-full-link" href="/size-guide"><LocalizedText translationKey="product.proof.size_guide" fallback="Explore the full size guide" /> <span aria-hidden="true">→</span></Link>
       </section>
 
+      <p className="domina-band-intro"><span aria-hidden="true">✦</span><LocalizedText translationKey="home.domina.section_intro" fallback="Big hugs start here." /><span aria-hidden="true">✦</span></p>
       <section className="domina-band" id="domina">
+        <div className="domina-petal-snow" aria-hidden="true">{Array.from({ length: 20 }, (_, index) => <span key={index}>❄</span>)}</div>
         <div className="domina-band-copy"><span className="domina-eyebrow"><LocalizedText translationKey="home.domina.eyebrow" fallback="DOMINA BY PONYO" /></span><h2><LocalizedText translationKey="home.domina.title" fallback="Room for Something Extraordinary." /></h2><p><LocalizedText translationKey="home.domina.body" fallback="Meet Domina XL — oversized plush companions to bring comfort, character, and a little wonder into your space." /></p><Link href="/pages/domina-xl"><LocalizedText translationKey="home.domina.cta" fallback="Shop giant plush →" /></Link></div>
         <figure><div className="domina-band-image"><Image src="/images/catalog/ponyo-3.png" alt={t("home.image_alt.domina")} fill sizes="(max-width: 767px) 90vw, 560px"/></div><figcaption><LocalizedText translationKey="home.domina.caption" fallback="A plush with presence." /></figcaption></figure>
       </section>

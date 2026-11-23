@@ -84,13 +84,14 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
     router.push("/checkout?buyNow=1");
   }
 
-  function scrollToWaitlist(event: React.MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault();
-    const target = document.getElementById("product-waitlist");
+  function scrollToProductSection(event: React.MouseEvent<HTMLAnchorElement>, targetId: string) {
+    const target = document.getElementById(targetId);
     if (!target) return;
+    event.preventDefault();
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-    window.history.replaceState(null, "", "#product-waitlist");
+    target.focus({ preventScroll: true });
+    window.history.replaceState(null, "", `#${targetId}`);
   }
 
   async function shareProduct() {
@@ -144,7 +145,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
   return (
     <>
       <div className="product-purchase-panel">
-        <div className="product-status-badges"><p className={`product-availability${waitlistEligible ? " is-muted" : ""}`}><span />{statusLabel}</p>{product.tags?.includes("rare") && <span className="product-rarity">{t("product.label.rare", "Rare")}</span>}</div>
+        <div className="product-status-badges"><p className={`product-availability${waitlistEligible ? " is-muted" : ""}`}><span />{statusLabel}</p></div>
         <div className="product-title-row"><div><h1>{productName}</h1></div><div className="product-heading-actions"><button className="product-share-button" type="button" onClick={() => void shareProduct()} aria-label={t("product.action.share", "Share this plush")}><ShareIcon /></button><button type="button" className={`product-save${saved ? " is-saved" : ""}`} aria-label={`${saved ? t("product.action.remove_saved", "Remove from") : t("product.action.save", "Save to")} wishlist`} aria-pressed={saved} onClick={toggleWishlist}>{saved ? "♥" : "♡"}</button></div></div>
         {shareMessage && <p className="product-share-message" role="status">{shareMessage}</p>}
         <p className="product-detail-price">{formatPrice(price, currency)}{compareAtAmount && <del>{formatPrice(compareAtAmount, currency)}</del>}</p>
@@ -163,24 +164,24 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
   {storefrontFeatures.productReservations
     ? shippingStatus === "deliverable"
       ? product.reservationsOpen
-        ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-reservation">{t("product.action.reserve_spot", "Reserve a spot")} <span aria-hidden="true">→</span></a>
+        ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-reservation" onClick={(event) => scrollToProductSection(event, "product-reservation")}>{t("product.action.reserve_spot", "Reserve a spot")} <span aria-hidden="true">→</span></a>
         : <p className="product-shipping-note">{t("product.reservation.closed", "Reservations are closed for this product.")}</p>
-      : <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest">{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a>
+      : <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest" onClick={(event) => scrollToProductSection(event, "product-interest")}>{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a>
     : shippingStatus !== "deliverable"
       ? product.reservationsOpen
-        ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest">{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a>
+        ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest" onClick={(event) => scrollToProductSection(event, "product-interest")}>{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a>
         : <p className="product-shipping-note">{t("product.shipping.checkout_blocked", "Checkout is unavailable until shipping is confirmed for your country.")}</p>
     : waitlistEligible
-      ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-waitlist" onClick={scrollToWaitlist}>{t("product.action.join_waitlist", "Join waitlist")} <span aria-hidden="true">→</span></a>
+      ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-waitlist" onClick={(event) => scrollToProductSection(event, "product-waitlist")}>{t("product.action.join_waitlist", "Join waitlist")} <span aria-hidden="true">→</span></a>
       : storefrontFeatures.commerce && <div className="product-purchase-actions"><button className="shop-button product-add-button" type="button" onClick={addToCart} disabled={previewOnly}>{t("product.action.add_to_cart", "Add to cart")} <span>· {formatPrice(price, currency)}</span></button><button className="product-buy-now-button" type="button" onClick={buyNow} disabled={previewOnly}>{t("product.action.buy_now", "Buy now")} <span aria-hidden="true">→</span></button></div>}
   {storefrontFeatures.productReservations
     ? <p className="product-shipping-note">{t("static.product.reservation_note", "Reservations are non-binding. No payment is required.")}</p>
     : (waitlistEligible || storefrontFeatures.commerce) && <p className="product-shipping-note">{waitlistEligible ? t("product.waitlist_note", "Join the waitlist and we’ll email you when this plush is available.") : t("product.shipping_note", "Shipping and taxes calculated at checkout.")}</p>}
         <div className="product-trust"><span>♡ {t("product.trust.curated", "Thoughtfully selected")}</span><span>✦ {t("product.trust.ready", "Ready to be loved")}</span></div>
       </div>
-      {storefrontFeatures.commerce && <div className="mobile-sticky-purchase"><Link href="/" className="product-home-shortcut" aria-label={t("static.product.home", "Home")}><span aria-hidden="true">⌂</span><small>{t("static.product.home", "Home")}</small></Link>{shippingStatus !== "deliverable" ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest">{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a> : waitlistEligible ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-waitlist" onClick={scrollToWaitlist}>{t("product.action.join_waitlist", "Join waitlist")} <span aria-hidden="true">→</span></a> : <button className="shop-button product-add-button" type="button" onClick={addToCart} disabled={previewOnly}>{t("product.action.add_to_cart", "Add to cart")} <span>· {formatPrice(price, currency)}</span></button>}</div>}
+      {storefrontFeatures.commerce && <div className="mobile-sticky-purchase"><Link href="/" className="product-home-shortcut" aria-label={t("static.product.home", "Home")}><span aria-hidden="true">⌂</span><small>{t("static.product.home", "Home")}</small></Link>{shippingStatus !== "deliverable" ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-interest" onClick={(event) => scrollToProductSection(event, "product-interest")}>{t("product.action.register_interest", "Register interest")} <span aria-hidden="true">→</span></a> : waitlistEligible ? <a className="shop-button product-add-button product-waitlist-cta" href="#product-waitlist" onClick={(event) => scrollToProductSection(event, "product-waitlist")}>{t("product.action.join_waitlist", "Join waitlist")} <span aria-hidden="true">→</span></a> : <button className="shop-button product-add-button" type="button" onClick={addToCart} disabled={previewOnly}>{t("product.action.add_to_cart", "Add to cart")} <span>· {formatPrice(price, currency)}</span></button>}</div>}
       <div className="product-details-accordion">
-        <details open><summary>{t("product.details.title", "Product details")}</summary><div><p>{productDescription}</p><dl><div><dt>{t("product.details.sku", "SKU")}</dt><dd>{sku}</dd></div><div><dt>{t("product.details.brand", "Brand")}</dt><dd>{product.supplierName}</dd></div><div><dt>{t("product.details.collection", "Collection")}</dt><dd>{t(`product.categories.${product.categoryName.toLowerCase().replaceAll(" ", "_")}`, product.categoryName)}</dd></div>{product.productType && <div><dt>{t("product.details.type", "Type")}</dt><dd>{product.productType}</dd></div>}{product.sizeTier && <div><dt>{t("product.details.size_tier", "Size tier")}</dt><dd>{product.sizeTier}</dd></div>}{product.size && <div><dt>{t("product.options.size", "Size")}</dt><dd>{product.size}</dd></div>}{product.dimensions && <div><dt>{t("product.details.dimensions", "Dimensions")}</dt><dd>{product.dimensions}</dd></div>}<div><dt>{t("product.details.availability", "Availability")}</dt><dd>{statusLabel}</dd></div>{product.dispatchTime && !storefrontFeatures.productReservations && <div><dt>{t("product.details.dispatch", "Dispatch estimate")}</dt><dd>{product.dispatchTime}</dd></div>}</dl></div></details>
+        <details><summary>{t("product.details.title", "Product details")}</summary><div><p>{productDescription}</p><dl><div><dt>{t("product.details.sku", "SKU")}</dt><dd>{sku}</dd></div><div><dt>{t("product.details.brand", "Brand")}</dt><dd>{product.supplierName}</dd></div><div><dt>{t("product.details.collection", "Collection")}</dt><dd>{t(`product.categories.${product.categoryName.toLowerCase().replaceAll(" ", "_")}`, product.categoryName)}</dd></div>{product.productType && <div><dt>{t("product.details.type", "Type")}</dt><dd>{product.productType}</dd></div>}{product.sizeTier && <div><dt>{t("product.details.size_tier", "Size tier")}</dt><dd>{product.sizeTier}</dd></div>}{product.size && <div><dt>{t("product.options.size", "Size")}</dt><dd>{product.size}</dd></div>}{product.dimensions && <div><dt>{t("product.details.dimensions", "Dimensions")}</dt><dd>{product.dimensions}</dd></div>}<div><dt>{t("product.details.availability", "Availability")}</dt><dd>{statusLabel}</dd></div>{product.dispatchTime && !storefrontFeatures.productReservations && <div><dt>{t("product.details.dispatch", "Dispatch estimate")}</dt><dd>{product.dispatchTime}</dd></div>}</dl></div></details>
         <details><summary>{t("product.details.care_title", "Materials & care")}</summary><p>{t("product.details.care_body", "Specific material and care details haven’t been provided for this plush yet. Please follow the care label included with your item, or contact Ponyo before ordering if you need more information.")}</p></details>
         {storefrontFeatures.commerce && <details><summary>{t("product.details.delivery_title", "Delivery & checkout")}</summary><p>{product.dispatchTime ? `${t("product.details.dispatch_prefix", "Estimated dispatch:")} ${product.dispatchTime}. ` : t("product.details.dispatch_confirm", "Dispatch timing will be confirmed at checkout. ")}{t("product.details.delivery_body", "Shipping options and applicable taxes are calculated for your destination during checkout.")}</p></details>}
       </div>

@@ -28,6 +28,7 @@ const shopKeys = [
 	"shop.size.medium", "shop.size.large", "shop.size.xl", "shop.badge.rare", "shop.badge.premium",
 	"shop.badge.new", "shop.filter.categories_aria",
 	"shop.filter.product_categories_aria", "shop.filter.products_aria", "shop.filter.active_aria",
+	"shop.filter.more_ways",
 	"shop.filter.filters", "shop.filter.refine", "shop.filter.category", "shop.filter.size",
 	"shop.filter.all", "shop.filter.any_size", "shop.filter.price", "shop.filter.price_range",
 	"shop.filter.from", "shop.filter.to", "shop.filter.to_connector", "shop.filter.no_limit",
@@ -78,24 +79,37 @@ test("shop metadata, labels, filters, counts, and empty states are wired to tran
 	const shopPage = readFileSync(new URL("../src/app/shop/page.tsx", import.meta.url), "utf8");
 	const filterPanel = readFileSync(new URL("../src/components/product/catalog-filter-panel.tsx", import.meta.url), "utf8");
 	const sortSelect = readFileSync(new URL("../src/components/product/sort-select.tsx", import.meta.url), "utf8");
+	const collectionStyles = readFileSync(new URL("../src/app/collection-theme.css", import.meta.url), "utf8");
 	assert.match(shopPage, /export async function generateMetadata/);
-	for (const key of ["shop.metadata.title", "shop.heading.search", "shop.description.default", "shop.count.products", "shop.empty.title", "shop.badge.rare", "shop.badge.premium", "shop.badge.new"]) {
+	for (const key of ["shop.metadata.title", "shop.heading.search", "shop.description.default", "shop.count.products", "shop.empty.title"]) {
 		assert.ok(shopPage.includes(key), `shop page does not use ${key}`);
 	}
+	assert.doesNotMatch(shopPage, /shop\.badge\.(?:rare|premium|new)/);
 	for (const key of ["shop.filter.filters", "shop.filter.category", "shop.filter.price_range", "shop.filter.show_results", "shop.size.small", "shop.size.medium", "shop.size.large", "shop.size.xl"]) {
 		assert.ok(filterPanel.includes(key), `filter panel does not use ${key}`);
 	}
 	for (const key of ["shop.sort.label", "shop.sort.current", "shop.sort.options_aria", "shop.sort.price_ascending"]) {
 		assert.ok(sortSelect.includes(key), `sort menu does not use ${key}`);
 	}
+	assert.match(shopPage, /<details className="collection-sidebar-details" open>/);
+	assert.match(shopPage, /<summary>\{t\("shop\.filter\.category"\)\}<\/summary>/);
+	assert.match(collectionStyles, /@media \(min-width: 1024px\)[\s\S]*?grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+	assert.match(collectionStyles, /\.collection-layout:has\(> \.collection-sidebar \.collection-sidebar-details:not\(\[open\]\)\)/);
 });
 
 test("homepage shelf, category rail, marquee, and descriptive image alt text use localized keys", () => {
 	const homePage = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
 	const homeStyles = readFileSync(new URL("../src/app/theme-parity.css", import.meta.url), "utf8");
+	const homePolishStyles = readFileSync(new URL("../src/app/theme-parity-polish.css", import.meta.url), "utf8");
 	const siteHeader = readFileSync(new URL("../src/components/layout/site-header.tsx", import.meta.url), "utf8");
 	const homeCarousel = readFileSync(new URL("../src/components/home/home-carousel.tsx", import.meta.url), "utf8");
+	const animalTabs = readFileSync(new URL("../src/components/home/animal-tabs.tsx", import.meta.url), "utf8");
+	const productAnimals = readFileSync(new URL("../src/lib/product-animals.ts", import.meta.url), "utf8");
+	const productGrid = readFileSync(new URL("../src/components/product/product-grid.tsx", import.meta.url), "utf8");
+	const sparkleRain = readFileSync(new URL("../src/components/home/home-sparkle-rain.tsx", import.meta.url), "utf8");
 	const shelf = readFileSync(new URL("../src/components/product/product-shelf.tsx", import.meta.url), "utf8");
+	const productActions = readFileSync(new URL("../src/app/product-card-actions.css", import.meta.url), "utf8");
+	const collections = readFileSync(new URL("../src/app/shop/page.tsx", import.meta.url), "utf8");
 	for (const key of ["home.category_rail.aria_label", "home.size.marquee_label", "home.size.marquee_big_hugs", "home.image_alt.lifestyle", "home.image_alt.domina", "home.size.image_alt"]) {
 		assert.ok(homePage.includes(key), `homepage does not use ${key}`);
 	}
@@ -105,8 +119,37 @@ test("homepage shelf, category rail, marquee, and descriptive image alt text use
 	assert.doesNotMatch(homePage, /New products in this category are coming soon/);
 	assert.match(homeStyles, /grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/);
 	assert.match(homePage, /t\("home\.size\.image_alt", \{ size: t\(`shop\.size\.\$\{tile\.name\.toLowerCase\(\)\}`\) \}\)/);
+	assert.match(homePage, /"plush-toys": \{ card: "[^"]+", hero: "\/images\/home-hero\/plush-room-hd\.png" \}/);
+	assert.match(homePage, /"soft-furniture": \{ card: "[^"]+", hero: "\/images\/home-hero\/soft-furniture-hero\.png" \}/);
+	assert.match(homePage, /oversized: \{ card: "[^"]+", hero: "\/images\/home-hero\/oversized-room-hd\.png" \}/);
+	assert.match(homePage, /cushions: \{ card: "[^"]+", hero: "\/images\/home-hero\/decor-room-hd\.png" \}/);
+	assert.match(sparkleRain, /const particleCount = isMobile \? 140 : 320/);
+	assert.match(sparkleRain, /Math\.random\(\) < 0\.62/);
+	assert.match(homePage, /className="home-marketplace-intro"[^>]*data-sparkle-end/);
+	assert.match(sparkleRain, /getBoundingClientRect\(\)\.bottom \+ window\.scrollY/);
+	assert.match(sparkleRain, /end - fadeDistance/);
+	assert.match(productAnimals, /tags: \["puppy", "dog", "corgi"\]/);
+	assert.match(productAnimals, /tags: \["bunny", "rabbit"\]/);
+	assert.match(productAnimals, /tags: \["cat", "kitten", "kitty"\]/);
+	assert.match(productAnimals, /name: "All animals", key: "shop\.category\.all", slug: "all", tags: \[\]/);
+	assert.match(productAnimals, /return tags\.length === 0 \|\| tags\.some/);
+	assert.match(animalTabs, /import \{ animalFilters, matchesAnimal \} from "@\/lib\/product-animals"/);
+	assert.match(animalTabs, /\.slice\(0, 8\)/);
+	assert.match(animalTabs, /fillColumns=\{\[2,\s*3,\s*5,\s*5\]\}/);
+	assert.match(homePolishStyles, /@media \(min-width: 1024px\) and \(max-width: 1279px\) \{\s*\.animal-tabs-section \[role="tabpanel"\] \.product-grid \{\s*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/s);
+	assert.match(homePolishStyles, /\.animal-tabs-section \[role="tabpanel"\] \.product-grid \{\s*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/s);
+	assert.match(homePolishStyles, /\.store-home \.marketplace-aisle \{[^}]*border-radius:\s*0\s*!important/s);
+	assert.match(homePolishStyles, /@media \(max-width: 767px\) \{[\s\S]*?\.store-home \.marketplace-aisles-grid>\.marketplace-aisle \{[^}]*min-height:\s*0;/);
+	assert.match(productGrid, /key: "drops"[\s\S]*key: "all"[\s\S]*key: "domina"/);
 	assert.doesNotMatch(homePage, /home\.size\.\$\{tile\.name\.toLowerCase\(\)\}/);
-	assert.match(homeCarousel, /t\(slide\.imageAltKey, slide\.imageAlt\)/);
+	assert.match(homeCarousel, /alt=\{slide\.imageAlt\}/);
+	assert.doesNotMatch(homeCarousel, /premiumSlide|rareSlide|home\.slides\.(premium|rare)_/);
+	assert.match(homePage, /products\.filter\(isDominaXLProduct\)\.slice\(0, 6\)/);
+	assert.match(collections, /t\("shop\.filter\.category"\)/);
+	assert.doesNotMatch(collections, /shop\.filter\.product_category/);
+	assert.match(collections, /return isDominaXLProduct\(product\)/);
+	assert.match(productActions, /white-space:\s*normal/);
+	assert.match(productActions, /position:\s*absolute/);
 	assert.match(homeCarousel, /home\.slides\.choose_collection/);
 	assert.match(siteHeader, /className="domina-link"><span>\{t\("home\.header\.domina", "DOMINA by Ponyo"\)\}/);
 	assert.match(shelf, /home\.most_loved\.eyebrow/);

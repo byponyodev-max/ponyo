@@ -6,33 +6,15 @@ import Link from "next/link";
 import { ProductGrid } from "@/components/product/product-grid";
 import { useLocalization } from "@/components/layout/localization-provider";
 import type { Product } from "@/types/product";
-
-const animalTabs = [
-  { name: "Bears", key: "home.categories.bears", slug: "bears", tags: ["bear"] },
-  { name: "Bunnies", key: "home.categories.bunnies", slug: "bunnies", tags: ["bunny"] },
-  { name: "Cats", key: "home.categories.cats", slug: "cats", tags: ["cat"] },
-  { name: "Puppies", key: "home.categories.puppies", slug: "puppies", tags: ["puppy"] },
-  { name: "Pandas", key: "home.categories.pandas", slug: "pandas", tags: ["panda"] },
-  { name: "Penguins", key: "home.categories.penguins", slug: "penguins", tags: ["penguin"] },
-  { name: "Cute Characters", key: "home.categories.characters", slug: "characters", tags: ["character"] },
-];
-
-function matchesAnimal(product: Product, tags: string[]) {
-  const productTags = product.tags ?? [];
-  const details = `${product.categoryName} ${product.productType ?? ""} ${product.name}`
-    .toLowerCase()
-    .replace(/ies\b/g, "y")
-    .replace(/s\b/g, "");
-  return tags.some((tag) => productTags.includes(tag) || details.includes(tag));
-}
+import { animalFilters, matchesAnimal } from "@/lib/product-animals";
 
 export function AnimalTabs({ products }: { products: Product[] }) {
   const { t } = useLocalization();
-  const availableTabs = animalTabs;
-  const [active, setActive] = useState(availableTabs[0]?.slug ?? "");
+  const availableTabs = animalFilters;
+  const [active, setActive] = useState<string>(availableTabs[0]?.slug ?? "");
   const current = availableTabs.find((tab) => tab.slug === active) ?? availableTabs[0];
   if (!current) return null;
-  const matching = products.filter((product) => matchesAnimal(product, current.tags)).slice(0, 6);
+  const matching = products.filter((product) => matchesAnimal(product, current.tags)).slice(0, 8);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
@@ -53,8 +35,8 @@ export function AnimalTabs({ products }: { products: Product[] }) {
         })}
       </div>
       <div role="tabpanel" id={`animal-panel-${current.slug}`} aria-labelledby={`animal-tab-${current.slug}`}>
-        <ProductGrid products={matching} badges={Object.fromEntries(matching.flatMap((product) => product.tags?.includes("rare") ? [[product.slug, "Rare"]] : []))} fillSlots fillColumns={[4, 3, 4, 6]} promoCount={2} />
-        <Link className="animal-tabs-all" href={`/collections/${current.slug}`}>{t("home.aisles.see_more", "Shop all {{title}} →", { title: current.name })}</Link>
+        <ProductGrid products={matching} fillSlots fillColumns={[2, 3, 5, 5]} promoCount={2} />
+        <Link className="animal-tabs-all" href={current.slug === "all" ? "/collections/all" : `/collections/${current.slug}`}>{t("home.aisles.see_more", "Shop all {{title}} →", { title: current.name })}</Link>
       </div>
     </section>
   );

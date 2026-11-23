@@ -235,6 +235,22 @@ export function ProductActionPanel({
 }) {
   const { country } = useLocalization();
   const shippingStatus = getShippingStatus(shippingCountries, country);
+  const targetId = shippingStatus === "deliverable" ? "product-reservation" : "product-interest";
+
+  useEffect(() => {
+    if (window.location.hash !== `#${targetId}`) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+      target.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [targetId]);
+
   return shippingStatus === "deliverable"
     ? <ProductReservationPanel productId={productId} productName={productName} reservationsOpen={reservationsOpen} reservationDeadline={reservationDeadline} productionStatus={productionStatus} country={country} />
     : <ProductInterestPanel productId={productId} productName={productName} defaultCountry={country} shippingCountries={shippingCountries} />;
@@ -311,7 +327,7 @@ function ProductReservationPanel({
     ? Math.min(100, Math.round((reservationCount / target) * 100))
     : null;
 
-  return <section className="product-reservation" id="product-reservation" aria-labelledby="product-reservation-title">
+  return <section className="product-reservation" id="product-reservation" aria-labelledby="product-reservation-title" tabIndex={-1}>
     <div className="product-reservation-heading">
       <span className="product-reservation-seal" aria-hidden="true">✦</span>
       <div><p className="eyebrow">{t("product.reservation.eyebrow", "RESERVE A SPOT · NO PAYMENT")}</p><h2 id="product-reservation-title">{t("product.reservation.title", "Reserve a spot")}</h2></div>
@@ -382,7 +398,7 @@ function ProductInterestPanel({
     }
   }
 
-  return <section className="product-reservation product-interest" id="product-interest" aria-labelledby="product-interest-title">
+  return <section className="product-reservation product-interest" id="product-interest" aria-labelledby="product-interest-title" tabIndex={-1}>
     <div className="product-reservation-heading">
       <span className="product-reservation-seal" aria-hidden="true">♡</span>
       <div>

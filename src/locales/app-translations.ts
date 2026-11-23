@@ -155,6 +155,7 @@ export const appTranslations: AppTranslations = {
 		"shop.filter.filters": "Filters",
 		"shop.filter.refine": "Refine your finds",
 		"shop.filter.category": "Category",
+		"shop.filter.more_ways": "More ways to browse",
 		"shop.filter.size": "Size",
 		"shop.filter.all": "All plush",
 		"shop.filter.any_size": "Any size",
@@ -193,6 +194,17 @@ export const appTranslations: AppTranslations = {
 		"shop.empty.title": "No plush found just yet.",
 		"shop.empty.description": "Try a different search or clear your filters.",
 		"shop.empty.cta": "See all plush",
+		"maker.profile.collection.filter_button": "Filter & search",
+		"maker.profile.collection.search_label": "Search this collection",
+		"maker.profile.collection.search_placeholder": "Try “bunny”, “cushion” or a color",
+		"maker.profile.collection.category_label": "Category",
+		"maker.profile.collection.all_categories": "All categories",
+		"maker.profile.collection.animal_label": "Animal",
+		"maker.profile.collection.all_animals": "All animals",
+		"maker.profile.collection.results": "Showing {{count}} of {{total}} pieces",
+		"maker.profile.collection.clear_filters": "Clear filters",
+		"maker.profile.collection.no_results_title": "No plush found just yet",
+		"maker.profile.collection.no_results": "Try another search or clear your filters to see every piece.",
 	},
 	id: {
 		"localization.form_label": "Preferensi bahasa dan mata uang",
@@ -301,6 +313,7 @@ export const appTranslations: AppTranslations = {
 			"Dari teman mungil hingga plush jumbo. Pilih ukuran untuk mulai belanja.",
 		"home.domina.eyebrow": "DOMINA DARI PONYO",
 		"home.domina.title": "Hadirkan sesuatu yang istimewa.",
+		"home.domina.section_intro": "Pelukan besar dimulai di sini.",
 		"home.domina.body":
 			"Kenali Domina XL — teman plush berukuran besar yang membawa kenyamanan, karakter, dan sedikit keajaiban ke ruangmu.",
 		"home.domina.cta": "Belanja plush jumbo →",
@@ -488,8 +501,8 @@ export const appTranslations: AppTranslations = {
 		"product.names.haneul-bunny": "Kelinci Haneul",
 		"product.names.mint-dino": "Dino Mint",
 		"product.names.bluebell-penguin": "Penguin Bluebell",
-		"product.names.good-things-ahead-kitty": "Kucing Good Things Ahead",
-		"product.names.better-days-panda": "Panda Better Days",
+		"product.names.good-things-ahead-kitty": "Kucing Good Things Ahead XL",
+		"product.names.better-days-panda": "Panda Better Days XL",
 		"product.names.biscuit-bow-pup": "Anjing Biscuit Bow",
 		"product.names.cloud-cat": "Kucing Cloud",
 		"product.names.sunny-chick": "Anak Ayam Sunny",
@@ -560,9 +573,9 @@ export const appTranslations: AppTranslations = {
 		"product.descriptions.bluebell-penguin":
 			"Penguin mungil berbentuk bulat dengan warna biru dan putih salju yang lembut.",
 		"product.descriptions.good-things-ahead-kitty":
-			"Kucing nyaman yang menggemaskan dengan pita merah muda.",
+			"Kucing krem berukuran besar dengan pita merah muda yang lembut dan bentuk nyaman seperti awan.",
 		"product.descriptions.better-days-panda":
-			"Tampilan panda klasik dengan pita manis.",
+			"Panda besar selembut awan dengan pita merah muda.",
 		"product.descriptions.biscuit-bow-pup":
 			"Anjing mungil yang manis dengan telinga terkulai dan pita kotak-kotak.",
 		"product.descriptions.cloud-cat":
@@ -714,6 +727,7 @@ export const appTranslations: AppTranslations = {
 		"home.size.sub": "小さな相棒から特大サイズまで。サイズを選んで探そう。",
 		"home.domina.eyebrow": "PONYOのDOMINA",
 		"home.domina.title": "特別な存在をお部屋に。",
+		"home.domina.section_intro": "大きなハグはここから。",
 		"home.domina.body":
 			"Domina XLは、心地よさと個性、少しの魔法をお部屋に届ける大きな相棒です。",
 		"home.domina.cta": "特大ぬいぐるみを見る →",
@@ -995,6 +1009,7 @@ export const appTranslations: AppTranslations = {
 		"shop.filter.filters": "絞り込み",
 		"shop.filter.refine": "ぬいぐるみを絞り込む",
 		"shop.filter.category": "カテゴリー",
+		"shop.filter.more_ways": "ほかの探し方",
 		"shop.filter.size": "サイズ",
 		"shop.filter.all": "すべてのぬいぐるみ",
 		"shop.filter.any_size": "すべてのサイズ",
@@ -1037,8 +1052,8 @@ export const appTranslations: AppTranslations = {
 		"product.names.haneul-bunny": "Haneul バニー",
 		"product.names.mint-dino": "ミントダイナソー",
 		"product.names.bluebell-penguin": "Bluebell ペンギン",
-		"product.names.good-things-ahead-kitty": "Good Things Ahead キティ",
-		"product.names.better-days-panda": "Better Days パンダ",
+		"product.names.good-things-ahead-kitty": "Good Things Ahead キティ XL",
+		"product.names.better-days-panda": "Better Days パンダ XL",
 		"product.names.biscuit-bow-pup": "Biscuit Bow パピー",
 		"product.names.cloud-cat": "Cloud キャット",
 		"product.names.sunny-chick": "Sunny ひよこ",
@@ -1086,9 +1101,9 @@ export const appTranslations: AppTranslations = {
 		"product.descriptions.bluebell-penguin":
 			"雪のような白と青色が愛らしい、丸くて小さなペンギン。",
 		"product.descriptions.good-things-ahead-kitty":
-			"ピンクのリボンをつけた、心地よさそうなかわいいねこ。",
+			"ピンクのリボンをつけた、雲のような抱き心地のクリーム色の大きなねこ。",
 		"product.descriptions.better-days-panda":
-			"かわいいリボンをつけた、クラシックなパンダ。",
+			"淡いピンクのリボンをつけた、雲のように柔らかな大きめサイズのパンダ。",
 		"product.descriptions.biscuit-bow-pup":
 			"垂れた耳とチェック柄リボンがかわいい、小さなわんちゃん。",
 		"product.descriptions.cloud-cat":
@@ -1393,6 +1408,18 @@ export const appTranslations: AppTranslations = {
 		"maker.profile.collection.piece_other": "点",
 		"maker.profile.collection.empty":
 			"Ponyoのカタログに掲載された商品はまだありません。",
+		"maker.profile.collection.filter_button": "絞り込み・検索",
+		"maker.profile.collection.search_label": "このコレクションを検索",
+		"maker.profile.collection.search_placeholder": "うさぎ、クッション、色などで検索",
+		"maker.profile.collection.category_label": "カテゴリー",
+		"maker.profile.collection.all_categories": "すべてのカテゴリー",
+		"maker.profile.collection.animal_label": "動物",
+		"maker.profile.collection.all_animals": "すべての動物",
+		"maker.profile.collection.results": "{{total}}点中{{count}}点を表示",
+		"maker.profile.collection.clear_filters": "絞り込みを解除",
+		"maker.profile.collection.no_results_title": "ぴったりの作品が見つかりません",
+		"maker.profile.collection.no_results":
+			"検索語を変えるか、絞り込みを解除してすべての作品をご覧ください。",
 		"legal.terms-of-service.title": "利用規約",
 		"legal.terms-of-service.subtitle":
 			"現在のお支払いを伴わない予約モデルに関する草案",
@@ -1553,6 +1580,7 @@ export const appTranslations: AppTranslations = {
 		"home.size.sub": "작은 친구부터 대형 인형까지, 크기를 선택해 쇼핑하세요.",
 		"home.domina.eyebrow": "PONYO의 DOMINA",
 		"home.domina.title": "특별한 친구를 만나 보세요.",
+		"home.domina.section_intro": "커다란 포옹은 여기서 시작돼요.",
 		"home.domina.body":
 			"Domina XL은 편안함과 개성, 작은 마법을 공간에 더해 주는 커다란 인형 친구예요.",
 		"home.domina.cta": "대형 인형 쇼핑하기 →",
@@ -1833,6 +1861,7 @@ export const appTranslations: AppTranslations = {
 		"shop.filter.filters": "필터",
 		"shop.filter.refine": "원하는 인형 찾기",
 		"shop.filter.category": "카테고리",
+		"shop.filter.more_ways": "다른 방법으로 둘러보기",
 		"shop.filter.size": "크기",
 		"shop.filter.all": "모든 인형",
 		"shop.filter.any_size": "모든 크기",
@@ -1875,8 +1904,8 @@ export const appTranslations: AppTranslations = {
 		"product.names.haneul-bunny": "하늘 버니",
 		"product.names.mint-dino": "민트 공룡",
 		"product.names.bluebell-penguin": "블루벨 펭귄",
-		"product.names.good-things-ahead-kitty": "굿 씽스 어헤드 키티",
-		"product.names.better-days-panda": "베터 데이즈 판다",
+		"product.names.good-things-ahead-kitty": "굿 씽스 어헤드 키티 XL",
+		"product.names.better-days-panda": "베터 데이즈 판다 XL",
 		"product.names.biscuit-bow-pup": "비스킷 보 퍼피",
 		"product.names.cloud-cat": "클라우드 캣",
 		"product.names.sunny-chick": "써니 병아리",
@@ -1924,8 +1953,8 @@ export const appTranslations: AppTranslations = {
 		"product.descriptions.bluebell-penguin":
 			"눈처럼 하얀색과 파란색이 어우러진 작고 동그란 펭귄.",
 		"product.descriptions.good-things-ahead-kitty":
-			"분홍 리본을 단 아늑하고 사랑스러운 고양이.",
-		"product.descriptions.better-days-panda": "귀여운 리본을 단 클래식한 판다.",
+			"부드러운 분홍 리본을 단, 구름처럼 포근한 크림색 대형 고양이 인형입니다.",
+		"product.descriptions.better-days-panda": "연한 분홍 리본을 단 구름처럼 부드럽고 넉넉한 크기의 판다 인형입니다.",
 		"product.descriptions.biscuit-bow-pup":
 			"늘어진 귀와 체크 리본이 귀여운 작은 강아지.",
 		"product.descriptions.cloud-cat":
@@ -2227,6 +2256,18 @@ export const appTranslations: AppTranslations = {
 		"maker.profile.collection.piece_other": "개",
 		"maker.profile.collection.empty":
 			"Ponyo 카탈로그에 공개된 제품이 아직 없습니다.",
+		"maker.profile.collection.filter_button": "필터 및 검색",
+		"maker.profile.collection.search_label": "컬렉션 검색",
+		"maker.profile.collection.search_placeholder": "토끼, 쿠션, 색상으로 검색",
+		"maker.profile.collection.category_label": "카테고리",
+		"maker.profile.collection.all_categories": "모든 카테고리",
+		"maker.profile.collection.animal_label": "동물",
+		"maker.profile.collection.all_animals": "모든 동물",
+		"maker.profile.collection.results": "전체 {{total}}개 중 {{count}}개 표시",
+		"maker.profile.collection.clear_filters": "필터 초기화",
+		"maker.profile.collection.no_results_title": "검색 결과가 없어요",
+		"maker.profile.collection.no_results":
+			"다른 검색어를 입력하거나 필터를 초기화해 모든 작품을 확인해보세요.",
 		"legal.terms-of-service.title": "이용약관",
 		"legal.terms-of-service.subtitle": "현재 결제 없는 예약 모델에 관한 초안",
 		"legal.terms-of-service.section.1.heading": "웹사이트 이용",
@@ -2340,6 +2381,7 @@ export const appTranslations: AppTranslations = {
 		"home.size.sub": "从小巧伙伴到巨型玩偶，选择尺寸开始选购。",
 		"home.domina.eyebrow": "PONYO DOMINA 系列",
 		"home.domina.title": "为生活空间添一份特别。",
+		"home.domina.section_intro": "温暖的大拥抱，从这里开始。",
 		"home.domina.body":
 			"认识 Domina XL——为你的空间带来舒适、个性与一点奇妙的大号毛绒伙伴。",
 		"home.domina.cta": "选购巨型毛绒玩具 →",
@@ -2528,8 +2570,8 @@ export const appTranslations: AppTranslations = {
 		"product.names.haneul-bunny": "Haneul 小兔",
 		"product.names.mint-dino": "薄荷恐龙",
 		"product.names.bluebell-penguin": "Bluebell 企鹅",
-		"product.names.good-things-ahead-kitty": "Good Things Ahead 小猫",
-		"product.names.better-days-panda": "Better Days 熊猫",
+		"product.names.good-things-ahead-kitty": "Good Things Ahead XL 小猫",
+		"product.names.better-days-panda": "Better Days XL 熊猫",
 		"product.names.biscuit-bow-pup": "Biscuit Bow 小狗",
 		"product.names.cloud-cat": "Cloud 小猫",
 		"product.names.sunny-chick": "Sunny 小鸡",
@@ -2574,8 +2616,8 @@ export const appTranslations: AppTranslations = {
 		"product.descriptions.bluebell-penguin":
 			"圆滚滚的小企鹅，拥有雪白与柔和蓝色。",
 		"product.descriptions.good-things-ahead-kitty":
-			"戴着粉色蝴蝶结、可爱又舒适的小猫。",
-		"product.descriptions.better-days-panda": "经典熊猫造型，搭配可爱蝴蝶结。",
+			"戴着柔和粉色蝴蝶结、像云朵一样柔软的大号奶油色小猫。",
+		"product.descriptions.better-days-panda": "戴着浅粉色蝴蝶结、云朵般柔软的大号熊猫。",
 		"product.descriptions.biscuit-bow-pup":
 			"垂耳小狗搭配格纹蝴蝶结，甜美可爱。",
 		"product.descriptions.cloud-cat":
@@ -2704,6 +2746,7 @@ export const appTranslations: AppTranslations = {
 			"Desde pequeños amigos hasta peluches gigantes. Elige un tamaño para empezar.",
 		"home.domina.eyebrow": "DOMINA DE PONYO",
 		"home.domina.title": "Añade algo especial a tu espacio.",
+		"home.domina.section_intro": "Los grandes abrazos empiezan aquí.",
 		"home.domina.body":
 			"Conoce Domina XL: un gran compañero de peluche que aporta comodidad, personalidad y un poco de magia a tu hogar.",
 		"home.domina.cta": "Comprar peluches gigantes →",
@@ -2925,8 +2968,8 @@ export const appTranslations: AppTranslations = {
 		"product.names.haneul-bunny": "Conejo Haneul",
 		"product.names.mint-dino": "Dinosaurio Mint",
 		"product.names.bluebell-penguin": "Pingüino Bluebell",
-		"product.names.good-things-ahead-kitty": "Gatita Good Things Ahead",
-		"product.names.better-days-panda": "Panda Better Days",
+		"product.names.good-things-ahead-kitty": "Gatita Good Things Ahead XL",
+		"product.names.better-days-panda": "Panda Better Days XL",
 		"product.names.biscuit-bow-pup": "Perrito Biscuit Bow",
 		"product.names.cloud-cat": "Gato Cloud",
 		"product.names.sunny-chick": "Pollito Sunny",
@@ -2975,9 +3018,9 @@ export const appTranslations: AppTranslations = {
 		"product.descriptions.bluebell-penguin":
 			"Un pequeño pingüino redondito en suaves tonos azules y blanco nieve.",
 		"product.descriptions.good-things-ahead-kitty":
-			"Una gatita adorable y acogedora con un lazo rosa.",
+			"Una gatita grande de color crema, suave como una nube y con un lazo rosa.",
 		"product.descriptions.better-days-panda":
-			"Un panda clásico con un dulce lazo.",
+			"Un panda grande y suave como una nube, con un lazo rosa claro.",
 		"product.descriptions.biscuit-bow-pup":
 			"Un perrito adorable con orejas caídas y un lazo de cuadros.",
 		"product.descriptions.cloud-cat":
