@@ -3749,12 +3749,12 @@
 .product-page .product-proof-in-gallery {
     position: relative;
     overflow: hidden;
-    border-color: #f0d9c0;
+    border-color: #c6a24f;
     background:
-        radial-gradient(ellipse at 100% 0, rgb(255 207 116 / 42%), transparent 34%),
-        radial-gradient(ellipse at 0 100%, rgb(240 173 190 / 24%), transparent 38%),
-        linear-gradient(145deg, #fffdfa, #fff7ec 72%, #fff0e8);
-    box-shadow: inset 0 0 0 4px rgb(255 255 255 / 62%), 0 14px 32px rgb(100 62 43 / 8%);
+        radial-gradient(ellipse at 100% 0, rgb(243 212 134 / 16%), transparent 34%),
+        radial-gradient(ellipse at 0 100%, rgb(255 247 236 / 5%), transparent 38%),
+        linear-gradient(145deg, #35101f, #4a1427 58%, #32121f);
+    box-shadow: inset 0 0 0 4px rgb(243 212 134 / 7%), 0 14px 32px rgb(52 16 31 / 18%);
 }
 
 .product-proof-in-gallery .product-proof-heading,
@@ -3765,15 +3765,23 @@
 }
 
 .product-proof-in-gallery .product-proof-seal {
-    border-color: #e6b369;
-    background: linear-gradient(145deg, #fff8dd, #f8dce2);
-    color: #ad5b47;
-    box-shadow: 0 5px 14px rgb(166 98 68 / 12%);
+    border-color: #c6a24f;
+    background: linear-gradient(145deg, #51232a, #351a1b);
+    color: #f3d486;
+    box-shadow: 0 5px 14px rgb(20 5 12 / 22%);
 }
 
 .product-proof-in-gallery .product-proof-heading h2 {
-    color: #563332;
+    color: #fff7ec;
     font-size: clamp(24px, 2.3vw, 30px);
+}
+
+.product-proof-in-gallery .product-proof-heading .eyebrow {
+    color: #f3d486;
+}
+
+.product-proof-in-gallery .product-proof-heading>div:nth-child(2)>p:last-child {
+    color: rgb(255 247 236 / 76%);
 }
 
 .product-proof-in-gallery .product-proof-grid {
@@ -3784,26 +3792,26 @@
 .product-proof-in-gallery .product-proof-fact {
     min-height: 88px;
     padding: 13px 15px;
-    border-color: #f0dfc9;
+    border-color: rgb(243 212 134 / 38%);
     border-radius: 17px 17px 17px 7px;
-    background: rgb(255 255 255 / 88%);
-    box-shadow: 0 5px 14px rgb(121 78 49 / 5%);
+    background: rgb(255 247 236 / 5%);
+    box-shadow: inset 0 1px 0 rgb(255 247 236 / 5%);
 }
 
 .product-proof-in-gallery .product-proof-fact dt {
-    color: #9a6b45;
+    color: #f3d486;
     font-size: 10px;
     letter-spacing: .09em;
 }
 
 .product-proof-in-gallery .product-proof-fact-mark {
-    border-color: #f1d6c6;
-    background: linear-gradient(145deg, #fff4d8, #fbe2e4);
-    color: #bb634c;
+    border-color: #c6a24f;
+    background: #f3d486;
+    color: #35101f;
 }
 
 .product-proof-in-gallery .product-proof-grid dd {
-    color: #563c35;
+    color: #fff7ec;
     font-size: 13px;
     line-height: 1.55;
 }
@@ -3814,17 +3822,17 @@
     position: relative;
     grid-column: 1 / -1;
     overflow: hidden;
-    border-color: #e8c58f;
+    border-color: rgb(243 212 134 / 65%);
     background:
-        radial-gradient(circle at 98% 8%, rgb(255 229 166 / 66%), transparent 25%),
-        linear-gradient(115deg, #fff0dc, #fff7f0 60%, #fbe7e8);
+        radial-gradient(circle at 98% 8%, rgb(243 212 134 / 14%), transparent 28%),
+        linear-gradient(115deg, rgb(255 247 236 / 9%), rgb(255 247 236 / 3%) 65%, rgb(243 212 134 / 6%));
 }
 
 .product-proof-in-gallery .product-proof-fact--story::after {
     position: absolute;
     right: 14px;
     bottom: -34px;
-    color: rgb(193 118 91 / 12%);
+    color: rgb(243 212 134 / 14%);
     content: "❝";
     font-family: Georgia, serif;
     font-size: 125px;
@@ -3838,8 +3846,13 @@
     z-index: 1;
 }
 
+.product-proof-in-gallery .product-proof-fact--story dt {
+    color: #f3d486;
+}
+
 .product-proof-in-gallery .product-proof-fact--story dd {
     max-width: 74ch;
+    color: rgb(255 247 236 / 92%);
     font-size: 14px;
 }
 
@@ -3850,13 +3863,17 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    border-color: #eac57b;
-    background: linear-gradient(105deg, #fff0c5, #fff8e9 65%, #fde6df);
+    border-color: #e0bd68;
+    background: linear-gradient(105deg, #f3d486, #f8e6bd 65%, #e8c779);
+}
+
+.product-proof-in-gallery .product-proof-fact--delivery dt {
+    color: #51232a;
 }
 
 .product-proof-in-gallery .product-proof-fact--delivery dd {
     margin: 0;
-    color: #8b4e39;
+    color: #35101f;
     font-size: 16px;
     font-weight: 850;
     text-align: right;
@@ -3865,17 +3882,21 @@
 .product-page .product-proof-size-guide {
     min-height: 42px;
     padding: 9px 16px;
-    border: 1px solid #ebc785;
+    border: 1px solid #e6c46e;
     border-radius: 16px 16px 16px 6px;
     align-items: center;
-    background: linear-gradient(110deg, #fff0c9, #ffe8e5);
-    color: #885338;
-    box-shadow: 0 5px 12px rgb(177 116 60 / 9%);
+    background: linear-gradient(110deg, #f3d486, #dfb75e);
+    color: #35101f;
+    box-shadow: 0 5px 12px rgb(20 5 12 / 18%);
     transition: transform .18s ease, box-shadow .18s ease;
 }
 
+.product-page .product-proof-size-guide > span {
+    color: #6a2935;
+}
+
 .product-page .product-proof-size-guide:hover {
-    box-shadow: 0 8px 17px rgb(177 116 60 / 16%);
+    box-shadow: 0 8px 17px rgb(20 5 12 / 26%);
     transform: translateY(-2px);
 }
 
@@ -3929,32 +3950,39 @@
 
 .product-page .product-details-accordion dl {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    border-top: 1px solid #d6b458;
 }
 
 .product-page .product-details-accordion dl div {
     min-width: 0;
-    padding: 10px 11px;
-    border: 1px solid #f0e2d4;
-    border-radius: 12px;
+    min-height: 44px;
+    padding: 12px 2px;
+    border: 0;
+    border-bottom: 1px solid rgb(198 162 79 / 42%);
+    border-radius: 0;
     display: grid;
-    align-content: start;
-    gap: 4px;
-    background: #fffdfa;
+    grid-template-columns: minmax(82px, .72fr) minmax(0, 1.28fr);
+    align-items: start;
+    gap: 12px;
+    background: transparent;
 }
 
 .product-page .product-details-accordion dt {
-    color: #9a7563;
-    font-size: 10px;
+    color: #94773c;
+    font-size: 12px;
     font-weight: 800;
 }
 
 .product-page .product-details-accordion dd {
+    margin: 0;
     color: #4f3832;
-    font-size: 12px;
-    line-height: 1.45;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: right;
     overflow-wrap: anywhere;
+    word-break: normal;
 }
 
 .product-page .product-add-button,

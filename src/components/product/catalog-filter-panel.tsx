@@ -25,7 +25,7 @@ export function CatalogFilterPanel({ categories, category, size, minimum, maximu
     function dismissOutside(event: PointerEvent) {
       const details = detailsRef.current;
       if (details && details.open && event.target instanceof Node && !details.contains(event.target)) {
-        setIsOpen(false);
+        details.open = false;
       }
     }
     document.addEventListener("pointerdown", dismissOutside);
@@ -33,17 +33,16 @@ export function CatalogFilterPanel({ categories, category, size, minimum, maximu
   }, []);
 
   return (
-    <details ref={detailsRef} className="all-filters" open={isOpen} onKeyDown={(event) => {
+    <details ref={detailsRef} className="all-filters" onToggle={(event) => {
+      setIsOpen(event.currentTarget.open);
+    }} onKeyDown={(event) => {
       if (event.key === "Escape" && event.currentTarget.open) {
         event.preventDefault();
-        setIsOpen(false);
+        event.currentTarget.open = false;
         event.currentTarget.querySelector("summary")?.focus({ preventScroll: true });
       }
     }}>
-      <summary aria-expanded={isOpen} onClick={(event) => {
-        event.preventDefault();
-        setIsOpen((open) => !open);
-      }}>
+      <summary aria-expanded={isOpen}>
         <span className="filter-summary-label"><span aria-hidden="true">☷</span> {t("shop.filter.filters", "Filters")}</span>
         <svg className="catalog-chevron filter-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7 5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </summary>

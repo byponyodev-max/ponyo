@@ -48,13 +48,14 @@ test("catalog filters dismiss outside and with Escape without navigation", () =>
 	assert.match(source, /event\.key === "Escape"/);
 	assert.match(source, /focus\(\{ preventScroll: true \}\)/);
 	assert.match(source, /<form action="\/shop" method="get"/);
-	assert.match(source, /open=\{isOpen\}/);
-	assert.match(source, /setIsOpen\(\(open\) => !open\)/);
+	assert.match(source, /onToggle=\{\(event\) => \{\s*setIsOpen\(event\.currentTarget\.open\)/);
+	assert.doesNotMatch(source, /open=\{isOpen\}|<summary[^>]*onClick=/);
 	assert.match(source, /aria-expanded=\{isOpen\}/);
 	assert.match(
 		source,
-		/if \(details && details\.open && event\.target instanceof Node && !details\.contains\(event\.target\)\)\s*\{\s*setIsOpen\(false\)/,
+		/if \(details && details\.open && event\.target instanceof Node && !details\.contains\(event\.target\)\)\s*\{\s*details\.open = false/,
 	);
+	assert.match(source, /event\.currentTarget\.open = false/);
 });
 
 test("homepage size guide maps decorative jellyfish tones and keeps the art non-interactive", () => {

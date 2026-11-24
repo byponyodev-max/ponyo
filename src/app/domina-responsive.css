@@ -336,7 +336,7 @@
     max-width: calc(100vw - 64px);
 }
 
-.domina-page .sort-menu:not([open])>.sort-menu-options {
+.domina-page .sort-menu:not(.is-open)>.sort-menu-options {
     display: none;
 }
 

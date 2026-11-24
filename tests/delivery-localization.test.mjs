@@ -21,6 +21,7 @@ vm.runInNewContext(
 const {
 	currencies,
 	deliveryCountries,
+	getInterestCountryOptions,
 	getDeliveryLocalization,
 	isDeliveryCountryCode,
 	languages,
@@ -53,6 +54,24 @@ test("saved delivery choice wins; supported detected region is used for first vi
 	assert.equal(resolveDeliveryCountry(undefined, ["US", " kr "]), "KR");
 	assert.equal(resolveDeliveryCountry(undefined, ["US", "T1"]), "JP");
 	assert.equal(isDeliveryCountryCode("US"), false);
+});
+
+test("interest country options include worldwide regions and prioritize Japan and Korea", () => {
+	const options = getInterestCountryOptions("en");
+	assert.equal(options.length, 249);
+	assert.deepEqual(
+		Array.from(options.slice(0, 2), ({ code }) => code),
+		["JP", "KR"],
+	);
+	const remainingLabels = Array.from(options.slice(2), ({ label }) => label);
+	assert.deepEqual(
+		remainingLabels,
+		[...remainingLabels].sort((a, b) => a.localeCompare(b, "en")),
+	);
+
+	const excludingShippedCountries = getInterestCountryOptions("en", ["JP", "US"]);
+	assert.equal(excludingShippedCountries.some(({ code }) => code === "JP" || code === "US"), false);
+	assert.equal(excludingShippedCountries[0].code, "KR");
 });
 
 test("changing delivery country applies defaults while manual language and currency changes remain available", async () => {

@@ -59,7 +59,7 @@ test("Domina mobile controls have shrinkable tracks and a stacked catalog headin
 	);
 	assert.match(
 		css,
-		/\.sort-menu:not\(\[open\]\)\s*>\s*\.sort-menu-options\s*\{\s*display: none;/,
+		/\.sort-menu:not\(\.is-open\)\s*>\s*\.sort-menu-options\s*\{\s*display: none;/,
 	);
 	assert.match(
 		mobile,
@@ -86,8 +86,14 @@ test("XL catalog requests all XL items and fills incomplete rows with helpful pr
 
 test("sorting supports repeated trigger, outside pointer, focus dismissal and Escape", () => {
 	const source = read("../src/components/product/sort-select.tsx");
+	const filters = read("../src/components/product/catalog-filter-panel.tsx");
 	assert.ok(source.startsWith('"use client";'));
-	assert.match(source, /event\.preventDefault\(\)/);
+	assert.match(source, /<button type="button" className="sort-menu-trigger"/);
+	assert.match(source, /onClick=\{\(\) => setIsOpen\(\(open\) => !open\)\}/);
+	assert.match(source, /isOpen && <div id=\{optionsId\} className="sort-menu-options"/);
+	assert.match(filters, /onToggle=\{\(event\) => \{\s*setIsOpen\(event\.currentTarget\.open\)/);
+	assert.doesNotMatch(source, /<details|<summary/);
+	assert.doesNotMatch(filters, /open=\{isOpen\}|<summary[^>]*onClick=/);
 	for (const event of ["pointerdown", "focusin"]) {
 		assert.ok(
 			source.includes(`document.addEventListener("${event}", dismissOutside)`),
@@ -101,19 +107,19 @@ test("sorting supports repeated trigger, outside pointer, focus dismissal and Es
 	assert.match(source, /!menu\.contains\(event\.target\)/);
 	assert.match(source, /event\.key === "Escape"/);
 	assert.match(source, /focus\(\{ preventScroll: true \}\)/);
-	assert.match(source, /onSubmit=\{\(\) => \{\s*setIsOpen\(false\)/);
+	assert.match(source, /onSubmit=\{\(\) => setIsOpen\(false\)\}/);
 	assert.match(source, /type="submit" name="sort_by" value=\{option.value\}/);
-	assert.match(source, /open=\{isOpen\}/);
-	assert.match(source, /setIsOpen\(\(open\) => !open\)/);
 	assert.match(source, /aria-expanded=\{isOpen\}/);
 	assert.match(
 		source,
-		/if \(menu && menu\.open && event\.target instanceof Node && !menu\.contains\(event\.target\)\)\s*\{\s*setIsOpen\(false\)/,
+		/if \(menu && event\.target instanceof Node && !menu\.contains\(event\.target\)\)\s*\{\s*setIsOpen\(false\)/,
 	);
+	assert.match(filters, /details\.open = false/);
 	assert.match(
 		read("../src/app/collection-theme.css"),
-		/\.sort-menu:not\(\[open\]\)\s*>\s*\.sort-menu-options\s*\{\s*display: none;/,
+		/\.sort-menu:not\(\.is-open\)\s*>\s*\.sort-menu-options\s*\{\s*display: none;/,
 	);
+	assert.match(read("../src/app/collection-theme.css"), /\.sort-menu\.is-open \.sort-menu-chevron\s*\{\s*transform: rotate\(180deg\);/);
 });
 
 test("Domina uses restrained gold jellyfish and an editorial framed catalog", () => {

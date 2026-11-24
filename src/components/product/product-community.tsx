@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useId, useRef } from "react";
+import { useId, useMemo, useRef } from "react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { PonyoSelect } from "@/components/ui/ponyo-select";
-import { regionName, supportedShippingCountries } from "@/lib/localization-options";
+import { getInterestCountryOptions, regionName } from "@/lib/localization-options";
 import { getShippingStatus } from "@/lib/product-shipping";
 import { ponyoApi, PONYO_API_BASE_URL, type CustomerProfile, type ProductReview, type ProductReviewSummary } from "@/services/ponyo-api.client";
 import { optimizeJpegPhoto } from "@/lib/optimize-jpeg-photo";
@@ -369,11 +369,16 @@ function ProductInterestPanel({
   shippingCountries?: string[] | null;
 }) {
   const { language, t } = useLocalization();
+  const interestCountries = useMemo(
+    () => getInterestCountryOptions(language, shippingCountries),
+    [language, shippingCountries],
+  );
   const [email, setEmail] = useState("");
   const [country, setCountry] = useState(
-    supportedShippingCountries.some((item) => item.code === defaultCountry) ? defaultCountry : "OTHER",
+    interestCountries.some((item) => item.code === defaultCountry)
+      ? defaultCountry
+      : interestCountries[0]?.code ?? "JP",
   );
-  const [otherCountry, setOtherCountry] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -383,12 +388,11 @@ function ProductInterestPanel({
     setSaving(true);
     setError("");
     setMessage("");
-    const destination = country === "OTHER" ? otherCountry.trim() : country;
     try {
-      await ponyoApi.submitProductInterest(productId, { email: email.trim(), country: destination });
+      await ponyoApi.submitProductInterest(productId, { email: email.trim(), country });
       setMessage(t("product.interest.success", "Thanks — we recorded your interest in shipping {{product}} to {{country}}.", {
         product: productName,
-        country: country === "OTHER" ? destination : regionName(country, language, country),
+        country: regionName(country, language, country),
       }));
       setEmail("");
     } catch (submitError) {
@@ -409,7 +413,9 @@ function ProductInterestPanel({
     <p>{t("product.interest.body", "Tell us where you would like this product shipped. This is separate from reserving an available item.")}</p>
     {!PONYO_API_BASE_URL
       ? <p className="product-reservation-status" role="status">{t("product.interest.service_unavailable", "The interest form is not available right now.")}</p>
-      : <form onSubmit={registerInterest}>
+      : interestCountries.length === 0
+        ? <p className="product-reservation-status" role="status">{t("product.interest.no_destinations", "This product already ships to all listed countries.")}</p>
+        : <form onSubmit={registerInterest}>
         <label>{t("product.reservation.email", "Email address")}<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("static.account.email_placeholder", "you@example.com")} required maxLength={320} /></label>
         <label htmlFor="product-interest-country">{t("product.reservation.country", "Country or region")}<PonyoSelect
           id="product-interest-country"
@@ -419,14 +425,11 @@ function ProductInterestPanel({
           onChange={setCountry}
           required
           label={t("product.reservation.country", "Country or region")}
-          options={[
-            ...supportedShippingCountries
-              .filter((item) => !shippingCountries?.includes(item.code))
-              .map((item) => ({ value: item.code, label: regionName(item.code, language, item.label) })),
-            { value: "OTHER", label: t("product.reservation.other_country", "Other country or region") },
-          ]}
+          options={interestCountries.map(({ code, label }) => ({ value: code, label }))}
+          searchable
+          searchPlaceholder={t("general.search", "Search")}
+          emptyMessage={t("localization.no_matches", "No matches yet. Try another search.")}
         /></label>
-        {country === "OTHER" && <label>{t("product.reservation.other_country_name", "Country or region")}<input autoComplete="country-name" value={otherCountry} onChange={(event) => setOtherCountry(event.target.value)} required maxLength={100} /></label>}
         {error && <p className="api-form-error" role="alert">{error}</p>}
         {message && <p className="product-form-success" role="status">{message}</p>}
         <button className="product-review-submit" type="submit" disabled={saving}>{saving ? t("product.interest.saving", "Saving your interest…") : t("product.interest.submit", "Register interest")}<span aria-hidden="true">→</span></button>
