@@ -85,7 +85,9 @@ test("available destinations reserve while other destinations register separate 
   assert.match(interestPanel, /searchable/);
   assert.doesNotMatch(interestPanel, /"OTHER"|otherCountry|supportedShippingCountries/);
   assert.match(productDetailStyles, /\.product-page \.product-details-accordion dl div \{[^}]*border: 0;[^}]*border-bottom: 1px solid rgb\(198 162 79 \/ 42%\);[^}]*border-radius: 0/);
-  assert.match(productDetailStyles, /\.product-page \.product-details-accordion dd \{\s*margin: 0;/);
+  assert.match(productDetailStyles, /\.product-page \.product-details-accordion dd \{[^}]*margin: 0;/);
+  assert.match(productDetailStyles, /\.product-page \.product-details-accordion dl div \{[^}]*grid-template-columns: minmax\(128px, \.8fr\) minmax\(0, 1\.2fr\)/);
+  assert.match(productDetailStyles, /\.product-page \.product-details-accordion dd \{[^}]*width: 100%;[^}]*max-width: none;[^}]*text-align: left;/);
   assert.match(apiClient, /submitProductReservation:[\s\S]*\/products\/\$\{encodeURIComponent\(productId\)\}\/reservations/);
   assert.match(apiClient, /submitProductInterest:[\s\S]*\/products\/\$\{encodeURIComponent\(productId\)\}\/interests/);
   assert.match(productCommunity, /product\.reservation\.title", "Reserve a spot"/);

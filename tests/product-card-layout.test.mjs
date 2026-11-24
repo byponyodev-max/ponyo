@@ -227,7 +227,18 @@ test("product cards show reservation or interest actions while commerce is pause
 	assert.match(cardActionSource, /: t\("product\.action\.register_interest"/);
 	assert.match(cardActionSource, /shippingStatus === "deliverable" && !product\.reservationsOpen/);
 	assert.doesNotMatch(cardSource, /add_to_cart|Notify me|<del>/);
-	assert.match(cardSource, /href=\{`\/products\/\$\{product\.id\}`\}/);
+	assert.match(cardSource, /href=\{`\/products\/\$\{product\.id\}#product-gallery-top`\}/);
+});
+
+test("product card navigation targets the exclusive badge at the top of the gallery", () => {
+	const page = read("../src/app/products/[id]/page.tsx");
+	const css = read("../src/app/maker-reservation.css");
+	assert.match(page, /className="product-gallery-hero" id="product-gallery-top"/);
+	assert.match(css, /\.product-gallery-hero\s*\{[^}]*scroll-margin-top: 124px;/);
+	assert.match(
+		css,
+		/@media \(max-width: 767px\) \{[\s\S]*?\.product-page \.product-gallery-hero\s*\{[^}]*scroll-margin-top: 88px;/,
+	);
 });
 
 test("product waitlist shows the lantern-lit waiting-list character panorama", () => {

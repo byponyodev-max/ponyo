@@ -154,17 +154,21 @@
 
 .search {
   min-width: 0;
-  height: 40px;
+  height: 52px;
   margin-top: 9px;
-  padding: 0 10px;
+  padding: 0 14px;
   border: 1px solid #e8d9cf;
   border-radius: 999px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   background: #fff;
   color: #8c756a;
   font-size: 15px;
+}
+
+.search > span {
+  font-size: 19px;
 }
 
 .search input {
@@ -177,7 +181,7 @@
   background: transparent;
   color: #3d2923;
   font: inherit;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .options {

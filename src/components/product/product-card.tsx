@@ -46,7 +46,7 @@ export function ProductCard({ product, compact = false }: { product: Product; co
   return (
     <div className="product-card-item">
       <article className={`shop-product-card${compact ? " is-compact" : ""}`}>
-        <Link className="shop-product-card-link" href={`/products/${product.id}`} aria-label={t("product.action.view", `View ${productName}`, { title: productName })} />
+        <Link className="shop-product-card-link" href={`/products/${product.id}#product-gallery-top`} aria-label={t("product.action.view", `View ${productName}`, { title: productName })} />
         <div className="shop-product-image">
           <Image src={product.image} alt={product.imageAlt} fill sizes="(max-width: 600px) 46vw, (max-width: 1000px) 30vw, 23vw" />
           <div className="product-labels">

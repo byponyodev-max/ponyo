@@ -73,7 +73,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     <SiteFrame className="store-page product-page">
       <section className="product-detail-layout">
         <div className="product-gallery-column">
-          <div className="product-gallery-hero">
+          <div className="product-gallery-hero" id="product-gallery-top">
             <ProductGallery title={product.name} images={productImages} />
             {product.onlyAtPonyo && <span className="product-gallery-approval-badge">
               <span className="product-gallery-approval-star" aria-hidden="true">★</span>

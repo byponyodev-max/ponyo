@@ -17,6 +17,15 @@ test("country search avoids iOS focus zoom without disabling user zoom", () => {
     assert.doesNotMatch(read("../src/app/layout.tsx"), /userScalable:\s*false|maximumScale:\s*1/);
 });
 
+test("searchable select input is larger and remains zoom-safe on mobile", () => {
+    const component = read("../src/components/ui/ponyo-select.tsx");
+    const css = read("../src/components/ui/ponyo-select.module.css");
+    assert.match(component, /searchable \? 60 : 0/);
+    assert.match(css, /\.search\s*\{[^}]*height: 52px;/);
+    assert.match(css, /\.search > span\s*\{[^}]*font-size: 19px;/);
+    assert.match(css, /\.search input\s*\{[^}]*font-size: 16px;/);
+});
+
 test("choosing a country closes the dialog and dismisses the shipping notice", () => {
     const component = read("../src/components/layout/delivery-region-banner.tsx");
     const selection = component.split('aria-selected={country === item.code}')[1].split('}}>')[0];

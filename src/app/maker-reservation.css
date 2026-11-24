@@ -2,6 +2,7 @@
     position: relative;
     width: 100%;
     min-width: 0;
+    scroll-margin-top: 124px;
 }
 
 .product-gallery-approval-badge {
@@ -3585,6 +3586,10 @@
         box-shadow: inset 0 -3px 0 #f4ead1;
     }
 
+    .product-page .product-gallery-hero {
+        scroll-margin-top: 88px;
+    }
+
     .product-page .product-detail-copy {
         width: calc(100% - 24px);
         margin: 16px auto 0;
@@ -3963,7 +3968,7 @@
     border-bottom: 1px solid rgb(198 162 79 / 42%);
     border-radius: 0;
     display: grid;
-    grid-template-columns: minmax(82px, .72fr) minmax(0, 1.28fr);
+    grid-template-columns: minmax(128px, .8fr) minmax(0, 1.2fr);
     align-items: start;
     gap: 12px;
     background: transparent;
@@ -3976,11 +3981,13 @@
 }
 
 .product-page .product-details-accordion dd {
+    width: 100%;
+    max-width: none;
     margin: 0;
     color: #4f3832;
     font-size: 13px;
     line-height: 1.5;
-    text-align: right;
+    text-align: left;
     overflow-wrap: anywhere;
     word-break: normal;
 }
