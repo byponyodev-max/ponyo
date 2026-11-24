@@ -394,6 +394,9 @@ test("footer has a themed image banner, animation, and social links", () => {
 		/\.footer-plush-lineup[\s\S]*object-fit: cover;[\s\S]*object-position: center bottom;/,
 	);
 	assert.match(css, /\.footer-social-links/);
+	assert.match(css, /\.footer-social-links\s*\{[^}]*flex-wrap:\s*nowrap;/);
+	assert.match(css, /@media \(min-width: 768px\) and \(max-width: 1100px\)[\s\S]*?\.footer-social-links\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
+	assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.footer-social-links\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
 	assert.match(
 		footer,
 		/className="footer-plush-lineup"[\s\S]*className="footer-social"/,
