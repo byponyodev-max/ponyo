@@ -1417,6 +1417,30 @@
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
+    .collections-landing {
+        width: calc(100% - 48px);
+        margin-block: 20px 56px;
+    }
+    .collections-landing-hero {
+        min-height: 310px;
+        padding: clamp(24px, 4vw, 36px);
+        grid-template-columns: minmax(0, 1.1fr) minmax(200px, .9fr);
+        gap: 16px;
+    }
+    .collections-landing-hero-copy {
+        min-width: 0;
+    }
+    .collections-landing-hero-bubble {
+        width: clamp(74px, 9vw, 96px);
+        top: 14px;
+        right: 14px;
+    }
+    .collections-landing-stamp {
+        min-width: 78px;
+        min-height: 78px;
+        right: -16px;
+        font-size: 10px;
+    }
     .collections-featured-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
@@ -1428,6 +1452,9 @@
     .collections-animal-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+    .collections-animal-card:last-child:nth-child(odd) {
+        grid-column: 2;
+    }
     .collections-size-section {
         grid-template-columns: minmax(170px, .7fr) minmax(0, 1.3fr);
         gap: 14px;
@@ -1435,6 +1462,10 @@
     }
     .collections-size-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .collections-new-arrivals .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
     }
     .collection-page .collection-heading {
         min-height: 230px;

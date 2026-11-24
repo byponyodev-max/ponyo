@@ -66,3 +66,24 @@ test("mobile quick navigation stays visible on product pages above the sticky pu
     assert.match(productStyles, /body:has\(\.product-page \.mobile-sticky-purchase\)\s*\{\s*padding-bottom:\s*calc\(134px \+ env\(safe-area-inset-bottom\)\);/);
     assert.match(productStyles, /\.product-page \.mobile-sticky-purchase\s*\{\s*bottom:\s*67px;/);
 });
+
+test("iPad headers use the hamburger menu instead of overflowing category links", () => {
+    const styles = read("src/app/theme-parity-polish.css");
+    const tabletHeader = styles.slice(styles.lastIndexOf("@media (min-width: 768px) and (max-width: 1100px)"));
+    assert.ok(tabletHeader, "tablet header rules are present");
+    assert.match(tabletHeader, /\.store-header-main\s*\{[^}]*grid-template-areas:\s*"menu brand actions"\s*"search search search";/);
+    assert.match(tabletHeader, /\.store-header-main \.menu-toggle\s*\{[^}]*display:\s*inline-flex;/);
+    assert.match(tabletHeader, /\.store-header \.store-category-row>\.store-navigation\s*\{[^}]*display:\s*none !important;/);
+    assert.match(tabletHeader, /\.smart-menu-trigger\s*\{[^}]*display:\s*grid;/);
+    assert.match(tabletHeader, /\.smart-header-category\s*\{[^}]*display:\s*none;/);
+    assert.match(tabletHeader, /body\s*\{[^}]*padding-bottom:\s*calc\(67px \+ env\(safe-area-inset-bottom\)\);/);
+    assert.match(tabletHeader, /\.mobile-tab-bar\s*\{[^}]*position:\s*fixed;[^}]*bottom:\s*0;[^}]*display:\s*grid;/);
+});
+
+test("iPad collections landing uses spacious product cards and balances the last animal tile", () => {
+    const styles = read("src/app/collection-theme.css");
+    const tabletLayout = styles.slice(styles.indexOf("@media (min-width: 768px) and (max-width: 1023px)"));
+    assert.match(tabletLayout, /\.collections-landing\s*\{[^}]*width:\s*calc\(100% - 48px\);/);
+    assert.match(tabletLayout, /\.collections-new-arrivals \.product-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
+    assert.match(tabletLayout, /\.collections-animal-card:last-child:nth-child\(odd\)\s*\{[^}]*grid-column:\s*2;/);
+});
