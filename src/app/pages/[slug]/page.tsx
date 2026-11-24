@@ -368,7 +368,15 @@ async function DominaPage({ searchParams }: { searchParams: Promise<Query> }) {
   };
   return <div className="domina-page">
     <section className="domina-page-hero">
-      <div className="domina-hero-glints" aria-hidden="true">{Array.from({ length: 8 }, (_, index) => <span key={index}>✧</span>)}</div>
+      <div className="domina-hero-glints" aria-hidden="true">
+        {Array.from({ length: 8 }, (_, index) => (
+          <span key={index}>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 1.5 14.8 9.2 22.5 12l-7.7 2.8L12 22.5l-2.8-7.7L1.5 12l7.7-2.8L12 1.5Z" />
+            </svg>
+          </span>
+        ))}
+      </div>
       <div className="domina-page-hero-copy">
         <span className="domina-hero-kicker"><span aria-hidden="true">✦</span> <PageCopy id="domina.hero_eyebrow" fallback="PONYO SIGNATURE COLLECTION" /> <span aria-hidden="true">✦</span></span>
         <h1><PageCopy as="span" id="domina.title" fallback="Domina XL" /></h1>

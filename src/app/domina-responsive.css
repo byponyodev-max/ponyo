@@ -22,12 +22,22 @@
 .domina-band .domina-petal-snow span {
     position: absolute;
     top: -12%;
+    display: block;
+    width: 1em;
+    height: 1em;
     color: #ffc4d8;
-    font-family: Georgia, serif;
     font-size: clamp(15px, 1.3vw, 21px);
+    line-height: 1;
     opacity: .8;
     text-shadow: 0 0 8px rgb(255 180 205 / 70%);
     animation: domina-petal-fall var(--fall-duration) linear var(--fall-delay) infinite;
+}
+
+.domina-page .domina-petal-snow svg,
+.domina-band .domina-petal-snow svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 :is(.domina-page, .domina-band) .domina-petal-snow span:nth-child(1) { left: 5%; --fall-duration: 13s; --fall-delay: -8s; --fall-drift: 28px; }
@@ -602,11 +612,19 @@
 
 .domina-page .domina-hero-glints span {
     position: absolute;
+    display: block;
+    width: clamp(12px, 1.2vw, 15px);
+    height: clamp(12px, 1.2vw, 15px);
     color: #d9bf80;
-    font-size: 15px;
     opacity: .48;
     text-shadow: 0 0 14px rgb(232 206 148 / 42%);
     animation: domina-glint 6s ease-in-out infinite;
+}
+
+.domina-page .domina-hero-glints svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .domina-page .domina-hero-glints span:nth-child(1) { top: 20%; left: 36%; }

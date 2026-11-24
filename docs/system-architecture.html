@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ponyo System Architecture Diagrams</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #252525;
+      --muted: #4c5f72;
+      --line: #7894b0;
+      --soft: #fff;
+      --accent: #244e78;
+      --accent-soft: #fff;
+      --green: #fff;
+      --blue: #fff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #fff;
+      color: var(--ink);
+      font: 14px/1.5 Arial, Helvetica, sans-serif;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 38px 0 56px;
+    }
+
+    header {
+      margin-bottom: 30px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #315f8e;
+    }
+
+    .kicker {
+      margin: 0 0 5px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font: 500 32px/1.2 Georgia, "Times New Roman", serif;
+    }
+
+    header p {
+      max-width: 820px;
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-note {
+      margin-top: 12px;
+      padding: 9px 11px;
+      border-left: 3px solid var(--accent);
+      background: #fff;
+      color: #444;
+      font-size: 11px;
+    }
+
+    .diagram {
+      margin: 25px 0 0;
+      padding: 15px 16px 12px;
+      border: 1px solid #9db4ca;
+      background: #fff;
+      break-inside: avoid;
+    }
+
+    .diagram-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .diagram-heading h2 {
+      margin: 0;
+      font: 500 19px/1.25 Georgia, "Times New Roman", serif;
+    }
+
+    .diagram-number {
+      margin-right: 7px;
+      color: var(--accent);
+      font: 700 11px Arial, Helvetica, sans-serif;
+    }
+
+    .download {
+      flex: 0 0 auto;
+      padding: 5px 9px;
+      border: 1px solid #7894b0;
+      border-radius: 3px;
+      background: #fff;
+      color: #333;
+      font: 11px Arial, Helvetica, sans-serif;
+      cursor: pointer;
+    }
+
+    .download:hover { background: #fff; }
+
+    .diagram svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #fff;
+    }
+
+    .diagram svg rect {
+      fill: #fff !important;
+    }
+
+    .diagram svg .box,
+    .diagram svg .b {
+      stroke: #356a9a !important;
+    }
+
+    .diagram svg .edge,
+    .diagram svg .a {
+      stroke: #356a9a !important;
+    }
+
+    .diagram svg marker path {
+      fill: #356a9a !important;
+    }
+
+    .diagram svg .title,
+    .diagram svg .t {
+      fill: #183b5d !important;
+    }
+
+    .diagram svg .text,
+    .diagram svg .small,
+    .diagram svg .s,
+    .diagram svg .n {
+      fill: #202a33 !important;
+    }
+
+    .caption {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 9px;
+      color: #555;
+      font-size: 10px;
+    }
+
+    .legend span::before {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 5px;
+      border: 1px solid #777;
+      background: var(--soft);
+      content: "";
+      vertical-align: -1px;
+    }
+
+    .legend .data::before,
+    .legend .human::before,
+    .legend .external::before { background: #fff; }
+
+    footer {
+      margin-top: 28px;
+      padding-top: 10px;
+      border-top: 1px solid #7894b0;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    @media (max-width: 640px) {
+      main { width: calc(100% - 20px); padding-top: 20px; }
+      h1 { font-size: 27px; }
+      .diagram { margin-top: 16px; padding: 10px; }
+      .diagram-heading h2 { font-size: 16px; }
+      .download { font-size: 10px; }
+    }
+
+    @media print {
+      @page { size: A4 portrait; margin: 12mm; }
+      body { background: #fff; }
+      main { width: 100%; padding: 0; }
+      header { margin-bottom: 12px; }
+      header p { margin-top: 4px; }
+      .status-note { margin-top: 7px; }
+      .diagram {
+        margin-top: 14px;
+        padding: 10px;
+        border-color: #aaa;
+      }
+      .download { display: none; }
+      .diagram-heading { margin-bottom: 4px; }
+      .caption { margin-top: 4px; }
+      .diagram svg { max-height: 185mm; }
+      footer { margin-top: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="kicker">Ponyo · System architecture</p>
+      <h1>Application Architecture and User Flows</h1>
+      <p>System overview, data connections, deployment, and user workflows. White-and-blue diagrams can be downloaded individually as PNGs for Google Docs.</p>
+      <div class="status-note"><strong>System status:</strong> This describes implemented code and clearly marks disabled or unconfigured features. Local Docker Compose is the verified runtime; AWS production hosting is not deployed.</div>
+    </header>
+
+    <section class="diagram" aria-labelledby="fig1">
+      <div class="diagram-heading">
+        <h2 id="fig1"><span class="diagram-number">Figure 1.</span>Overall application architecture</h2>
+        <button class="download" type="button">Download PNG</button>
+      </div>
+      <svg viewBox="0 0 1600 900" role="img" aria-labelledby="title1 desc1" xmlns="http://www.w3.org/2000/svg">
+        <title id="title1">Ponyo system architecture and data connections</title>
+        <desc id="desc1">Three identities use separate storefront, admin, and supplier portal surfaces in one Next.js application. Each calls identity-scoped FastAPI routes. The shared API connects to PostgreSQL by SQL, Redis for rate limits, private and public Supabase Storage for images, and optional SMTP, translation, Stripe, supplier, and event services.</desc>
+        <defs>
+          <marker id="arrow1" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#356a9a"/></marker>
+          <style>
+            rect{fill:#fff!important}.box{stroke:#356a9a;stroke-width:2;rx:8}.title{font:700 20px Arial;fill:#183b5d}.text{font:15px Arial;fill:#202a33}.small{font:12px Arial;fill:#202a33}.edge{fill:none;stroke:#356a9a;stroke-width:2;marker-end:url(#arrow1)}.dash{stroke-dasharray:7 6}
+          </style>
+        </defs>
+        <rect width="1600" height="900" fill="#fff"/>
+
+        <text x="35" y="30" class="small" font-weight="700" letter-spacing="1.2">IDENTITY → PORTAL → ROLE-SCOPED API</text>
+
+        <rect class="box" x="35" y="50" width="480" height="70"/>
+        <text x="55" y="79" class="title">Visitor / customer</text>
+        <text x="55" y="103" class="text">Anonymous public use · customer account UI disabled</text>
+        <rect class="box" x="35" y="140" width="480" height="126"/>
+        <text x="55" y="171" class="title">Public storefront</text>
+        <text x="55" y="197" class="text">Browse · search · product details</text>
+        <text x="55" y="220" class="text">Newsletter · contact · maker application</text>
+        <text x="55" y="243" class="text">Reserve · register interest · waitlist</text>
+        <path class="edge" d="M275 120V140"/>
+
+        <rect class="box" x="560" y="50" width="480" height="70"/>
+        <text x="580" y="79" class="title">Ponyo administrator</text>
+        <text x="580" y="103" class="text">Verified account · database role: admin</text>
+        <rect class="box" x="560" y="140" width="480" height="126"/>
+        <text x="580" y="171" class="title">Admin Portal · /admin-portal</text>
+        <text x="580" y="197" class="text">Review makers and supplier submissions</text>
+        <text x="580" y="220" class="text">Manage catalog · reservations · orders</text>
+        <text x="580" y="243" class="text">Email inbox · reports · admin accounts</text>
+        <path class="edge" d="M800 120V140"/>
+
+        <rect class="box" x="1085" y="50" width="480" height="70"/>
+        <text x="1105" y="79" class="title">Maker / supplier account</text>
+        <text x="1105" y="103" class="text">Verified supplier role + SupplierAccount binding</text>
+        <rect class="box" x="1085" y="140" width="480" height="126"/>
+        <text x="1105" y="171" class="title">Supplier Portal · /supplier-portal</text>
+        <text x="1105" y="197" class="text">View own approved offers</text>
+        <text x="1105" y="220" class="text">Propose cost / capacity changes</text>
+        <text x="1105" y="243" class="text">Submit products · respond to own POs</text>
+        <path class="edge" d="M1325 120V140"/>
+
+        <text x="35" y="302" class="small" font-weight="700" letter-spacing="1.2">HTTPS REQUESTS · SAME NEXT.JS APP · DISTINCT AUTHENTICATION AND AUTHORIZATION BOUNDARIES</text>
+        <rect class="box" x="35" y="320" width="480" height="92"/>
+        <text x="55" y="352" class="title">Public / customer API routes</text>
+        <text x="55" y="380" class="text">catalog · content · makers · products · auth</text>
+        <text x="55" y="400" class="text">reservations · interests · cart / orders</text>
+
+        <rect class="box" x="560" y="320" width="480" height="92"/>
+        <text x="580" y="352" class="title">Admin API routes</text>
+        <text x="580" y="380" class="text">/v1/admin/* · /v1/admin-auth/*</text>
+        <text x="580" y="400" class="text">admin role · CSRF on changes</text>
+
+        <rect class="box" x="1085" y="320" width="480" height="92"/>
+        <text x="1105" y="352" class="title">Supplier API routes</text>
+        <text x="1105" y="380" class="text">/v1/supplier-catalog · /v1/supplier-orders</text>
+        <text x="1105" y="400" class="text">supplier ownership + CSRF checks</text>
+
+        <path class="edge" d="M275 266V320"/>
+        <path class="edge" d="M800 266V320"/>
+        <path class="edge" d="M1325 266V320"/>
+
+        <rect class="box" x="230" y="465" width="1140" height="105"/>
+        <text x="260" y="500" class="title">FastAPI application · /v1</text>
+        <text x="260" y="529" class="text">Route guards → validate request → apply marketplace rules → read / write records → return response to the calling portal</text>
+        <text x="260" y="553" class="small">Shared SQLAlchemy services · PostgreSQL transactions · CSRF · Redis rate limits · request IDs</text>
+        <path class="edge" d="M275 412V440H800V465"/>
+        <path class="edge" d="M800 412V465"/>
+        <path class="edge" d="M1325 412V440H800V465"/>
+
+        <text x="35" y="612" class="small" font-weight="700" letter-spacing="1.2">BACKEND DATA CONNECTIONS · THE BROWSER DOES NOT CONNECT TO DATABASES OR PROVIDER SECRETS</text>
+
+        <rect class="box" x="35" y="638" width="405" height="150"/>
+        <text x="55" y="671" class="title">PostgreSQL</text>
+        <text x="55" y="698" class="text">Products · categories · brands · translations</text>
+        <text x="55" y="722" class="text">Accounts · makers · supplier offers</text>
+        <text x="55" y="746" class="text">Reservations · interests · carts · orders</text>
+        <text x="55" y="770" class="text">Contacts · newsletter · outbox · audit history</text>
+
+        <rect class="box" x="470" y="638" width="230" height="150"/>
+        <text x="490" y="671" class="title">Redis</text>
+        <text x="490" y="703" class="text">Rate limiting</text>
+        <text x="490" y="727" class="text">Supporting runtime state</text>
+        <text x="490" y="763" class="small">API only</text>
+
+        <rect class="box" x="730" y="638" width="390" height="150"/>
+        <text x="750" y="671" class="title">Image / media storage</text>
+        <text x="750" y="703" class="text">Private bucket: maker application photos</text>
+        <text x="750" y="727" class="text">Public bucket: supplier product submissions</text>
+        <text x="750" y="751" class="text">Catalog also serves repository /public assets</text>
+        <text x="750" y="775" class="small">Signed admin previews · public catalog image URLs</text>
+
+        <rect class="box" x="1150" y="638" width="415" height="150"/>
+        <text x="1170" y="671" class="title">External services / workers</text>
+        <text x="1170" y="699" class="text">SMTP / IMAP · transactional email / inbox</text>
+        <text x="1170" y="722" class="text">LibreTranslate · cached product translations</text>
+        <text x="1170" y="745" class="text">Stripe · checkout disabled</text>
+        <text x="1170" y="768" class="text">Supplier forwarding off · no carrier API</text>
+
+        <path class="edge" d="M800 570V605H237V638"/>
+        <path class="edge" d="M800 570V605H585V638"/>
+        <path class="edge" d="M800 570V638"/>
+        <path class="edge dash" d="M800 570V605H1357V638"/>
+        <text x="396" y="598" class="small">SQL read / write</text>
+        <text x="601" y="598" class="small">rate limit</text>
+        <text x="852" y="598" class="small">image object API</text>
+        <text x="1114" y="598" class="small">provider calls / events</text>
+
+        <rect class="box" x="35" y="822" width="1530" height="48"/>
+        <text x="55" y="852" class="text">Deployment status: local Docker Compose verified · Cloudflare Quick Tunnel temporary preview · AWS Terraform target not deployed · frontend production host not established</text>
+      </svg>
+      <p class="caption">Main data path: portal → identity-scoped API route → FastAPI business logic → database / storage / configured provider → API response to portal.</p>
+      <div class="legend"><span>Solid arrow: active request / data flow</span><span class="external">Dashed arrow: optional or configuration-dependent service</span></div>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig2">
+      <div class="diagram-heading"><h2 id="fig2"><span class="diagram-number">Figure 2.</span>Product discovery and catalog display</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 230" role="img" aria-labelledby="title2 desc2" xmlns="http://www.w3.org/2000/svg">
+        <title id="title2">Product search and display flow</title><desc id="desc2">Visitor searches in the storefront. Frontend requests catalog API. Backend reads published product data and image references and returns results.</desc>
+        <defs><marker id="arrow2" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#555"/></marker><style>.b{stroke:#666;stroke-width:1.4;rx:8}.t{font:700 16px Arial;fill:#222}.s{font:13px Arial;fill:#444}.a{fill:none;stroke:#555;stroke-width:1.7;marker-end:url(#arrow2)}.n{font:11px Arial;fill:#666}</style></defs>
+        <rect width="1200" height="230" fill="#fff"/>
+        <rect class="b" x="30" y="55" width="205" height="105" fill="#f4efe6"/><text class="t" x="50" y="88">Visitor</text><text class="s" x="50" y="115">Search or browse</text><text class="s" x="50" y="137">Open a product page</text>
+        <rect class="b" x="310" y="55" width="220" height="105" fill="#faf8f4"/><text class="t" x="330" y="88">Next.js storefront</text><text class="s" x="330" y="115">Shop · search · collections</text><text class="s" x="330" y="137">Product detail</text>
+        <rect class="b" x="610" y="55" width="230" height="105" fill="#f4efe6"/><text class="t" x="630" y="88">FastAPI catalog</text><text class="s" x="630" y="115">GET /v1/products</text><text class="s" x="630" y="137">Search · filters · detail</text>
+        <rect class="b" x="925" y="28" width="240" height="72" fill="#eef2f5"/><text class="t" x="945" y="57">PostgreSQL</text><text class="s" x="945" y="80">Published product records</text>
+        <rect class="b" x="925" y="125" width="240" height="72" fill="#eef2f5"/><text class="t" x="945" y="154">Image assets</text><text class="s" x="945" y="177">Local assets / public bucket</text>
+        <path class="a" d="M235 108H310"/><path class="a" d="M530 108H610"/><path class="a" d="M840 83H925"/><path class="a" d="M840 134H880V161H925"/>
+        <text class="n" x="544" y="97">HTTPS</text><text class="n" x="850" y="69">query</text><text class="n" x="850" y="153">image URL</text>
+        <text class="n" x="313" y="190">Results and product details are rendered in the browser.</text>
+      </svg>
+      <p class="caption">Only published products are returned by the public catalog endpoints.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig3">
+      <div class="diagram-heading"><h2 id="fig3"><span class="diagram-number">Figure 3.</span>Newsletter subscription and contact request</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 250" role="img" aria-labelledby="title3 desc3" xmlns="http://www.w3.org/2000/svg">
+        <title id="title3">Newsletter and contact form flow</title><desc id="desc3">Visitor submits newsletter or contact form. API stores subscription/request and an event. Contact notification is sent via SMTP if configured; newsletter marketing sender is not configured.</desc>
+        <defs><marker id="arrow3" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#555"/></marker><style>.b{stroke:#666;stroke-width:1.4;rx:8}.t{font:700 15px Arial;fill:#222}.s{font:12px Arial;fill:#444}.n{font:11px Arial;fill:#666}.a{fill:none;stroke:#555;stroke-width:1.7;marker-end:url(#arrow3)}.d{stroke-dasharray:6 5}</style></defs>
+        <rect width="1200" height="250" fill="#fff"/>
+        <rect class="b" x="25" y="65" width="190" height="100" fill="#f4efe6"/><text class="t" x="44" y="97">Visitor</text><text class="s" x="44" y="123">Newsletter email</text><text class="s" x="44" y="145">Contact message</text>
+        <rect class="b" x="275" y="65" width="215" height="100" fill="#faf8f4"/><text class="t" x="294" y="97">Storefront forms</text><text class="s" x="294" y="123">Validate and submit</text><text class="s" x="294" y="145">CSRF / rate limits</text>
+        <rect class="b" x="550" y="65" width="235" height="100" fill="#f4efe6"/><text class="t" x="569" y="97">FastAPI content routes</text><text class="s" x="569" y="123">Save record + event</text><text class="s" x="569" y="145">POST /v1/contact/requests</text>
+        <rect class="b" x="850" y="25" width="300" height="80" fill="#eef2f5"/><text class="t" x="869" y="56">PostgreSQL</text><text class="s" x="869" y="81">Newsletter subscription / contact request / outbox</text>
+        <rect class="b" x="850" y="145" width="300" height="80" fill="#edf4ef"/><text class="t" x="869" y="176">SMTP email (conditional)</text><text class="s" x="869" y="201">Contact notification when configured</text>
+        <path class="a" d="M215 115H275"/><path class="a" d="M490 115H550"/><path class="a" d="M785 85H850"/><path class="a d" d="M785 145H850"/>
+        <text class="n" x="798" y="71">persist</text><text class="n" x="790" y="165">notify if configured</text>
+        <text class="n" x="25" y="208">Newsletter provider is not configured: subscription consent is stored, but a marketing campaign is not sent.</text>
+      </svg>
+      <p class="caption">Contact requests are committed before SMTP is attempted, so notification failure does not discard the request.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig4">
+      <div class="diagram-heading"><h2 id="fig4"><span class="diagram-number">Figure 4.</span>Maker application, onboarding, and approval</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 270" role="img" aria-labelledby="title4 desc4" xmlns="http://www.w3.org/2000/svg">
+        <title id="title4">Maker onboarding workflow</title><desc id="desc4">Maker submits an application and photos. API stores details and private photos. Admin accepts and sends an invitation. Maker completes onboarding; Admin approves and creates brand and supplier and issues supplier portal invitation.</desc>
+        <defs><marker id="arrow4" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#555"/></marker><style>.b{stroke:#666;stroke-width:1.4;rx:8}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#444}.n{font:10px Arial;fill:#666}.a{fill:none;stroke:#555;stroke-width:1.6;marker-end:url(#arrow4)}</style></defs>
+        <rect width="1200" height="270" fill="#fff"/>
+        <rect class="b" x="15" y="66" width="170" height="90" fill="#f4efe6"/><text class="t" x="31" y="96">Maker applies</text><text class="s" x="31" y="121">Details + 1–3 photos</text><text class="s" x="31" y="141">/for-makers</text>
+        <rect class="b" x="220" y="66" width="185" height="90" fill="#f4efe6"/><text class="t" x="236" y="96">FastAPI stores</text><text class="s" x="236" y="121">Application → database</text><text class="s" x="236" y="141">Photos → private bucket</text>
+        <rect class="b" x="440" y="66" width="170" height="90" fill="#f4efe6"/><text class="t" x="456" y="96">Admin reviews</text><text class="s" x="456" y="121">Accept or reject</text><text class="s" x="456" y="141">Acceptance ≠ supplier</text>
+        <rect class="b" x="645" y="66" width="170" height="90" fill="#f4efe6"/><text class="t" x="661" y="96">Maker onboarding</text><text class="s" x="661" y="121">Invitation + details</text><text class="s" x="661" y="141">Submitted for review</text>
+        <rect class="b" x="850" y="66" width="155" height="90" fill="#f4efe6"/><text class="t" x="866" y="96">Admin approves</text><text class="s" x="866" y="121">Creates brand</text><text class="s" x="866" y="141">+ inactive supplier</text>
+        <rect class="b" x="1040" y="66" width="145" height="90" fill="#edf4ef"/><text class="t" x="1055" y="96">Supplier invite</text><text class="s" x="1055" y="121">Portal activated</text><text class="s" x="1055" y="141">separately</text>
+        <path class="a" d="M185 111H220"/><path class="a" d="M405 111H440"/><path class="a" d="M610 111H645"/><path class="a" d="M815 111H850"/><path class="a" d="M1005 111H1040"/>
+        <rect class="b" x="220" y="190" width="185" height="51" fill="#eef2f5"/><text class="t" x="237" y="212">PostgreSQL</text><text class="n" x="237" y="230">Application + onboarding records</text>
+        <rect class="b" x="440" y="190" width="170" height="51" fill="#eef2f5"/><text class="t" x="457" y="212">Private storage</text><text class="n" x="457" y="230">Admin uses expiring signed links</text>
+        <rect class="b" x="735" y="190" width="270" height="51" fill="#edf4ef"/><text class="t" x="752" y="212">SMTP notifications (if configured)</text><text class="n" x="752" y="230">Application / onboarding / supplier invitations</text>
+        <path class="a" d="M312 156V190"/><path class="a" d="M525 156V190"/><path class="a" d="M730 156V174H870V190"/>
+      </svg>
+      <p class="caption">Maker acceptance, onboarding approval, supplier activation, and product approval are separate steps. Application photos are stored privately.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig5">
+      <div class="diagram-heading"><h2 id="fig5"><span class="diagram-number">Figure 5.</span>Supplier product submission, admin review, and publication</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 285" role="img" aria-labelledby="title5 desc5" xmlns="http://www.w3.org/2000/svg">
+        <title id="title5">Supplier product approval and publication flow</title><desc id="desc5">Approved supplier submits product data and images. API saves submission and image files. Admin approves, creating an unpublished product. Admin separately publishes after Japanese and Korean translations are ready.</desc>
+        <defs><marker id="arrow5" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#555"/></marker><style>.b{stroke:#666;stroke-width:1.4;rx:8}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#444}.n{font:10px Arial;fill:#666}.a{fill:none;stroke:#555;stroke-width:1.6;marker-end:url(#arrow5)}</style></defs>
+        <rect width="1200" height="285" fill="#fff"/>
+        <rect class="b" x="18" y="62" width="180" height="94" fill="#f4efe6"/><text class="t" x="34" y="92">Approved supplier</text><text class="s" x="34" y="118">Product details</text><text class="s" x="34" y="139">+ 1–4 photos</text>
+        <rect class="b" x="230" y="62" width="180" height="94" fill="#f4efe6"/><text class="t" x="246" y="92">FastAPI submission</text><text class="s" x="246" y="118">Validates supplier</text><text class="s" x="246" y="139">Saves submission</text>
+        <rect class="b" x="445" y="32" width="200" height="70" fill="#eef2f5"/><text class="t" x="463" y="62">PostgreSQL</text><text class="s" x="463" y="84">Submission metadata</text>
+        <rect class="b" x="445" y="119" width="200" height="70" fill="#eef2f5"/><text class="t" x="463" y="149">Image storage</text><text class="s" x="463" y="171">Public product bucket</text>
+        <rect class="b" x="680" y="62" width="170" height="94" fill="#f4efe6"/><text class="t" x="696" y="92">Admin review</text><text class="s" x="696" y="118">Approve or reject</text><text class="s" x="696" y="139">Submission</text>
+        <rect class="b" x="885" y="62" width="145" height="94" fill="#faf8f4"/><text class="t" x="900" y="92">Product created</text><text class="s" x="900" y="118">Unpublished</text><text class="s" x="900" y="139">Checkout disabled</text>
+        <rect class="b" x="1060" y="62" width="125" height="94" fill="#edf4ef"/><text class="t" x="1075" y="92">Publish</text><text class="s" x="1075" y="118">After JA + KO</text><text class="s" x="1075" y="139">translations</text>
+        <path class="a" d="M198 109H230"/><path class="a" d="M410 91H445"/><path class="a" d="M410 133H445"/><path class="a" d="M645 67H680"/><path class="a" d="M645 154H660V137H680"/><path class="a" d="M850 109H885"/><path class="a" d="M1030 109H1060"/>
+        <text class="n" x="868" y="96">approved</text><text class="n" x="1036" y="96">separate action</text>
+        <text class="n" x="680" y="205">Approval creates product + default variant + supplier offer + inventory.</text>
+        <text class="n" x="680" y="226">Publication is separate; checkout must also be enabled separately.</text>
+        <text class="n" x="18" y="247">A maker application alone does not create a product listing.</text>
+      </svg>
+      <p class="caption">New supplier products start unpublished and with checkout disabled. Admin publication requires Japanese and Korean translations.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig6">
+      <div class="diagram-heading"><h2 id="fig6"><span class="diagram-number">Figure 6.</span>Customer reservation or product-interest registration</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 270" role="img" aria-labelledby="title6 desc6" xmlns="http://www.w3.org/2000/svg">
+        <title id="title6">Reservation and interest flow</title><desc id="desc6">Customer submits email and country on published product. Backend checks shipping confirmation and reservation availability. Eligible requests create reservations, other customers can register interest. Both are stored separately and neither charges payment.</desc>
+        <defs><marker id="arrow6" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#555"/></marker><style>.b{stroke:#666;stroke-width:1.4;rx:8}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#444}.n{font:10px Arial;fill:#666}.a{fill:none;stroke:#555;stroke-width:1.6;marker-end:url(#arrow6)}</style></defs>
+        <rect width="1200" height="270" fill="#fff"/>
+        <rect class="b" x="28" y="84" width="190" height="92" fill="#f4efe6"/><text class="t" x="46" y="115">Customer</text><text class="s" x="46" y="141">Email + country</text><text class="s" x="46" y="161">Published product</text>
+        <rect class="b" x="280" y="84" width="220" height="92" fill="#faf8f4"/><text class="t" x="298" y="115">Product page</text><text class="s" x="298" y="141">Reservation / interest form</text><text class="s" x="298" y="161">CSRF + rate limits</text>
+        <rect class="b" x="560" y="84" width="230" height="92" fill="#f4efe6"/><text class="t" x="578" y="115">FastAPI checks</text><text class="s" x="578" y="141">Shipping country confirmed?</text><text class="s" x="578" y="161">Reservations open?</text>
+        <rect class="b" x="880" y="28" width="275" height="82" fill="#eef2f5"/><text class="t" x="900" y="60">Reservation record</text><text class="s" x="900" y="86">Eligible destination + open reservation</text>
+        <rect class="b" x="880" y="151" width="275" height="82" fill="#eef2f5"/><text class="t" x="900" y="183">Product-interest record</text><text class="s" x="900" y="209">Unsupported / unconfirmed destination</text>
+        <path class="a" d="M218 130H280"/><path class="a" d="M500 130H560"/><path class="a" d="M790 108H830V69H880"/><path class="a" d="M790 152H830V192H880"/>
+        <text class="n" x="800" y="93">eligible</text><text class="n" x="800" y="180">otherwise</text>
+        <text class="n" x="28" y="224">Both records are stored in PostgreSQL and reported separately to Admin.</text>
+        <text class="n" x="28" y="245" font-weight="700">No payment is taken. Reaching a reservation target signals a production review; it does not place a supplier order.</text>
+      </svg>
+      <p class="caption">Reservation and interest are distinct non-payment flows; the selected path depends on the product's shipping confirmation and reservation settings.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig7">
+      <div class="diagram-heading"><h2 id="fig7"><span class="diagram-number">Figure 7.</span>Conditional Stripe payment flow (not currently enabled)</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 270" role="img" aria-labelledby="title7 desc7" xmlns="http://www.w3.org/2000/svg">
+        <title id="title7">Conditional Stripe payment process</title><desc id="desc7">When enabled, a verified customer starts checkout. Backend validates price and stock, reserves inventory and creates order and hosted Stripe session. Stripe processes payment and sends a signed webhook, after which backend updates order and inventory.</desc>
+        <defs><marker id="arrow7" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#555"/></marker><style>.b{stroke:#666;stroke-width:1.4;rx:8}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#444}.n{font:10px Arial;fill:#666}.a{fill:none;stroke:#555;stroke-width:1.6;marker-end:url(#arrow7)}.off{font:700 12px Arial;fill:#7b4d25}</style></defs>
+        <rect width="1200" height="270" fill="#fff"/>
+        <rect class="b" x="28" y="78" width="190" height="100" fill="#f4efe6"/><text class="t" x="46" y="111">Verified customer</text><text class="s" x="46" y="138">Starts checkout</text><text class="s" x="46" y="159">No card data to Ponyo</text>
+        <rect class="b" x="285" y="78" width="235" height="100" fill="#f4efe6"/><text class="t" x="303" y="111">Ponyo FastAPI</text><text class="s" x="303" y="138">Reprice · stock · ship / tax / coupon</text><text class="s" x="303" y="159">Reserve stock + create order</text>
+        <rect class="b" x="590" y="78" width="210" height="100" fill="#edf4ef"/><text class="t" x="608" y="111">Stripe Hosted Checkout</text><text class="s" x="608" y="138">Customer pays at Stripe</text><text class="s" x="608" y="159">Card data stays with Stripe</text>
+        <rect class="b" x="870" y="78" width="285" height="100" fill="#f4efe6"/><text class="t" x="888" y="111">Signed Stripe webhook</text><text class="s" x="888" y="138">FastAPI verifies signature + payment</text><text class="s" x="888" y="159">Updates order and inventory records</text>
+        <path class="a" d="M218 128H285"/><path class="a" d="M520 128H590"/><path class="a" d="M800 128H870"/>
+        <text class="n" x="530" y="116">hosted session URL</text><text class="n" x="807" y="116">payment event</text>
+        <rect class="b" x="285" y="205" width="870" height="42" fill="#faf6ee" stroke-dasharray="5 4"/>
+        <text class="off" x="305" y="231">CURRENTLY OFF</text><text class="s" x="435" y="231">storefrontFeatures.commerce = false · enable only after launch configuration and sandbox testing</text>
+      </svg>
+      <p class="caption">When enabled, admin-only payment capture, void, refund, and sync use a durable transaction ledger; signed webhooks reconcile provider state. Product reservations and interests do not initiate Stripe.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig8">
+      <div class="diagram-heading"><h2 id="fig8"><span class="diagram-number">Figure 8.</span>Portal identities, sign-in, and authorization boundaries</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 310" role="img" aria-labelledby="title8 desc8" xmlns="http://www.w3.org/2000/svg">
+        <title id="title8">Ponyo user identity and portal authorization boundaries</title>
+        <desc id="desc8">The public storefront allows anonymous visitors and currently hides customer accounts. Admin and supplier portals use separate login and identity checks. Admin endpoints require admin role; supplier endpoints require verified supplier role and explicit SupplierAccount binding.</desc>
+        <defs><marker id="arrow8" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker><style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.4;rx:7}.t{font:700 15px Arial;fill:#222}.s{font:12px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.6;marker-end:url(#arrow8)}</style></defs>
+        <rect width="1200" height="310" fill="#fff"/>
+        <rect class="b" x="20" y="24" width="270" height="102"/><text class="t" x="38" y="52">Visitor → Storefront</text><text class="s" x="38" y="78">Anonymous public catalog and forms</text><text class="s" x="38" y="100">No elevated identity or write access</text>
+        <rect class="b" x="310" y="24" width="270" height="102"/><text class="t" x="328" y="52">Customer → Storefront</text><text class="s" x="328" y="78">Customer auth APIs are implemented</text><text class="s" x="328" y="100">Account UI flag is OFF</text>
+        <rect class="b" x="600" y="24" width="270" height="102"/><text class="t" x="618" y="52">Admin → Admin Portal</text><text class="s" x="618" y="78">Separate admin login / identity check</text><text class="s" x="618" y="100">Database role must be admin</text>
+        <rect class="b" x="890" y="24" width="290" height="102"/><text class="t" x="908" y="52">Supplier → Supplier Portal</text><text class="s" x="908" y="78">Separate supplier login / identity check</text><text class="s" x="908" y="100">Supplier role + SupplierAccount binding</text>
+        <rect class="b" x="20" y="170" width="270" height="90"/><text class="t" x="38" y="199">Public API</text><text class="s" x="38" y="224">Catalog · forms · reservations</text><text class="n" x="38" y="244">Public reads; CSRF / rate limits on writes</text>
+        <rect class="b" x="310" y="170" width="270" height="90"/><text class="t" x="328" y="199">Customer API</text><text class="s" x="328" y="224">/v1/auth · /cart · /orders</text><text class="n" x="328" y="244">Verified owner + CSRF checks</text>
+        <rect class="b" x="600" y="170" width="270" height="90"/><text class="t" x="618" y="199">Admin API</text><text class="s" x="618" y="224">/v1/admin/* · /v1/admin-auth/*</text><text class="n" x="618" y="244">Admin role guard + CSRF on changes</text>
+        <rect class="b" x="890" y="170" width="290" height="90"/><text class="t" x="908" y="199">Supplier API</text><text class="s" x="908" y="224">/v1/supplier-catalog · supplier-orders</text><text class="n" x="908" y="244">Bound supplier owns each requested record</text>
+        <path class="a" d="M155 126V170"/><path class="a" d="M445 126V170"/><path class="a" d="M735 126V170"/><path class="a" d="M1035 126V170"/>
+        <rect class="b" x="112" y="278" width="976" height="26"/><text class="n" x="132" y="296">Shared security controls: secure HTTP-only session cookies · CSRF protection · role / ownership checks · rate limits · request IDs</text>
+      </svg>
+      <p class="caption">These are three separate portal identities, not three separate databases or backend deployments. The supplier hostname rewrite is code-supported; public DNS and HTTPS for the subdomain are not established by this repository.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig9">
+      <div class="diagram-heading"><h2 id="fig9"><span class="diagram-number">Figure 9.</span>Customer account, cart, wishlist, and engagement features</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 320" role="img" aria-labelledby="title9 desc9" xmlns="http://www.w3.org/2000/svg">
+        <title id="title9">Customer account and engagement capabilities</title><desc id="desc9">The customer account API supports registration and email verification, login, reset, profile, addresses, wishlist, cart, and order history. The customer account and commerce interfaces are currently disabled. Guest wishlist and cart are local. Product reviews are disabled; product waitlist, reservation, and interest flows are separate.</desc>
+        <defs><marker id="arrow9" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker><style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.4;rx:7}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.5;marker-end:url(#arrow9)}.d{stroke-dasharray:5 4}</style></defs>
+        <rect width="1200" height="320" fill="#fff"/>
+        <rect class="b" x="20" y="45" width="225" height="120"/><text class="t" x="37" y="73">Customer account APIs</text><text class="s" x="37" y="99">Register → verify email → login</text><text class="s" x="37" y="121">Reset password · profile</text><text class="s" x="37" y="143">Addresses · wishlist · orders</text>
+        <rect class="b" x="275" y="45" width="225" height="120"/><text class="t" x="292" y="73">Customer data</text><text class="s" x="292" y="99">PostgreSQL account / address</text><text class="s" x="292" y="121">Persistent wishlist / cart</text><text class="s" x="292" y="143">Orders and order history</text>
+        <rect class="b" x="530" y="45" width="225" height="120"/><text class="t" x="547" y="73">Guest experience</text><text class="s" x="547" y="99">Wishlist saved in browser</text><text class="s" x="547" y="121">Guest cart saved locally</text><text class="s" x="547" y="143">No account sync while disabled</text>
+        <rect class="b" x="785" y="45" width="395" height="120"/><text class="t" x="802" y="73">Product engagement</text><text class="s" x="802" y="99">Waitlist → per-product email record / admin notification</text><text class="s" x="802" y="121">Reservations and interest → separate database records</text><text class="s" x="802" y="143">Reviews API exists; public review feature is disabled</text>
+        <path class="a" d="M245 105H275"/><path class="a d" d="M500 105H530"/><path class="a" d="M755 105H785"/>
+        <rect class="b" x="20" y="210" width="1160" height="72"/><text class="t" x="38" y="238">Current feature flags</text><text class="s" x="38" y="262">customerAccounts = false · commerce = false · productReviews = false · productReservations = true</text>
+        <text class="n" x="20" y="304">Account, checkout, and customer order routes are hidden from the normal storefront. Implemented backend capabilities should not be described as enabled customer features.</text>
+      </svg>
+      <p class="caption">The diagram separates code-supported APIs from features currently visible and enabled in the storefront.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig10">
+      <div class="diagram-heading"><h2 id="fig10"><span class="diagram-number">Figure 10.</span>Supplier offer and inventory change approval</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 285" role="img" aria-labelledby="title10 desc10" xmlns="http://www.w3.org/2000/svg">
+        <title id="title10">Supplier offer and inventory change workflow</title><desc id="desc10">Supplier sees only approved offers for published products, submits proposed cost and capacity changes, and waits while admin reviews. Pending proposals do not change current inventory, supplier cost, or retail price. On admin approval new terms are applied and retail is recalculated.</desc>
+        <defs><marker id="arrow10" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker><style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.4;rx:7}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.5;marker-end:url(#arrow10)}</style></defs>
+        <rect width="1200" height="285" fill="#fff"/>
+        <rect class="b" x="20" y="48" width="210" height="100"/><text class="t" x="38" y="77">Supplier Portal</text><text class="s" x="38" y="102">View own approved offers</text><text class="s" x="38" y="124">Propose cost / capacity</text>
+        <rect class="b" x="270" y="48" width="220" height="100"/><text class="t" x="288" y="77">FastAPI validates scope</text><text class="s" x="288" y="102">SupplierAccount ownership</text><text class="s" x="288" y="124">No direct live catalog edits</text>
+        <rect class="b" x="530" y="48" width="220" height="100"/><text class="t" x="548" y="77">Pending change request</text><text class="s" x="548" y="102">Saved without live effects</text><text class="s" x="548" y="124">Current offer / stock unchanged</text>
+        <rect class="b" x="790" y="48" width="190" height="100"/><text class="t" x="808" y="77">Ponyo Admin</text><text class="s" x="808" y="102">Approve or reject</text><text class="s" x="808" y="124">Select primary maker</text>
+        <rect class="b" x="1020" y="48" width="160" height="100"/><text class="t" x="1038" y="77">Approved terms</text><text class="s" x="1038" y="102">Inventory / cost updated</text><text class="s" x="1038" y="124">Retail = cost + 20%</text>
+        <path class="a" d="M230 98H270"/><path class="a" d="M490 98H530"/><path class="a" d="M750 98H790"/><path class="a" d="M980 98H1020"/>
+        <rect class="b" x="270" y="190" width="710" height="56"/><text class="t" x="290" y="215">PostgreSQL offer / inventory / approval records</text><text class="n" x="290" y="235">Only the Ponyo-approved primary offer is eligible for a variant; pending supplier changes are not public catalog data.</text>
+        <path class="a" d="M640 148V190"/>
+        <text class="n" x="20" y="270">Supplier wholesale cost, capacity, retail price, product text, images, variant identity, and maker selection remain under Ponyo admin control.</text>
+      </svg>
+      <p class="caption">The supplier can suggest changes but cannot change the public catalog directly. Admin approval applies pricing and capacity updates.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig11">
+      <div class="diagram-heading"><h2 id="fig11"><span class="diagram-number">Figure 11.</span>Paid order routing to supplier purchase orders (conditional)</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 330" role="img" aria-labelledby="title11 desc11" xmlns="http://www.w3.org/2000/svg">
+        <title id="title11">Supplier purchase order planning and confirmation flow</title><desc id="desc11">After a paid processing order, the planner groups order items by approved primary supplier and creates durable purchase orders. Configured forwarding is disabled by default. Suppliers see only their own purchase orders and confirm or reject through authenticated API. Ambiguous failures retry with idempotency; exhausted attempts require manual review.</desc>
+        <defs><marker id="arrow11" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker><style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.4;rx:7}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.5;marker-end:url(#arrow11)}.d{stroke-dasharray:5 4}</style></defs>
+        <rect width="1200" height="330" fill="#fff"/>
+        <rect class="b" x="18" y="48" width="180" height="90"/><text class="t" x="34" y="77">Paid order</text><text class="s" x="34" y="102">Processing</text><text class="s" x="34" y="122">Eligible items</text>
+        <rect class="b" x="230" y="48" width="205" height="90"/><text class="t" x="246" y="77">PO planner</text><text class="s" x="246" y="102">Approved primary offer</text><text class="s" x="246" y="122">Group items by supplier</text>
+        <rect class="b" x="470" y="48" width="205" height="90"/><text class="t" x="486" y="77">Durable PO records</text><text class="s" x="486" y="102">Items / route history</text><text class="s" x="486" y="122">Idempotency key</text>
+        <rect class="b" x="710" y="48" width="205" height="90"/><text class="t" x="726" y="77">Forwarding worker</text><text class="s" x="726" y="102">Backend integration</text><text class="s" x="726" y="122">OFF by default</text>
+        <rect class="b" x="950" y="48" width="232" height="90"/><text class="t" x="966" y="77">Supplier Portal / adapter</text><text class="s" x="966" y="102">Own PO lines only</text><text class="s" x="966" y="122">Confirm or reject</text>
+        <path class="a" d="M198 93H230"/><path class="a" d="M435 93H470"/><path class="a d" d="M675 93H710"/><path class="a d" d="M915 93H950"/>
+        <rect class="b" x="230" y="182" width="250" height="92"/><text class="t" x="248" y="211">Confirmed</text><text class="s" x="248" y="236">Supplier acceptance recorded</text><text class="s" x="248" y="256">Order remains processing</text>
+        <rect class="b" x="500" y="182" width="310" height="92"/><text class="t" x="518" y="211">Explicit rejection</text><text class="s" x="518" y="236">Admin may re-plan an eligible item</text><text class="s" x="518" y="256">Only approved primary offer is used</text>
+        <rect class="b" x="830" y="182" width="352" height="92"/><text class="t" x="848" y="211">Timeout / ambiguous response</text><text class="s" x="848" y="236">Retry same PO key; bounded attempts</text><text class="s" x="848" y="256">Then manual review; no silent reroute</text>
+        <path class="a" d="M1066 138V160H355V182"/><path class="a" d="M1066 138V166H655V182"/><path class="a" d="M1066 138V182"/>
+        <text class="n" x="18" y="306">Demo suppliers are not auto-contacted. An external supplier adapter must be explicitly configured and idempotent before forwarding is enabled.</text>
+      </svg>
+      <p class="caption">This fulfillment routing is a post-payment commerce workflow. It is not triggered by non-binding product reservations or by reaching a reservation target.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig12">
+      <div class="diagram-heading"><h2 id="fig12"><span class="diagram-number">Figure 12.</span>Admin shipment management and customer delivery confirmation</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 300" role="img" aria-labelledby="title12 desc12" xmlns="http://www.w3.org/2000/svg">
+        <title id="title12">Order fulfillment and shipment tracking flow</title><desc id="desc12">After supplier confirmation, Ponyo admin creates one or more shipments with line quantities, carrier, tracking number and ETA. Admin manually records shipment status events. Customer views shipment tracking and confirms delivery after a shipment is marked delivered. No live carrier integration is configured.</desc>
+        <defs><marker id="arrow12" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker><style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.4;rx:7}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.5;marker-end:url(#arrow12)}.d{stroke-dasharray:5 4}</style></defs>
+        <rect width="1200" height="300" fill="#fff"/>
+        <rect class="b" x="24" y="56" width="235" height="96"/><text class="t" x="42" y="85">Paid order / supplier confirmed</text><text class="s" x="42" y="111">Order items and quantities</text><text class="s" x="42" y="133">Supplier status tracked separately</text>
+        <rect class="b" x="315" y="56" width="235" height="96"/><text class="t" x="333" y="85">Ponyo Admin creates shipment</text><text class="s" x="333" y="111">Carrier · tracking · ETA</text><text class="s" x="333" y="133">Supports partial item quantities</text>
+        <rect class="b" x="610" y="56" width="235" height="96"/><text class="t" x="628" y="85">Shipment records in API / DB</text><text class="s" x="628" y="111">Operator enters status events</text><text class="s" x="628" y="133">Label → transit → delivered</text>
+        <rect class="b" x="905" y="56" width="270" height="96"/><text class="t" x="923" y="85">Customer order tracking</text><text class="s" x="923" y="111">Authenticated order detail</text><text class="s" x="923" y="133">Confirms an already-delivered parcel</text>
+        <path class="a" d="M259 104H315"/><path class="a" d="M550 104H610"/><path class="a" d="M845 104H905"/>
+        <rect class="b" x="315" y="192" width="860" height="58"/><text class="t" x="335" y="218">PostgreSQL shipment, event, tracking, and confirmation records</text><text class="n" x="335" y="239">Shipment status is separate from supplier PO acceptance; aggregate order status can be partially shipped / shipped / delivered.</text>
+        <path class="a" d="M727 152V192"/>
+        <rect class="b" x="24" y="192" width="235" height="58"/><text class="t" x="42" y="218">No carrier integration</text><text class="n" x="42" y="239">Tracking/status are operator-entered</text>
+        <text class="n" x="24" y="280">Customer order history UI is currently hidden by the customer-account feature flag; order tracking APIs and records are implemented.</text>
+      </svg>
+      <p class="caption">Shipment records support partial fulfillment. Supplier confirmation does not mean that a parcel has shipped.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig13">
+      <div class="diagram-heading"><h2 id="fig13"><span class="diagram-number">Figure 13.</span>Admin Portal control plane and use cases</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 355" role="img" aria-labelledby="title13 desc13" xmlns="http://www.w3.org/2000/svg">
+        <title id="title13">Admin Portal operations</title><desc id="desc13">A role-authorized admin manages maker applications and onboarding, product submissions, publication, catalog proof, suppliers and offer changes, reservations and production approval, orders and shipments, newsletter records, contact inbox, admins, and analytics.</desc>
+        <defs><marker id="arrow13" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker><style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.3;rx:7}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.4;marker-end:url(#arrow13)}</style></defs>
+        <rect width="1200" height="355" fill="#fff"/>
+        <rect class="b" x="420" y="20" width="360" height="62"/><text class="t" x="440" y="47">Admin identity → Admin Portal → admin-guarded API</text><text class="n" x="440" y="68">CSRF-protected mutations · records audit / status where implemented</text>
+        <rect class="b" x="20" y="130" width="270" height="86"/><text class="t" x="38" y="158">Partner review</text><text class="s" x="38" y="182">Maker applications · onboarding</text><text class="s" x="38" y="202">Create / activate supplier access</text>
+        <rect class="b" x="310" y="130" width="270" height="86"/><text class="t" x="328" y="158">Catalog control</text><text class="s" x="328" y="182">Approve supplier product drafts</text><text class="s" x="328" y="202">Publish / unpublish · categories</text>
+        <rect class="b" x="600" y="130" width="270" height="86"/><text class="t" x="618" y="158">Supply &amp; reservations</text><text class="s" x="618" y="182">Approve offer cost / capacity changes</text><text class="s" x="618" y="202">Shipping proof · targets · production</text>
+        <rect class="b" x="890" y="130" width="290" height="86"/><text class="t" x="908" y="158">Customer operations</text><text class="s" x="908" y="182">Orders · payments · shipments</text><text class="s" x="908" y="202">Contact inbox · newsletter records</text>
+        <path class="a" d="M600 82V106H155V130"/><path class="a" d="M600 82V106H445V130"/><path class="a" d="M600 82V106H735V130"/><path class="a" d="M600 82V106H1035V130"/>
+        <rect class="b" x="20" y="250" width="360" height="70"/><text class="t" x="38" y="278">Reservations / waitlists</text><text class="s" x="38" y="301">Reports · country filters · CSV / XLSX · notify waitlist</text>
+        <rect class="b" x="420" y="250" width="360" height="70"/><text class="t" x="438" y="278">Email center / administration</text><text class="s" x="438" y="301">IMAP sync · threaded SMTP replies · manage admin accounts</text>
+        <rect class="b" x="820" y="250" width="360" height="70"/><text class="t" x="838" y="278">Reports and safety controls</text><text class="s" x="838" y="301">First-party analytics · role checks · publish and fulfillment rules</text>
+        <path class="a" d="M155 216V250"/><path class="a" d="M445 216V250"/><path class="a" d="M735 216V233H600V250"/><path class="a" d="M1035 216V250"/>
+        <text class="n" x="20" y="342">Admin can publish existing approved products; deployment of application code is a different release authority and no production deployment workflow is established.</text>
+      </svg>
+      <p class="caption">The Admin Portal is an operational control plane. It does not expose admin functions to the public storefront or supplier identity.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig14">
+      <div class="diagram-heading"><h2 id="fig14"><span class="diagram-number">Figure 14.</span>Email notifications, background processing, and localization</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1200 335" role="img" aria-labelledby="title14 desc14" xmlns="http://www.w3.org/2000/svg">
+        <title id="title14">Background workers, transactional email, and translation flow</title><desc id="desc14">Application actions persist data and outbox or notification records. Configured workers deliver transactional email with retry tracking, synchronize an admin mailbox through IMAP, process reservation expiry and supplier forwarding when enabled, and publish payment events when configured. LibreTranslate supplies product translations which are cached. Newsletter campaign delivery has no configured consumer.</desc>
+        <defs><marker id="arrow14" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker><style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.3;rx:7}.t{font:700 14px Arial;fill:#222}.s{font:11px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.4;marker-end:url(#arrow14)}.d{stroke-dasharray:5 4}</style></defs>
+        <rect width="1200" height="335" fill="#fff"/>
+        <rect class="b" x="20" y="42" width="235" height="100"/><text class="t" x="38" y="71">API transaction</text><text class="s" x="38" y="96">Domain data + outbox event</text><text class="s" x="38" y="118">Committed to PostgreSQL</text>
+        <rect class="b" x="300" y="42" width="250" height="100"/><text class="t" x="318" y="71">Notification worker</text><text class="s" x="318" y="96">Leases · retry state · templates</text><text class="s" x="318" y="118">Email when configured</text>
+        <rect class="b" x="595" y="42" width="250" height="100"/><text class="t" x="613" y="71">SMTP provider</text><text class="s" x="613" y="96">Verify / reset / partner notices</text><text class="s" x="613" y="118">Order / payment / shipping notices</text>
+        <rect class="b" x="890" y="42" width="290" height="100"/><text class="t" x="908" y="71">Admin email inbox</text><text class="s" x="908" y="96">IMAP sync · saved contact records</text><text class="s" x="908" y="118">Threaded replies via SMTP</text>
+        <path class="a" d="M255 92H300"/><path class="a" d="M550 92H595"/><path class="a d" d="M845 92H890"/>
+        <rect class="b" x="20" y="190" width="360" height="93"/><text class="t" x="38" y="219">Other backend workers</text><text class="s" x="38" y="244">Reservation expiry recovery · email retry</text><text class="s" x="38" y="266">Supplier PO forwarding only when explicitly enabled</text>
+        <rect class="b" x="420" y="190" width="360" height="93"/><text class="t" x="438" y="219">Translation path</text><text class="s" x="438" y="244">FastAPI → LibreTranslate (en / ja / ko)</text><text class="s" x="438" y="266">Translated product fields cached in PostgreSQL</text>
+        <rect class="b" x="820" y="190" width="360" height="93"/><text class="t" x="838" y="219">Optional event / provider paths</text><text class="s" x="838" y="244">Stripe webhook → outbox / SQS publisher if configured</text><text class="s" x="838" y="266">Newsletter consent stored; marketing sender absent</text>
+        <path class="a d" d="M135 142V166H200V190"/><path class="a" d="M135 142V166H600V190"/><path class="a d" d="M135 142V166H1000V190"/>
+        <text class="n" x="20" y="310">External service calls are backend-only. Provider credentials are not sent to browser clients. SMTP/IMAP, SQS, supplier forwarding, and Stripe require explicit configuration.</text>
+      </svg>
+      <p class="caption">Database records are the source of truth; email and integration workers are conditional services, not evidence that production delivery is active.</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="fig15">
+      <div class="diagram-heading"><h2 id="fig15"><span class="diagram-number">Figure 15.</span>Deployment: verified local runtime and planned AWS target</h2><button class="download" type="button">Download PNG</button></div>
+      <svg viewBox="0 0 1400 590" role="img" aria-labelledby="title15 desc15" xmlns="http://www.w3.org/2000/svg">
+        <title id="title15">Ponyo local and planned AWS deployment architecture</title>
+        <desc id="desc15">The currently verified deployment is a local Docker Compose stack with Next.js, FastAPI, PostgreSQL, Redis, LibreTranslate, and a temporary Cloudflare tunnel. A separate AWS Terraform plan, not applied, provisions a public API load balancer and private ECS Fargate API, Aurora PostgreSQL, Redis, private S3 and CloudFront, event queues, logging and alerts. Frontend hosting is not included in the Terraform stack and remains undecided.</desc>
+        <defs>
+          <marker id="arrow15" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker>
+          <style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.4;rx:7}.t{font:700 15px Arial;fill:#222}.s{font:12px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.5;marker-end:url(#arrow15)}.d{stroke-dasharray:6 5}</style>
+        </defs>
+        <rect width="1400" height="590" fill="#fff"/>
+        <text class="t" x="24" y="27">A · VERIFIED LOCAL PREVIEW</text>
+        <text class="n" x="650" y="27">SEPARATE FROM THE NOT-YET-DEPLOYED CLOUD TARGET →</text>
+
+        <rect class="b" x="24" y="48" width="510" height="388"/>
+        <text class="t" x="44" y="76">Docker Compose · developer machine</text>
+        <rect class="b" x="48" y="98" width="218" height="82"/><text class="t" x="64" y="127">Next.js frontend</text><text class="s" x="64" y="151">Port 3000 · storefront / portals</text><text class="n" x="64" y="169">Three portal surfaces in one frontend</text>
+        <rect class="b" x="292" y="98" width="218" height="82"/><text class="t" x="308" y="127">FastAPI backend</text><text class="s" x="308" y="151">Port 8000 · /v1 API</text><text class="n" x="308" y="169">Migrations + demo seed at startup</text>
+        <rect class="b" x="48" y="210" width="218" height="78"/><text class="t" x="64" y="239">PostgreSQL</text><text class="s" x="64" y="263">Named persistent volume</text><text class="n" x="64" y="280">Local application data</text>
+        <rect class="b" x="292" y="210" width="218" height="78"/><text class="t" x="308" y="239">Redis</text><text class="s" x="308" y="263">Rate limits / runtime</text><text class="n" x="308" y="280">Local container</text>
+        <rect class="b" x="48" y="318" width="218" height="78"/><text class="t" x="64" y="347">LibreTranslate</text><text class="s" x="64" y="371">Internal Compose service</text><text class="n" x="64" y="388">Product text translations</text>
+        <rect class="b" x="292" y="318" width="218" height="78"/><text class="t" x="308" y="347">Cloudflare Quick Tunnel</text><text class="s" x="308" y="371">Temporary HTTPS preview URL</text><text class="n" x="308" y="388">Not production hosting</text>
+        <path class="a" d="M266 139H292"/><path class="a" d="M401 180V195H157V210"/><path class="a" d="M401 180V210"/><path class="a" d="M292 357H266V180"/>
+        <text class="n" x="275" y="130">API</text><text class="n" x="410" y="199">DB / Redis</text><text class="n" x="271" y="345">translation</text>
+
+        <text class="t" x="570" y="27">B · PLANNED AWS FOUNDATION · TERRAFORM NOT APPLIED</text>
+        <rect class="b" x="570" y="48" width="806" height="388"/>
+        <rect class="b" x="592" y="73" width="300" height="72"/><text class="t" x="610" y="101">Next.js storefront hosting: TBD</text><text class="s" x="610" y="125">Not provisioned by this Terraform stack</text><text class="n" x="610" y="140">Admin / supplier host DNS and HTTPS also pending</text>
+        <rect class="b" x="960" y="73" width="390" height="72"/><text class="t" x="978" y="101">Internet · api.byponyo.com</text><text class="s" x="978" y="125">Route 53 record + ACM certificate (planned)</text><text class="n" x="978" y="140">Public HTTPS API entry point</text>
+        <rect class="b" x="960" y="171" width="390" height="76"/><text class="t" x="978" y="200">Application Load Balancer</text><text class="s" x="978" y="224">Public HTTPS → private API targets</text><text class="n" x="978" y="241">VPC public subnets · security-group ingress</text>
+        <rect class="b" x="960" y="273" width="390" height="92"/><text class="t" x="978" y="302">ECS / Fargate FastAPI service</text><text class="s" x="978" y="326">Private subnets · no public IP · health checks</text><text class="n" x="978" y="347">Secrets Manager · CloudWatch logs · task IAM</text>
+        <rect class="b" x="592" y="171" width="300" height="76"/><text class="t" x="610" y="200">Amazon ECR</text><text class="s" x="610" y="224">Immutable, scanned API image</text><text class="n" x="610" y="241">Build / push before ECS rollout</text>
+        <rect class="b" x="592" y="273" width="300" height="92"/><text class="t" x="610" y="302">Frontend deploy / release</text><text class="s" x="610" y="326">Hosting provider and CI/CD: TBD</text><text class="n" x="610" y="347">No production deployment workflow is present</text>
+        <path class="a" d="M892 109H960"/><path class="a" d="M1155 145V171"/><path class="a" d="M1155 247V273"/><path class="a d" d="M892 207H925V319H960"/>
+        <text class="n" x="905" y="99">HTTPS API</text><text class="n" x="902" y="256">immutable image</text><text class="n" x="900" y="337">deployment needs approved image</text>
+
+        <rect class="b" x="24" y="462" width="1352" height="96"/>
+        <text class="t" x="44" y="490">Private AWS data, media, messaging, and operations services (planned)</text>
+        <text class="s" x="44" y="516">VPC across AZs · public HTTPS ALB · private ECS / Aurora / Redis · NAT egress</text>
+        <text class="s" x="44" y="540">Encrypted Aurora / Redis · private versioned S3 + CloudFront OAC · SQS + DLQ · EventBridge · Secrets Manager · CloudWatch / SNS</text>
+        <path class="a" d="M1155 365V444H700V462"/>
+        <text class="n" x="24" y="580">Caveats: S3 media/upload integration and background event consumers still need implementation / verification. AWS services create cost; budget, account, domain, security, CI/CD, backups, SMTP, and staging require review before apply.</text>
+      </svg>
+      <p class="caption">The current application runs locally; the AWS diagram is a target architecture, not a claim of production deployment. The API infrastructure plan does not define where the Next.js storefront will be hosted.</p>
+    </section>
+
+    <footer>Source: repository implementation and project documentation. Local preview and temporary tunnel are not production deployment. Stripe checkout and newsletter campaign delivery are not active.</footer>
+  </main>
+  <script>
+    document.querySelectorAll(".download").forEach((button, index) => {
+      button.addEventListener("click", () => {
+        const svg = button.closest(".diagram").querySelector("svg");
+        const exportSvg = svg.cloneNode(true);
+        const whiteBackground = document.createElementNS("http://www.w3.org/2000/svg", "style");
+        whiteBackground.textContent = "rect { fill: #fff !important; } .box, .b { stroke: #356a9a !important; } .edge, .a { stroke: #356a9a !important; } marker path { fill: #356a9a !important; } .title, .t { fill: #183b5d !important; } .text, .small, .s, .n { fill: #202a33 !important; }";
+        exportSvg.insertBefore(whiteBackground, exportSvg.firstChild);
+        const source = new XMLSerializer().serializeToString(exportSvg);
+        const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+        const image = new Image();
+        const objectUrl = URL.createObjectURL(blob);
+        image.onload = () => {
+          const viewBox = svg.viewBox.baseVal;
+          const scale = 2;
+          const canvas = document.createElement("canvas");
+          canvas.width = viewBox.width * scale;
+          canvas.height = viewBox.height * scale;
+          const context = canvas.getContext("2d");
+          if (!context) {
+            URL.revokeObjectURL(objectUrl);
+            throw new Error("Could not create an image canvas.");
+          }
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(objectUrl);
+          canvas.toBlob((png) => {
+            if (!png) throw new Error("Could not export the diagram as PNG.");
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(png);
+            link.download = `ponyo-architecture-figure-${index + 1}.png`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+          }, "image/png");
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          throw new Error("Could not render the diagram for PNG export.");
+        };
+        image.src = objectUrl;
+      });
+    });
+  </script>
+</body>
+</html>

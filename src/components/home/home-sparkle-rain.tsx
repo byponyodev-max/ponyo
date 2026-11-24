@@ -18,7 +18,7 @@ type Particle = {
   twinkle: number;
 };
 
-const colors = ["#f6c453", "#f6c453", "#f4a6b4", "#a9c8e6", "#ee8a4c", "#ffffff"];
+const colors = ["#f4a6b4", "#f6bfd0", "#ee8fb0", "#ffd6e2"];
 
 export function HomeSparkleRain() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,6 +30,7 @@ export function HomeSparkleRain() {
 
     let width = 0;
     let height = 0;
+    let effectBottom = 0;
     let pixelRatio = 1;
     const particles: Particle[] = [];
     let frameId = 0;
@@ -63,6 +64,7 @@ export function HomeSparkleRain() {
       pixelRatio = Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.5);
       width = window.innerWidth;
       height = window.innerHeight;
+      effectBottom = height;
       canvas.width = width * pixelRatio;
       canvas.height = height * pixelRatio;
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -105,8 +107,8 @@ export function HomeSparkleRain() {
         context.closePath();
         context.fill();
       } else {
-        context.shadowColor = particle.color === "#ffffff" ? "rgba(169, 200, 230, .9)" : "transparent";
-        context.shadowBlur = particle.color === "#ffffff" ? 4 : 0;
+        context.shadowColor = particle.color;
+        context.shadowBlur = particle.radius * 0.8;
         context.beginPath();
         context.arc(0, 0, particle.radius, 0, Math.PI * 2);
         context.fill();
@@ -131,15 +133,20 @@ export function HomeSparkleRain() {
       previousTime = now;
       const time = now / 1000;
       context.clearRect(0, 0, width, height);
+      context.save();
+      context.beginPath();
+      context.rect(0, 0, width, effectBottom);
+      context.clip();
 
       for (const particle of particles) {
         particle.y += particle.speed * delta;
         particle.x += Math.sin(time * 0.8 + particle.phase) * particle.sway * delta;
         particle.angle += particle.spin * delta;
-        if (particle.y > height + 20) Object.assign(particle, makeParticle(true));
+        if (particle.y - particle.radius > effectBottom) Object.assign(particle, makeParticle(true));
         drawParticle(particle, time);
       }
 
+      context.restore();
       frameId = window.requestAnimationFrame(animate);
     };
 
@@ -153,16 +160,10 @@ export function HomeSparkleRain() {
 
     const updateVisibility = () => {
       const marker = document.querySelector<HTMLElement>("[data-sparkle-end]");
-      const end = marker ? marker.getBoundingClientRect().bottom + window.scrollY : height;
-      const fadeDistance = marker
-        ? Math.min(height * 0.22, Math.max(100, marker.offsetHeight * 0.18))
-        : height * 0.25;
-      const fadeFrom = Math.max(0, end - fadeDistance);
-      const scrollY = window.scrollY;
-      const opacity = scrollY <= fadeFrom ? 1 : Math.max(0, 1 - (scrollY - fadeFrom) / Math.max(1, end - fadeFrom));
-      canvas.style.opacity = String(opacity);
+      effectBottom = marker ? Math.max(0, Math.min(height, marker.getBoundingClientRect().top)) : height;
+      canvas.style.opacity = effectBottom > 0 ? "1" : "0";
 
-      if (opacity === 0 || document.hidden) stop();
+      if (effectBottom === 0 || document.hidden) stop();
       else start();
     };
 

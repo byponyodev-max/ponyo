@@ -27,7 +27,7 @@ export function AnimalTabs({ products }: { products: Product[] }) {
 
   return (
     <section className="animal-tabs-section store-container" aria-labelledby="animals-heading">
-      <div className="animal-tabs-heading"><h2 id="animals-heading">{t("home.aisles.animal_title", "Shop by animal")}</h2><p>{t("home.aisles.animal_sub", "Bears, bunnies, cats and more. Pick a favourite and meet the family.")}</p></div>
+      <div className="animal-tabs-heading" data-sparkle-end><h2 id="animals-heading">{t("home.aisles.animal_title", "Shop by animal")}</h2><p>{t("home.aisles.animal_sub", "Bears, bunnies, cats and more. Pick a favourite and meet the family.")}</p></div>
       <div className="animal-tabs-list" role="tablist" aria-label={t("home.category_rail.aria_label", "Shop by animal")}>
         {availableTabs.map((tab, index) => {
           const item = products.find((product) => matchesAnimal(product, tab.tags));

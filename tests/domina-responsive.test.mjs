@@ -4,6 +4,15 @@ import { test } from "node:test";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
+test("home Domina snowflakes use a tintable SVG instead of platform emoji glyphs", () => {
+	const home = read("../src/app/page.tsx");
+	const css = read("../src/app/domina-responsive.css");
+	assert.match(home, /className="domina-petal-snow"[\s\S]*?<svg viewBox="0 0 24 24"/);
+	assert.doesNotMatch(home, /❄/);
+	assert.match(css, /\.domina-band \.domina-petal-snow span\s*\{[^}]*color: #ffc4d8;/);
+	assert.match(css, /\.domina-band \.domina-petal-snow svg\s*\{[^}]*width: 100%;[^}]*height: 100%;/);
+});
+
 test("Domina has a dedicated image container and a separate results row", () => {
 	const page = read("../src/app/pages/[slug]/page.tsx");
 	assert.match(page, /className="domina-hero-media"><Image[^>]*fill/);
@@ -114,7 +123,9 @@ test("Domina uses restrained gold jellyfish and an editorial framed catalog", ()
 	assert.match(source, /id="domina-catalog-pearl" tone="gold"/);
 	assert.match(source, /id="domina-hero-gold" tone="gold"/);
 	assert.match(source, /className="domina-editorial-frame"/);
-	assert.match(source, /className="domina-hero-glints"[^>]*>[\s\S]*?✧/);
+	const heroGlints = source.match(/<div className="domina-hero-glints"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
+	assert.match(heroGlints, /<svg viewBox="0 0 24 24" fill="currentColor"/);
+	assert.doesNotMatch(heroGlints, /✧/);
 	assert.doesNotMatch(source, /❄/);
 	assert.match(css, /@keyframes domina-jellyfish-swim/);
 	assert.match(

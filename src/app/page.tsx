@@ -114,7 +114,7 @@ export default async function Home() {
       <HomeSparkleRain />
       <HomeCarousel categories={aisles} />
 
-      <section className="home-marketplace-intro" aria-labelledby="home-hero-heading" data-sparkle-end>
+      <section className="home-marketplace-intro" aria-labelledby="home-hero-heading">
         <span className="home-marketplace-jellyfish home-marketplace-jellyfish--left" aria-hidden="true"><JellyfishArtwork id="marketplace-jellyfish-left" tone="blue" direction={-1} /></span>
         <span className="home-marketplace-jellyfish home-marketplace-jellyfish--right" aria-hidden="true"><JellyfishArtwork id="marketplace-jellyfish-right" tone="gold" direction={1} /></span>
         <span className="home-marketplace-eyebrow"><LocalizedText translationKey="home.marketplace.hero_eyebrow" fallback={locale.mp.hero_eyebrow} /></span>
@@ -186,7 +186,15 @@ export default async function Home() {
 
       <p className="domina-band-intro"><span aria-hidden="true">✦</span><LocalizedText translationKey="home.domina.section_intro" fallback="Big hugs start here." /><span aria-hidden="true">✦</span></p>
       <section className="domina-band" id="domina">
-        <div className="domina-petal-snow" aria-hidden="true">{Array.from({ length: 20 }, (_, index) => <span key={index}>❄</span>)}</div>
+        <div className="domina-petal-snow" aria-hidden="true">
+          {Array.from({ length: 20 }, (_, index) => (
+            <span key={index}>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2v20M3.35 7l17.3 10M20.65 7l-17.3 10M12 2 9.5 4.5M12 2l2.5 2.5M12 22l-2.5-2.5M12 22l2.5-2.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+              </svg>
+            </span>
+          ))}
+        </div>
         <div className="domina-band-copy"><span className="domina-eyebrow"><LocalizedText translationKey="home.domina.eyebrow" fallback="DOMINA BY PONYO" /></span><h2><LocalizedText translationKey="home.domina.title" fallback="Room for Something Extraordinary." /></h2><p><LocalizedText translationKey="home.domina.body" fallback="Meet Domina XL — oversized plush companions to bring comfort, character, and a little wonder into your space." /></p><Link href="/pages/domina-xl"><LocalizedText translationKey="home.domina.cta" fallback="Shop giant plush →" /></Link></div>
         <figure><div className="domina-band-image"><Image src="/images/catalog/ponyo-3.png" alt={t("home.image_alt.domina")} fill sizes="(max-width: 767px) 90vw, 560px"/></div><figcaption><LocalizedText translationKey="home.domina.caption" fallback="A plush with presence." /></figcaption></figure>
       </section>

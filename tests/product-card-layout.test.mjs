@@ -376,6 +376,7 @@ test("mobile size guide has an edge-to-edge ticker and decorative jellyfish abov
 test("footer has a themed image banner, animation, and social links", () => {
 	const footer = read("../src/components/layout/site-footer.tsx");
 	const css = read("../src/app/footer-experience.css");
+	const parity = read("../src/app/theme-parity-polish.css");
 	assert.ok(footer.includes("/images/footer-plush-lineup.png"));
 	assert.ok(footer.includes('className="footer-plush-lineup"'));
 	assert.ok(!footer.includes('className="footer-visual"'));
@@ -397,6 +398,9 @@ test("footer has a themed image banner, animation, and social links", () => {
 	assert.match(css, /\.footer-social-links\s*\{[^}]*flex-wrap:\s*nowrap;/);
 	assert.match(css, /@media \(min-width: 768px\) and \(max-width: 1100px\)[\s\S]*?\.footer-social-links\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
 	assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.footer-social-links\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
+	assert.match(parity, /\.footer-column:nth-of-type\(1\)\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*2 \/ span 2;/);
+	assert.match(parity, /\.footer-column:nth-of-type\(2\)\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*2;/);
+	assert.match(parity, /\.footer-column:nth-of-type\(3\)\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*3;/);
 	assert.match(
 		footer,
 		/className="footer-plush-lineup"[\s\S]*className="footer-social"/,
