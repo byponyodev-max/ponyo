@@ -1,5 +1,7 @@
 # Ponyo site blueprint
 
+> **One-page version with all diagrams:** [site-blueprint.html](./site-blueprint.html) (24 November 2026). Where the two differ, the one-pager is newer.
+
 **Snapshot:** 22 November 2026 · **Status:** repo-verified; local API, email authentication, and private maker-photo storage checks passed; production/vendor details remain TBC  
 **Drive:** This file is ready to copy to the shared Drive. Drive folder/link and document owner are TBC; this workspace has no Drive connection.  
 **Scope:** Current code and planned architecture, not proof that a production site or cloud service is deployed.
