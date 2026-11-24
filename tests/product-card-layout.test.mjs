@@ -230,6 +230,15 @@ test("product cards show reservation or interest actions while commerce is pause
 	assert.match(cardSource, /href=\{`\/products\/\$\{product\.id\}#product-gallery-top`\}/);
 });
 
+test("product cards keep the wishlist toggle on the product photo", () => {
+	const cardSource = read("../src/components/product/product-card.tsx");
+	assert.match(cardSource, /import \{ saveWishlist, useWishlistHandles \} from "@\/lib\/wishlist";/);
+	assert.match(cardSource, /className=\{`wishlist-toggle\$\{isWishlisted \? " is-saved" : ""\}`\}/);
+	assert.match(cardSource, /aria-pressed=\{isWishlisted\}/);
+	assert.match(cardSource, /onClick=\{toggleWishlist\}/);
+	assert.match(cardSource, /t\("product\.action\.remove_saved", "Remove from wishlist"\) : t\("product\.action\.save", "Save to wishlist"\)/);
+});
+
 test("product card navigation targets the exclusive badge at the top of the gallery", () => {
 	const page = read("../src/app/products/[id]/page.tsx");
 	const css = read("../src/app/maker-reservation.css");

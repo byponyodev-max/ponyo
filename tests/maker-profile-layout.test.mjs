@@ -45,3 +45,17 @@ test("maker profile keeps its monogram, fixed luxury palette, and full-bleed res
   assert.doesNotMatch(styles, /maker-profile-hero--sage|maker-profile-hero--lilac|maker-profile-hero--yellow/);
   assert.doesNotMatch(styles, /#3f594b|#5f765f|#60776a/);
 });
+
+test("maker profile sort uses a themed custom dropdown instead of the native select", () => {
+  assert.doesNotMatch(collection, /<select|<option/);
+  assert.doesNotMatch(styles, /\.maker-profile-sort (?:select|option)/);
+  assert.match(collection, /className="maker-profile-sort-trigger"/);
+  assert.match(collection, /aria-haspopup="listbox"/);
+  assert.match(collection, /className="maker-profile-sort-options" role="listbox"/);
+  assert.match(collection, /role="option" aria-selected=\{option\.value === sort\}/);
+  assert.match(collection, /event\.key === "Escape" && isSortOpen/);
+  assert.match(styles, /\.maker-profile-filter-toggle,\s*\.maker-profile-sort-trigger \{[^}]*background: linear-gradient\(135deg, #4a172b, #32101f\);/);
+  assert.match(styles, /\.maker-profile-sort-options \{[^}]*position: absolute;[^}]*linear-gradient\(135deg, #4a172b, #2c0f1c\);/);
+  assert.match(styles, /\.maker-profile-sort-options button\[aria-selected="true"\] \{[^}]*background: linear-gradient\(135deg, #ead59c, #c59d5c\);/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.maker-profile-sort-options \{\s*animation: none;/);
+});

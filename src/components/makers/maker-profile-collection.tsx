@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ProductGrid } from "@/components/product/product-grid";
 import { useLocalization } from "@/components/layout/localization-provider";
 import { animalFilters, matchesAnimal } from "@/lib/product-animals";
@@ -29,7 +29,24 @@ export function MakerProfileCollection({ products }: { products: Product[] }) {
   const [category, setCategory] = useState("");
   const [animal, setAnimal] = useState("");
   const [sort, setSort] = useState<MakerSort>("featured");
+  const [isSortOpen, setIsSortOpen] = useState(false);
   const filterToggleRef = useRef<HTMLButtonElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const sortOptionsId = `maker-sort-options-${useId().replaceAll(":", "")}`;
+
+  useEffect(() => {
+    if (!isSortOpen) return;
+    sortMenuRef.current?.querySelector<HTMLButtonElement>('[role="option"][aria-selected="true"]')?.focus({ preventScroll: true });
+    function dismissOutside(event: Event) {
+      if (event.target instanceof Node && !sortMenuRef.current?.contains(event.target)) setIsSortOpen(false);
+    }
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("focusin", dismissOutside);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      document.removeEventListener("focusin", dismissOutside);
+    };
+  }, [isSortOpen]);
 
   const categories = useMemo(() => [...new Set(products.map(categoryName).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, language, { sensitivity: "base" })), [language, products]);
@@ -72,9 +89,39 @@ export function MakerProfileCollection({ products }: { products: Product[] }) {
     : filteredProducts;
 
   const activeFilterCount = Number(Boolean(search.trim())) + Number(Boolean(category)) + Number(Boolean(animal));
-  const updateSort = (value: string) => {
-    const option = sortOptions.find((item) => item.value === value);
-    if (option) setSort(option.value);
+  const selectedSortOption = sortOptions.find((item) => item.value === sort) ?? sortOptions[0];
+  const selectedSortLabel = t(selectedSortOption.key, selectedSortOption.fallback);
+  const focusSortTrigger = () => sortMenuRef.current?.querySelector<HTMLButtonElement>(".maker-profile-sort-trigger")?.focus({ preventScroll: true });
+  const chooseSort = (value: MakerSort) => {
+    setSort(value);
+    setIsSortOpen(false);
+    focusSortTrigger();
+  };
+  const handleSortKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && isSortOpen) {
+      event.preventDefault();
+      setIsSortOpen(false);
+      focusSortTrigger();
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    if (!isSortOpen) {
+      setIsSortOpen(true);
+      return;
+    }
+    const options = Array.from(sortMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+    if (!options.length) return;
+    const currentIndex = options.findIndex((option) => option === document.activeElement);
+    const lastIndex = options.length - 1;
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? lastIndex
+        : event.key === "ArrowDown"
+          ? (currentIndex + 1) % options.length
+          : currentIndex <= 0 ? lastIndex : currentIndex - 1;
+    options[nextIndex]?.focus({ preventScroll: true });
   };
   const clearFilters = () => {
     setSearch("");
@@ -106,12 +153,30 @@ export function MakerProfileCollection({ products }: { products: Product[] }) {
             {t("maker.profile.collection.filter_button", "Filter & search")}
             {activeFilterCount > 0 && <span className="maker-profile-filter-count">{activeFilterCount}</span>}
           </button>
-          <label className="maker-profile-sort">
+          <div className="maker-profile-sort">
             <span>{t("shop.sort.label", "Sort by")}</span>
-            <select value={sort} onChange={(event) => updateSort(event.target.value)}>
-              {sortOptions.map((option) => <option key={option.value} value={option.value}>{t(option.key, option.fallback)}</option>)}
-            </select>
-          </label>
+            <div ref={sortMenuRef} className={`maker-profile-sort-menu${isSortOpen ? " is-open" : ""}`} onKeyDown={handleSortKeyDown}>
+              <button
+                type="button"
+                className="maker-profile-sort-trigger"
+                aria-label={t("shop.sort.current", "Sort by, currently {{label}}", { label: selectedSortLabel })}
+                aria-haspopup="listbox"
+                aria-expanded={isSortOpen}
+                aria-controls={sortOptionsId}
+                onClick={() => setIsSortOpen((open) => !open)}
+              >
+                <span>{selectedSortLabel}</span>
+                <svg className="maker-profile-sort-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7 5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+              {isSortOpen && <div id={sortOptionsId} className="maker-profile-sort-options" role="listbox" aria-label={t("shop.sort.options_aria", "Sort products")}>
+                {sortOptions.map((option) => (
+                  <button key={option.value} type="button" role="option" aria-selected={option.value === sort} onClick={() => chooseSort(option.value)}>
+                    <span>{t(option.key, option.fallback)}</span><span className="maker-profile-sort-check" aria-hidden="true">✓</span>
+                  </button>
+                ))}
+              </div>}
+            </div>
+          </div>
         </div>
 
         <div className="maker-profile-filter-panel" id="maker-profile-filters" hidden={!isOpen} onKeyDown={(event) => {
