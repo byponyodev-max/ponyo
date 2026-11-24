@@ -44,9 +44,10 @@ const footerGroups = [
 const jellyfishSizes = [28, 18, 24, 16, 28, 18, 24];
 
 const socialLinks = [
-  { name: "Instagram", handle: "@byponyo", href: "https://www.instagram.com/byponyo/", icon: "instagram" },
-  { name: "TikTok", handle: "@byponyo", href: "https://www.tiktok.com/@byponyo", icon: "tiktok" },
-  { name: "YouTube", handle: "Find Ponyo", href: "https://www.youtube.com/results?search_query=byponyo+plush", icon: "youtube" },
+  { name: "Instagram", handle: "@hello.byponyo", href: "https://www.instagram.com/hello.byponyo/", icon: "instagram" },
+  { name: "TikTok", handle: "@hello.byponyo", href: "https://www.tiktok.com/@hello.byponyo", icon: "tiktok" },
+  { name: "YouTube", handle: "Channel: hello.byponyo", href: "https://www.youtube.com/@hello.byponyo", icon: "youtube" },
+  { name: "Threads", handle: "@hello.byponyo", href: "https://www.threads.net/@hello.byponyo", icon: "threads" },
 ] as const;
 
 function Jellyfish({ size, dimmed = false }: { size: number; dimmed?: boolean }) {
@@ -64,7 +65,8 @@ function Jellyfish({ size, dimmed = false }: { size: number; dimmed?: boolean })
 function SocialIcon({ name }: { name: (typeof socialLinks)[number]["icon"] }) {
   if (name === "instagram") return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle className="footer-social-icon-dot" cx="17.5" cy="6.8" r="1"/></svg>;
   if (name === "tiktok") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v11.2a4.2 4.2 0 1 1-3.1-4.05M14 3c.5 3.2 2.4 5.2 5.6 5.5"/></svg>;
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path className="footer-social-icon-fill" d="m10 9 5 3-5 3Z"/></svg>;
+  if (name === "youtube") return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path className="footer-social-icon-fill" d="m10 9 5 3-5 3Z"/></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.8 12.2c0-4.2-2.7-7.1-6.7-7.1-4.1 0-6.9 3.1-6.9 7.3 0 4 2.5 6.7 6.6 6.7 2.2 0 4.1-.7 5.5-2.2"/><path d="M8.8 11.6c.8-1 4.3-1 5.7.1 1.4 1.1 1.1 3.3-.6 4.1-1.6.7-3.8.2-4.2-1.4-.3-1.5 1-2.3 2.5-2.3s3.4.4 4.9 1.4c1.4 1 2.5.4 2.8-.8"/></svg>;
 }
 
 export function SiteFooter() {

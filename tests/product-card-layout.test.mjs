@@ -382,6 +382,12 @@ test("footer has a themed image banner, animation, and social links", () => {
 	assert.ok(footer.includes('name: "Instagram"'));
 	assert.ok(footer.includes('name: "TikTok"'));
 	assert.ok(footer.includes('name: "YouTube"'));
+	assert.ok(footer.includes('name: "Threads"'));
+	assert.match(footer, /instagram\.com\/hello\.byponyo/);
+	assert.match(footer, /tiktok\.com\/@hello\.byponyo/);
+	assert.match(footer, /youtube\.com\/@hello\.byponyo/);
+	assert.match(footer, /threads\.net\/@hello\.byponyo/);
+	assert.match(footer, /Channel: hello\.byponyo/);
 	assert.ok(footer.includes('className="footer-social"'));
 	assert.match(
 		css,
