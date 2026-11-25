@@ -21,6 +21,7 @@ function renderMenu() {
       if (id === "next/image") return { default: "img" };
       if (id === "next/navigation") return { usePathname: () => "/" };
       if (id === "@/components/layout/localization-provider") return { useLocalization: () => ({ t: (_, fallback) => fallback }) };
+      if (id === "@/lib/product-categories") return { PRODUCT_CATEGORY_DEFINITIONS: [], productCategoryTranslationKey: () => "" };
       if (id.startsWith("@/")) return {};
       return require(id);
     },

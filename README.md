@@ -13,6 +13,8 @@ To run only the storefront without Docker, install dependencies and start it wit
 
 Optional backend connection: start the local backend from [backend/README.md](backend/README.md), then copy the root `.env.example` to `.env.local` and set `NEXT_PUBLIC_PONYO_API_BASE_URL` to `http://localhost:8000`. All storefront imagery is served from Ponyo's local [public/images](public/images) assets, including the 16 catalog/reference photos in [public/images/catalog](public/images/catalog). Runtime translations and styles are also app-owned under `src/locales` and `src/app`; `src/ponyo-shopify` is read-only design reference only. The frontend contract is documented in [docs/backend-api-contract.md](docs/backend-api-contract.md). Never add AWS, database, supplier, or payment secrets to the frontend or to a `NEXT_PUBLIC_` variable.
 
+For a deployment Docker image, set `NEXT_PUBLIC_PONYO_API_BASE_URL` to the deployed API origin at build time. The Dockerfile disables the local-preview rewrite and Cloudflare tunnel allowance by default; `docker-compose.yml` explicitly enables them only for the local preview stack.
+
 ## Main routes
 
 - `/` — responsive homepage, animated stats, merchandising shelves, category rails, size guide, and newsletter preview.
@@ -28,4 +30,4 @@ All UI changes should be compared against the Liquid/theme files in `src/ponyo-s
 
 ## Validate
 
-Run `npm run lint` and `npm run build`.
+Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build`.

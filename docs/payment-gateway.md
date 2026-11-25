@@ -6,6 +6,8 @@ Stripe Hosted Checkout is the selected gateway. Card data, 3DS and bank authoriz
 
 Configure **backend-only** `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Use sandbox/test values while testing. Never place secrets in `NEXT_PUBLIC_*`, commit them, paste them into chat/logs or expose them through API responses. The example environment file contains placeholders only. Existing Terraform injects secret ARNs through Secrets Manager; it does not create account credentials or register a Stripe webhook automatically.
 
+For the reservation-only P0 phase, leave both Stripe keys blank. Production startup permits payments to remain unconfigured, and checkout/provider operations return 503 until credentials are present. Configure both keys together before enabling payments; production then also requires `SQS_ORDER_EVENTS_URL` for transactional event delivery.
+
 `STRIPE_CAPTURE_METHOD=automatic` is the safe default: Stripe authorizes and captures during hosted payment. `manual` authorizes eligible card payments first and requires admin capture before Stripe's authorization deadline. No fixed seven-day expiry is assumed: card/account rules differ. Subscribe to intent cancellation events and monitor unfulfilled authorized orders. Switching the setting affects new orders only; each order snapshots its strategy.
 
 Admin-only `GET /v1/payments/configuration` reports presence booleans and capture method, never keys. Presence is **not** proof the credentials work; verify with a real Stripe sandbox E2E before release. Missing keys return 503 for provider operations.

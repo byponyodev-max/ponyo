@@ -8,6 +8,8 @@ Verification and password-reset links remain single-use, hashed in the database,
 
 Order/payment confirmation, shipping, delivery, cancellation, and successful-refund messages are inserted transactionally alongside their state/outbox events. A separate worker delivers them with deterministic Message-IDs, leases, exponential retries (up to 10 attempts), and a terminal `failed` state. This is at-least-once delivery: an SMTP server can accept a message immediately before the worker crashes, so recipient-side duplicate suppression is not guaranteed. The service logs event/template identifiers and exception classes, not recipients, message bodies, or credentials. Monitor `email_notifications` for pending/failed work.
 
+The SQS outbox publisher starts only when `SQS_ORDER_EVENTS_URL` is configured. Without it, outbox events remain persisted as pending and production logs a warning; configure SQS before relying on external event consumers. Production payment configuration requires this URL when both Stripe keys are set.
+
 ## Checkout and payment idempotency
 
 Secure checkout requires a UUID idempotency key scoped to the authenticated customer. The order and stock reservation are persisted before Stripe is called. The canonical request hash prevents using the same key with changed cart/address/payment/return URL details. Exact retries resume the same Stripe request using the stable order identity and provider key. The frontend retains the key in session storage for retries and rotates it when checkout details change. Session creation is limited to 10 requests/minute per client IP.

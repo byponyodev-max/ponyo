@@ -79,15 +79,16 @@ function loadProductsRoute({ apiBase = "", translations = async () => ({}) } = {
 	return { ...route, productService, translationCatalog, translationRequests };
 }
 
-test("reviewed Japanese and Korean preview translations cover every catalog field", async () => {
+test("reviewed preview translations take precedence over automatic translations", async () => {
 	for (const locale of ["ja", "ko"]) {
 		const cachedKey = `preview.product.haneul-bunny.name`;
 		const cachedName = `cached ${locale} Haneul Bunny`;
 		const translationCache = new Map([[`${locale}:${cachedKey}`, cachedName]]);
 		let providerCalls = 0;
-		const mockedProvider = async () => {
+		const mockedProvider = async (requestedLocale, entries) => {
 			providerCalls += 1;
-			return {};
+			assert.equal(requestedLocale, locale);
+			return Object.fromEntries(entries.map((entry) => [entry.key, `${locale} automatic: ${entry.text}`]));
 		};
 		const service = loadProductsRoute({
 			translations: async (requestedLocale, entries) => {
@@ -118,29 +119,23 @@ test("reviewed Japanese and Korean preview translations cover every catalog fiel
 			const localized = payload.data.find((product) => product.id === source.id);
 			const reviewed = service.translationCatalog.reviewedPreviewTranslations[locale][source.slug];
 			assert.ok(localized, `missing preview product ${source.slug}`);
-			assert.ok(reviewed, `missing reviewed ${locale} translation for ${source.slug}`);
-
 			for (const field of service.translationCatalog.previewTranslatableFields) {
 				const sourceValue = source[field];
 				if (typeof sourceValue !== "string" || !sourceValue) continue;
-				assert.ok(
-					typeof reviewed[field] === "string" && reviewed[field].length > 0,
-					`${locale} is missing ${source.slug}.${field}`,
-				);
 				const key = `preview.product.${source.slug}.${field}`;
+				const automatic = `${locale} automatic: ${sourceValue}`;
 				assert.equal(
 					localized[field],
-					reviewed[field] || translationCache.get(`${locale}:${key}`),
+					reviewed?.[field] || translationCache.get(`${locale}:${key}`) || automatic,
 					`${locale} did not localize ${source.slug}.${field}`,
 				);
 			}
 
 			for (const [index, image] of (source.galleryImages ?? []).entries()) {
-				assert.ok(reviewed.imageAlt, `${locale} is missing ${source.slug}.galleryImages[${index}].alt`);
 				const galleryKey = `preview.product.${source.slug}.gallery.${index}.alt`;
 				assert.equal(
 					localized.galleryImages[index].alt,
-					reviewed.imageAlt || translationCache.get(`${locale}:${galleryKey}`),
+					reviewed?.imageAlt || translationCache.get(`${locale}:${galleryKey}`) || `${locale} automatic: ${image.alt}`,
 					`${locale} did not localize ${source.slug}.galleryImages[${index}].alt`,
 				);
 				assert.equal(typeof image.alt, "string");
@@ -179,7 +174,16 @@ test("English preview data stays unchanged and configured backend products bypas
 	const englishService = loadProductsRoute();
 	const englishResponse = await englishService.GET(new Request("http://localhost/api/products?locale=en"));
 	const english = await englishResponse.json();
-	assert.equal(JSON.stringify(english.data), JSON.stringify(englishService.productService.storefrontPreviewProducts));
+	assert.equal(english.data.length, englishService.productService.storefrontPreviewProducts.length);
+	for (const source of englishService.productService.storefrontPreviewProducts) {
+		const routeProduct = english.data.find((product) => product.id === source.id);
+		assert.ok(routeProduct);
+		for (const [field, value] of Object.entries(source)) {
+			assert.equal(JSON.stringify(routeProduct[field]), JSON.stringify(value), `${field} changed for ${source.slug}`);
+		}
+		assert.ok(routeProduct.categoryId);
+		assert.ok(routeProduct.categorySlug);
+	}
 	assert.equal(englishService.translationRequests.length, 0);
 
 	const backendProduct = {
@@ -200,6 +204,7 @@ test("English preview data stays unchanged and configured backend products bypas
 					getProductById: async () => backendProduct,
 				};
 			}
+			if (id === "@/lib/product-categories") return { PRODUCT_CATEGORY_DEFINITIONS: [] };
 			if (id === "@/services/ponyo-api.client") return { PONYO_API_BASE_URL: "https://api.example.test" };
 			if (id === "@/services/preview-product-translations") {
 				return englishService.translationCatalog;

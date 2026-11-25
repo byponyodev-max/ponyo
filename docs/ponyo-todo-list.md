@@ -51,7 +51,7 @@ Dokumen ini merangkum pekerjaan Ponyo yang pernah diminta, status implementasi y
 
 - 🟡 Ganti supplier demo dengan supplier sungguhan dan verifikasi harga grosir, SKU, kapasitas, MOQ, lead time, alamat, dan izin berbagi data pelanggan. Tetapkan satu maker utama per varian melalui persetujuan Ponyo; pergantian maker tidak otomatis.
 - ⬜ Aktifkan `SUPPLIER_FORWARDING_ENABLED` hanya setelah kontrak integrasi, idempotensi supplier, retry, manual review, dan staging test disetujui. Integrasi supplier eksternal belum dibuktikan dengan transaksi nyata.
-- ⬜ Jika memakai `supplier.byponyo.com`, siapkan DNS, HTTPS, dan routing produksi; hostname lokal/tunnel bukan domain permanen.
+- ⬜ Untuk `suppliers.byponyo.com`, siapkan DNS, HTTPS, dan routing produksi; hostname lokal/tunnel bukan domain permanen.
 - 🟡 Status shipment dan tracking saat ini dapat diperbarui operator; integrasi carrier/webhook langsung belum dikonfigurasi. Putuskan apakah pengelolaan manual cukup untuk launch.
 
 ### P0 — Keamanan, deployment, dan pemulihan

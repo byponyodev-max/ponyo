@@ -422,7 +422,7 @@ export function CheckoutPageClient({ buyNow = false }: { buyNow?: boolean }) {
                 value={delivery.country}
                 onChange={(country) => setDelivery({ ...delivery, country })}
                 required
-                label={t("checkout.country_required", "Country or region")}
+                label={t("checkout.country_required", "Country or region *")}
                 options={deliveryCountries.map((item) => ({
                   value: item.label,
                   label: regionName(item.code, language, item.label),

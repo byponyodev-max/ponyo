@@ -126,8 +126,8 @@ test("storefront keeps reservation progress without showing the target status me
   assert.match(productCommunity, /className="product-reservation-progress"/);
   assert.match(productCommunity, /product\.reservation\.progress", "\{\{progress\}\}% of the reservation target reached"/);
   assert.doesNotMatch(productCommunity, /status\.target_not_reached|Reservation target not reached/);
-  assert.match(apiClient, /getProductReservations: \(productId: string\) =>\s*apiRequest<\{ reservationCount: number; target: number \| null; open: boolean \}>/);
-  assert.match(apiClient, /submitProductReservation: \(productId: string, input: \{ email: string; country: string \}\) =>\s*apiRequest<\{ accepted: boolean; reservationCount: number; target: number \| null \}>/);
+  assert.match(apiClient, /getProductReservations: \(productId: string\) =>\s*apiRequest<\{ reservationCount: number; target: number \| null; open: boolean; deadline: string \| null; productionStatus: string \}>/);
+  assert.match(apiClient, /submitProductReservation: \(productId: string, input: \{ email: string; country: string \}\) =>\s*apiRequest<\{ accepted: boolean; reservationCount: number; target: number \| null; open: boolean; productionStatus: string \}>/);
   const productTypes = readFileSync(new URL("../src/types/product.ts", import.meta.url), "utf8");
-  assert.doesNotMatch(productTypes, /reservationTarget/);
+  assert.match(productTypes, /reservationTarget\?: number \| null/);
 });

@@ -8,12 +8,14 @@ const compile = (path, imports = {}) => {
 	const source = readFileSync(new URL(path, import.meta.url), "utf8");
 	const context = {
 		exports: {},
+		document: { body: {} },
 		require: (name) => {
 			if (imports[name]) return imports[name];
 			if (name === "react/jsx-runtime") {
 				const jsx = (type, props) => ({ type, props });
 				return { jsx, jsxs: jsx };
 			}
+			if (name === "react-dom") return { createPortal: (element) => element };
 			throw new Error(`Unexpected import: ${name}`);
 		},
 	};

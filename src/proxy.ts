@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const supplierPortalHost = (
-	process.env.NEXT_PUBLIC_SUPPLIER_PORTAL_HOST ?? "supplier.byponyo.com"
+	process.env.NEXT_PUBLIC_SUPPLIER_PORTAL_HOST ?? "suppliers.byponyo.com"
 ).toLowerCase();
 const adminPortalHost = (
 	process.env.NEXT_PUBLIC_ADMIN_PORTAL_HOST ?? "admin.byponyo.com"

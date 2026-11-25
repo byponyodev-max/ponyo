@@ -19,8 +19,8 @@ function load(path) {
 }
 const { regionName, currencyName } = load("../src/lib/localization-options.ts");
 const { uniqueProducts } = load("../src/lib/featured-products.ts");
-const { formatCountryBudget, getCountryBudgetProfile } = load(
-	"../src/lib/budget-by-country.ts",
+const { formatCurrencyBudget, getCurrencyBudgetProfile } = load(
+	"../src/lib/budget-by-currency.ts",
 );
 
 test("Japanese and Korean country/currency labels use native scripts", () => {
@@ -35,25 +35,25 @@ test("Japanese and Korean country/currency labels use native scripts", () => {
 });
 
 test("shop-by-budget uses round country prices and JPY filter thresholds", () => {
-	const korea = getCountryBudgetProfile("KR");
+	const korea = getCurrencyBudgetProfile("KRW");
 	assert.deepEqual(
 		[korea.underMax, korea.middleMax, korea.overMin],
 		[150000, 250000, 500000],
 	);
 	assert.deepEqual(
 		[
-			korea.filterJPY.underMax,
-			korea.filterJPY.middleMax,
-			korea.filterJPY.overMin,
+			korea.catalogPriceJPY.underMax,
+			korea.catalogPriceJPY.middleMax,
+			korea.catalogPriceJPY.overMin,
 		],
 		[18000, 30000, 60000],
 	);
-	assert.equal(formatCountryBudget("KR", korea.underMax), "₩150,000");
+	assert.equal(formatCurrencyBudget("KRW", korea.underMax), "₩150,000");
 	assert.equal(
-		formatCountryBudget("JP", getCountryBudgetProfile("JP").underMax),
+		formatCurrencyBudget("JPY", getCurrencyBudgetProfile("JPY").underMax),
 		"￥20,000",
 	);
-	assert.equal(getCountryBudgetProfile("unknown").currency, "JPY");
+	assert.equal(getCurrencyBudgetProfile("unknown").currency, "JPY");
 });
 
 test("rare preview keeps at most three distinct product identities and slugs", () => {

@@ -15,7 +15,7 @@ const CustomerSessionContext = createContext<CustomerSessionValue | null>(null);
 
 export function CustomerSessionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const supplierHost = (process.env.NEXT_PUBLIC_SUPPLIER_PORTAL_HOST ?? "supplier.byponyo.com").toLowerCase();
+  const supplierHost = (process.env.NEXT_PUBLIC_SUPPLIER_PORTAL_HOST ?? "suppliers.byponyo.com").toLowerCase();
   const adminHost = (process.env.NEXT_PUBLIC_ADMIN_PORTAL_HOST ?? "admin.byponyo.com").toLowerCase();
   const isOperationsPortal = pathname.startsWith("/supplier-portal") || pathname.startsWith("/admin-portal")
     || (typeof window !== "undefined" && [supplierHost, adminHost].includes(window.location.hostname.toLowerCase()));

@@ -51,7 +51,6 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const related = selectRelatedProducts(products, product);
   const hasWaitlist = product.availability === "unavailable"
     || ["Coming Soon", "Waitlist", "Unavailable"].includes(product.availabilityStatus ?? "");
-  const isExample = product.isExampleData === true || product.tags?.includes("demo") === true;
   const makerName = product.makerName;
   const makerStory = [product.makerStory, product.makerPhilosophy, product.makerProcess].filter(Boolean).join(" ") || null;
   const sizeAndWeight = Array.from(new Set([

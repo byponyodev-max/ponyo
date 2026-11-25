@@ -15,7 +15,7 @@ def production_settings(**overrides):
         "stripe_secret_key": "sk_test_configuration",
         "stripe_webhook_secret": "whsec_test_configuration",
         "sqs_order_events_url": "https://sqs.example.test/orders",
-        "database_url": "postgresql+asyncpg://test@example.test/ponyo",
+        "database_url": "postgresql+asyncpg://test@example.test/ponyo?ssl=require",
         "redis_url": "rediss://cache.example.test:6379/0",
         "smtp_host": "smtp.example.test",
         "smtp_from_email": "hello@example.test",
@@ -29,6 +29,40 @@ def test_production_accepts_public_verification_origin_and_configured_mail():
     configured = production_settings()
     assert configured.contact_email_configured is True
     assert configured.storefront_base_url == "https://byponyo.com"
+
+
+def test_production_accepts_disabled_stripe_and_sqs_for_p0():
+    configured = production_settings(
+        stripe_secret_key=None,
+        stripe_webhook_secret=None,
+        sqs_order_events_url=None,
+    )
+    assert configured.stripe_configured is False
+    assert configured.sqs_order_events_url is None
+
+
+@pytest.mark.parametrize("overrides", [
+    {"stripe_secret_key": None},
+    {"stripe_webhook_secret": None},
+])
+def test_production_requires_both_stripe_keys_when_either_is_set(overrides):
+    with pytest.raises(ValidationError, match="must be configured together"):
+        production_settings(**overrides)
+
+
+def test_production_requires_sqs_when_stripe_is_configured():
+    with pytest.raises(ValidationError, match="SQS_ORDER_EVENTS_URL"):
+        production_settings(sqs_order_events_url=None)
+
+
+def test_production_requires_postgresql_database_url():
+    with pytest.raises(ValidationError, match="DATABASE_URL must use PostgreSQL"):
+        production_settings(database_url="sqlite+aiosqlite:///./ponyo-local.db")
+
+
+def test_production_requires_database_tls():
+    with pytest.raises(ValidationError, match="ssl=require"):
+        production_settings(database_url="postgresql+asyncpg://test@example.test/ponyo")
 
 
 @pytest.mark.parametrize("origin", [

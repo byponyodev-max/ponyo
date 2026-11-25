@@ -53,14 +53,16 @@ test("supplier listings submit capacity and wholesale changes for Ponyo approval
     assert.ok(portal.includes("Approved wholesale costs set the public retail price at 20% above wholesale"));
 });
 
-test("supplier server auth checks verified role, active assignment, and CSRF on writes", () => {
+test("supplier server auth checks verified identity, active assignment, and CSRF on writes", () => {
     for (const value of[
-            'require_roles("supplier")',
-            'customer.role != "supplier"',
+            "if not customer.email_verified",
+            "await supplier_identity(db, customer)",
             "if not supplier or not supplier.active",
             "require_csrf(request)",
         ])
         assert.ok(authRouter.includes(value), `missing auth guard: ${value}`);
+    assert.ok(supplierCatalog.includes("get_authenticated_customer"));
+    assert.ok(supplierOrders.includes("get_authenticated_customer"));
     assert.ok(!authRouter.toLowerCase().includes("register"));
     assert.ok(!authRouter.includes("create_supplier_role"));
 });
@@ -100,7 +102,7 @@ test("supplier workspace adopts Ponyo palette and a compact mobile layout", () =
 });
 
 test("supplier subdomain root rewrites to the portal without redirecting storefront traffic", () => {
-    assert.ok(proxy.includes('?? "supplier.byponyo.com"'));
+    assert.ok(proxy.includes('?? "suppliers.byponyo.com"'));
     assert.ok(proxy.includes('if (pathname !== "/" || host !== supplierPortalHost)'));
     assert.ok(proxy.includes('destination.pathname = "/supplier-portal"'));
     assert.ok(proxy.includes("NextResponse.rewrite(destination)"));

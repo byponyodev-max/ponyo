@@ -133,7 +133,7 @@ test("visible JSX copy, accessible names and placeholders are wired; trademark S
     assert.match(sourceText, /const \{ t, language,/);
     assert.match(
         sourceText,
-        /value=\{item.label\}>\{regionName\(item.code, language, item.label\)\}/,
+        /options=\{deliveryCountries\.map\(\(item\) => \(\{\s*value: item\.label,\s*label: regionName\(item\.code, language, item\.label\),\s*icon: item\.code,/s,
     );
     assert.match(sourceText, /item.label === checkoutDelivery.country/);
     assert.match(sourceText, /error instanceof Error \? error.message/);
@@ -274,6 +274,8 @@ function harness(
                         formatPrice: (value) => `USD ${value}`,
                     }),
                 };
+            if (name === "@/components/ui/ponyo-select")
+                return { PonyoSelect: "PonyoSelect" };
             if (name === "@/lib/localization-options")
                 return {
                     regionName: (code, locale, fallback) => {
@@ -344,17 +346,16 @@ for (const language of locales) {
     test(`${language}: delivery/payment/review, raw countries, coupon interpolation and authoritative totals`, async() => {
         const page = harness(language);
         assert.ok(text(page.render()).includes(t("heading")));
+        const countrySelect = page.find((node) => node.props && node.props.name === "country");
+        assert.equal(countrySelect.props.value, "Japan");
+        assert.equal(countrySelect.props.label, t("country_required"));
+        const countries = countrySelect.props.options;
+        assert.equal(countries[0].value, "Japan");
         assert.equal(
-            page.find((node) => node.props && node.props.name === "country").props
-            .value,
-            "Japan",
-        );
-        const countries = nodes(page.render(), (node) => node.type === "option");
-        assert.equal(countries[0].props.value, "Japan");
-        assert.equal(
-            text(countries[0]),
+            countries[0].label,
             new Intl.DisplayNames([language], { type: "region" }).of("JP"),
         );
+        assert.equal(countries[0].icon, "JP");
         assert.equal(
             page.find((node) => node.props && node.props.name === "first-name").props
             .placeholder,

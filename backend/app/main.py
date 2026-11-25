@@ -43,6 +43,8 @@ async def lifespan(app: FastAPI):
         app.state.redis = None
     if settings.sqs_order_events_url:
         outbox_task = asyncio.create_task(publish_outbox_events())
+    elif settings.environment == "production":
+        logger.warning("SQS_ORDER_EVENTS_URL is unset; transactional outbox events will remain pending.")
     if settings.supplier_forwarding_enabled:
         supplier_task = asyncio.create_task(supplier_order_worker())
     if settings.contact_email_configured or settings.email_inbox_reply_configured:

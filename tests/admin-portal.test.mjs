@@ -73,10 +73,13 @@ test("admin tables are readable, collapsible and automatically refresh the activ
     assert.ok(css.includes(".ad-table-wrap"));
 });
 
-test("product workspace explains current database intake and supplier limitations", () => {
+test("product workspace explains supplier draft review and separate publishing", () => {
     assert.ok(page.includes("catalog_intake_title"));
     assert.ok(page.includes("catalog_intake_note"));
     assert.ok(adminTranslations.includes('"admin.ui.catalog_intake_note"'));
+    assert.ok(page.includes('ui("product_submissions", "Product submissions")'));
+    assert.ok(page.includes('ui("publish_product", "Publish product")'));
+    assert.ok(!adminTranslations.includes("they do not submit new products"));
 });
 
 test("admin email inbox supports mailbox sync, queued replies and editable templates", () => {
@@ -114,9 +117,10 @@ test("dashboard UI uses Ponyo palette and responsive compact navigation", () => 
 
 test("admin language can be changed in both login and dashboard and defaults to English", () => {
     assert.equal((page.match(/<AdminLanguageSelect /g) || []).length, 2);
-    assert.ok(page.includes('value="en">English'));
-    assert.ok(page.includes('value="ja">日本語'));
-    assert.ok(page.includes('value="ko">한국어'));
+    assert.ok(page.includes('{ value: "en", label: "English", icon: "EN" }'));
+    assert.ok(page.includes('{ value: "ja", label: "日本語", icon: "JP" }'));
+    assert.ok(page.includes('{ value: "ko", label: "한국어", icon: "KR" }'));
+    assert.ok(page.includes("<PonyoSelect"));
     assert.ok(proxy.includes('"x-ponyo-admin-portal"'));
     assert.ok(rootLayout.includes('isAdminPortal ? "ponyo-admin-language" : "ponyo-language"'));
     assert.ok(rootLayout.includes('isAdminPortal ? "en" : countryLocalization.language'));

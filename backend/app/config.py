@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qsl, quote_plus, urlparse
 
 from pydantic import BaseModel, EmailStr, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -253,10 +253,14 @@ class Settings(BaseSettings):
                 raise ValueError("FRONTEND_ORIGINS cannot contain wildcard origins in production.")
             if self.cookie_samesite == "none" and not self.cookie_secure:
                 raise ValueError("SameSite=None cookies require COOKIE_SECURE=true.")
-            if not self.stripe_secret_key or not self.stripe_webhook_secret:
-                raise ValueError("Stripe secret and webhook keys are required in production.")
-            if not self.sqs_order_events_url:
-                raise ValueError("SQS_ORDER_EVENTS_URL is required in production for transactional event delivery.")
+            if bool(self.stripe_secret_key) != bool(self.stripe_webhook_secret):
+                raise ValueError("STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be configured together.")
+            if self.stripe_configured and not self.sqs_order_events_url:
+                raise ValueError("SQS_ORDER_EVENTS_URL is required in production when Stripe payments are configured.")
+            if not self.database_url.startswith("postgresql+asyncpg://"):
+                raise ValueError("DATABASE_URL must use PostgreSQL with asyncpg in production.")
+            if dict(parse_qsl(urlparse(self.database_url).query)).get("ssl") != "require":
+                raise ValueError("DATABASE_URL must require TLS with ssl=require in production.")
             if "localhost" in self.database_url or "localhost" in self.redis_url:
                 raise ValueError("Production database and Redis endpoints must be explicitly configured.")
         return self

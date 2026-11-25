@@ -83,6 +83,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
+        # Local preview opts into the API proxy and tunnel; Dockerfile defaults stay production-safe.
         NEXT_PUBLIC_PONYO_API_BASE_URL: /ponyo-api
         PONYO_LOCAL_PREVIEW: "true"
         PONYO_DEV_API_PROXY: "true"
