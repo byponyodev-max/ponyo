@@ -10,7 +10,7 @@
 - The transactional email queue currently has no pending or failed records.
 - The private Supabase bucket `maker-application-photos` is reachable. A temporary JPEG upload, signed private preview (HTTP 200), and cleanup succeeded.
 - Storefront, admin, and maker-facing native dropdowns were replaced with the Ponyo custom picker. Supplier Portal currently has no native HTML `<select>` controls.
-- The app is still a local Docker deployment. Terraform has not been applied and no production deployment workflow or persistent staging environment is documented.
+- Production is live on AWS Lightsail Tokyo using Docker Compose; storefront/API HTTPS and the `www` redirect were smoke-tested on 27 November 2026. Deployments are manual: GitHub Actions runs checks but does not deploy. A persistent staging environment and tested restore process are still outstanding; see the [production operations runbook](./production-operations-runbook.md).
 
 ## First decision: what does “subscription” mean?
 
@@ -74,7 +74,7 @@ If paid recurring billing is wanted, decide the benefit, price, billing interval
 
 | Area | Current evidence | Release gate |
 | --- | --- | --- |
-| Hosting/deployment | Local Compose works; Terraform is unapplied; no production deployment workflow is documented. | Staging and production deployment, DNS/TLS, secret manager, budget, and release owner confirmed. |
+| Hosting/deployment | Production is live on Lightsail Tokyo with manual Compose releases; no automatic deployment or persistent staging environment is documented. | Confirm deployment owner and budget; establish staging, a reviewed release/rollback procedure, and keep production DNS/TLS healthy. |
 | Email | SMTP/IMAP logins passed locally; no test message was sent; production domain/delivery are unverified. | Controlled staging delivery and DNS authentication verified. |
 | Payments | Stripe integration exists, but storefront commerce is disabled; sandbox E2E is still required. | Business policy, test flow, webhook delivery, refunds, and reconciliation signed off. |
 | Paid recurring subscriptions | No customer subscription lifecycle found; newsletter subscriptions are separate. | Do not sell recurring plans until requirements, billing implementation, lifecycle tests, and disclosures are complete. |
@@ -84,6 +84,7 @@ If paid recurring billing is wanted, decide the benefit, price, billing interval
 
 ## Related runbooks
 
+- [Production operations runbook](./production-operations-runbook.md)
 - [Site blueprint](./site-blueprint.md)
 - [AWS Terraform and production prerequisites](../infra/terraform/README.md)
 - [Payment gateway and Stripe webhook checklist](./payment-gateway.md)

@@ -231,18 +231,19 @@
       <h1>Ponyo Site Blueprint</h1>
       <p>One page on how the site is built, hosted and run. Update it whenever a service, page, data store, backup or release step changes.</p>
       <div class="doc-meta">
-        <span><b>Snapshot:</b> 24 November 2026</span>
+        <span><b>Snapshot:</b> 27 November 2026</span>
         <span><b>Site:</b> byponyo.com</span>
         <span><b>Maintained by:</b> Nena</span>
-        <span><b>Sources:</b> code repository, vendor account notes, live check of byponyo.com</span>
+        <span><b>Sources:</b> code repository and production checks reported 27 November 2026</span>
       </div>
+      <p class="answer"><b>Production status · 27 November 2026:</b> The storefront and API are live on AWS Lightsail Tokyo via Docker Compose; HTTPS and the <code>www</code> redirect were smoke-tested. Supabase Tokyo is the production database. Releases are manual; no automatic deployment or persistent staging environment is documented. Stripe remains off. A manual database dump was validated, but scheduled backups and a restore test are not verified. See the <a href="./production-operations-runbook.md">production operations runbook</a>.</p>
     </header>
 
     <section class="today" aria-labelledby="today">
       <h2 id="today">Where we are today</h2>
       <ul>
         <li><b>Custom-coded shop, not a ready-made shop system.</b> Next.js pages, a FastAPI back end and a PostgreSQL database, all in one GitHub repository.</li>
-        <li><b>Not public yet.</b> byponyo.com is parked at Hostinger and returns an error page (503). The full site runs on the developer machine in Docker and is shared through a temporary link.</li>
+        <li><b>Live.</b> byponyo.com and the API are served over HTTPS from AWS Lightsail Tokyo. The <code>www</code> hostname redirects to the main domain.</li>
         <li><b>Switched on:</b> browsing, product reservations and interest sign-ups (no payment), newsletter, contact form, maker applications, Admin and Supplier portals.</li>
         <li><b>Built but switched off:</b> cart, checkout and Stripe payments, customer accounts, product reviews, the journal.</li>
       </ul>
@@ -270,7 +271,7 @@
         </div>
         <svg viewBox="0 0 1200 860" role="img" aria-labelledby="title0 desc0" xmlns="http://www.w3.org/2000/svg">
           <title id="title0">Ponyo site blueprint overview</title>
-          <desc id="desc0">Visitors, Ponyo admins and suppliers use pages built with Next.js and hosted on Vercel. The pages call a custom FastAPI back end planned for AWS. The back end connects to a PostgreSQL database on Supabase, image storage, Hostinger email, Stripe payments, built-in analytics, and Redis and LibreTranslate helpers. The domain is at Hostinger and code is deployed from GitHub.</desc>
+          <desc id="desc0">Visitors, Ponyo admins and suppliers use custom Next.js pages served from AWS Lightsail Tokyo. The pages call a FastAPI backend on the same Compose host. The backend connects to the production Supabase Tokyo PostgreSQL database, image storage, configured email services, disabled Stripe integration, built-in analytics, Redis and LibreTranslate. Hostinger manages domain DNS. GitHub Actions runs backend checks; production releases are manual.</desc>
           <defs>
             <marker id="arrow0" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#356a9a"/></marker>
             <style>
@@ -290,12 +291,12 @@
           <path class="ov-e" d="M600 98V128"/>
           <rect class="ov-box" x="808" y="36" width="372" height="62"/>
           <text x="824" y="62" class="ov-h">Maker / supplier</text>
-          <text x="824" y="84" class="ov-p">Logs in · submits products, cost and capacity</text>
+          <text x="824" y="84" class="ov-p">Logs in · submits products, updates offers</text>
           <path class="ov-e" d="M994 98V128"/>
 
           <rect class="ov-box" x="20" y="128" width="1160" height="172"/>
           <text x="38" y="156" class="ov-h">Pages people see · Next.js 16 + React 19 · custom code</text>
-          <text x="1162" y="156" class="ov-p" text-anchor="end">Hosting: Vercel · set up, byponyo.com not connected yet</text>
+          <text x="1162" y="156" class="ov-p" text-anchor="end">Hosting: AWS Lightsail Tokyo · live</text>
           <rect class="ov-in" x="38" y="172" width="356" height="112"/>
           <text x="54" y="198" class="ov-h2">Storefront</text>
           <text x="54" y="222" class="ov-p">Home · shop · search · collections</text>
@@ -309,7 +310,7 @@
           <rect class="ov-in" x="806" y="172" width="356" height="112"/>
           <text x="822" y="198" class="ov-h2">Supplier Portal · /supplier-portal</text>
           <text x="822" y="222" class="ov-p">Own offers · cost and capacity changes</text>
-          <text x="822" y="242" class="ov-p">Product submissions</text>
+          <text x="822" y="242" class="ov-p">Product submissions + purchase orders</text>
           <text x="822" y="262" class="ov-p">Purchase orders</text>
 
           <path class="ov-e" d="M600 300V344"/>
@@ -318,19 +319,19 @@
           <rect class="ov-box" x="20" y="344" width="250" height="104"/>
           <text x="36" y="370" class="ov-h2">Domain · byponyo.com</text>
           <text x="36" y="394" class="ov-p">Hostinger: domain + DNS</text>
-          <text x="36" y="414" class="ov-p">Parked today (503 page)</text>
-          <text x="36" y="434" class="ov-k">Cloudflare DNS pending</text>
+          <text x="36" y="414" class="ov-p">A records point to Lightsail</text>
+          <text x="36" y="434" class="ov-k">Caddy provides HTTPS</text>
           <path class="ov-e ov-d" d="M145 344V300"/>
           <rect class="ov-box" x="300" y="344" width="600" height="104"/>
           <text x="316" y="372" class="ov-h">Back end · FastAPI /v1 API · custom Python code</text>
           <text x="316" y="396" class="ov-p">Checks who is asking → applies Ponyo rules → reads / writes data</text>
-          <text x="316" y="416" class="ov-p">Hosting: AWS Tokyo · pending, nothing deployed</text>
-          <text x="316" y="434" class="ov-k">Today it runs in Docker on the developer machine</text>
+          <text x="316" y="416" class="ov-p">Hosting: Lightsail Tokyo · Docker Compose</text>
+          <text x="316" y="434" class="ov-k">Live · Caddy HTTPS reverse proxy</text>
           <rect class="ov-box" x="930" y="344" width="250" height="104"/>
           <text x="946" y="370" class="ov-h2">Code · GitHub</text>
-          <text x="946" y="394" class="ov-p">Push → Vercel builds the pages</text>
-          <text x="946" y="414" class="ov-p">Back-end tests run on every push</text>
-          <text x="946" y="434" class="ov-k">Back end → AWS: no pipeline yet</text>
+          <text x="946" y="394" class="ov-p">Push → Actions run backend checks</text>
+          <text x="946" y="414" class="ov-p">SSH to Lightsail · pull and build</text>
+          <text x="946" y="434" class="ov-k">Manual release · no auto-deploy</text>
           <path class="ov-e ov-d" d="M1055 344V300"/>
           <path class="ov-e ov-d" d="M930 396H900"/>
 
@@ -347,7 +348,7 @@
           <text x="36" y="562" class="ov-p">PostgreSQL on Supabase</text>
           <text x="36" y="582" class="ov-p">Products · reservations · newsletter</text>
           <text x="36" y="602" class="ov-p">Accounts · orders · maker applications</text>
-          <text x="36" y="618" class="ov-k">Project created · local database today</text>
+          <text x="36" y="618" class="ov-k">Production: Supabase Tokyo</text>
           <rect class="ov-box" x="414" y="512" width="372" height="120"/>
           <text x="430" y="538" class="ov-h2">Image storage</text>
           <text x="430" y="562" class="ov-p">Catalog photos: files in the repository</text>
@@ -375,10 +376,10 @@
           <text x="824" y="692" class="ov-h2">Helpers</text>
           <text x="824" y="716" class="ov-p">Redis: rate limits</text>
           <text x="824" y="736" class="ov-p">LibreTranslate: JA / KO product text</text>
-          <text x="824" y="772" class="ov-k">Self-hosted · local today</text>
+          <text x="824" y="772" class="ov-k">Self-hosted · Lightsail Compose</text>
 
           <rect class="ov-in" x="20" y="804" width="1160" height="38"/>
-          <text x="38" y="828" class="ov-p">Today: the whole stack runs locally in Docker Compose, shared through a temporary tunnel link. byponyo.com is not public yet.</text>
+          <text x="38" y="828" class="ov-p">Production is live on Lightsail Tokyo · Docker Compose · HTTPS. See section 7 for manual releases.</text>
         </svg>
         <div class="legend"><span>Solid arrow: works in the current build</span><span class="external">Dashed arrow: switched off or not connected yet</span></div>
       </div>
@@ -411,19 +412,18 @@
         <table class="grid">
           <thead><tr><th>Need</th><th>Service</th><th>Status</th><th>Monthly cost</th><th>Renewal date</th></tr></thead>
           <tbody>
-            <tr><td>Hosting: pages</td><td>Vercel, deploys from GitHub</td><td><span class="chip c-setup">Set up</span> byponyo.com not connected</td><td><span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td></tr>
-            <tr><td>Hosting: back end</td><td>AWS, Tokyo region</td><td><span class="chip c-plan">Pending</span> nothing deployed</td><td>None today; <span class="chip c-tbc">TBC</span> once deployed</td><td>Monthly AWS bill once deployed</td></tr>
-            <tr><td>Database</td><td>Supabase (PostgreSQL)</td><td><span class="chip c-setup">Project created</span> not in use yet</td><td><span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td></tr>
-            <tr><td>Domain</td><td>byponyo.com at Hostinger</td><td><span class="chip c-live">Active</span> parked, shows a 503 page</td><td><span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td></tr>
-            <tr><td>DNS and CDN</td><td>Cloudflare</td><td><span class="chip c-plan">Pending</span> decision not confirmed</td><td><span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td></tr>
+            <tr><td>Website and API hosting</td><td>AWS Lightsail, Tokyo; Docker Compose</td><td><span class="chip c-live">Live</span> HTTPS smoke-tested</td><td><span class="chip c-tbc">TBC</span> from AWS billing</td><td>Monthly AWS bill; exact date TBC</td></tr>
+            <tr><td>Database</td><td>Supabase Tokyo (PostgreSQL)</td><td><span class="chip c-live">In production</span></td><td><span class="chip c-tbc">TBC</span> from Supabase billing</td><td><span class="chip c-tbc">TBC</span></td></tr>
+            <tr><td>Domain and DNS</td><td>byponyo.com at Hostinger</td><td><span class="chip c-live">Live</span> DNS points to Lightsail; HTTPS active</td><td><span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td></tr>
+            <tr><td>CDN</td><td>None confirmed</td><td><span class="chip c-plan">Not configured</span></td><td>None identified</td><td>N/A</td></tr>
             <tr><td>Payments</td><td>Stripe</td><td><span class="chip c-off">Off</span> built, not enabled</td><td>No monthly fee; fee per sale <span class="chip c-tbc">TBC</span></td><td>None</td></tr>
             <tr><td>Email sending and inboxes</td><td>Hostinger mail: hello@, support@, partners@</td><td><span class="chip c-live">Active</span> logins tested 22 Nov; no test email sent from the site yet</td><td><span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td></tr>
             <tr><td>Newsletter sending</td><td>None chosen; sign-ups are saved in Ponyo's database</td><td><span class="chip c-plan">Not chosen</span></td><td>None</td><td>None</td></tr>
             <tr><td>Forms</td><td>Built in (contact, newsletter, reservation, maker application)</td><td><span class="chip c-live">Working</span> in the current build</td><td>No separate fee</td><td>None</td></tr>
             <tr><td>Analytics</td><td>Built in (Admin Portal reports)</td><td><span class="chip c-live">Working</span> in the current build</td><td>No separate fee</td><td>None</td></tr>
-            <tr><td>Image storage</td><td>Repository files and Supabase Storage; AWS S3 planned for production</td><td><span class="chip c-setup">Set up</span> private bucket tested 22 Nov</td><td><span class="chip c-tbc">TBC</span> (Supabase plan)</td><td><span class="chip c-tbc">TBC</span></td></tr>
+            <tr><td>Image storage</td><td>Repository files and Supabase Storage</td><td><span class="chip c-setup">Configured</span> production retention/backup coverage TBC</td><td><span class="chip c-tbc">TBC</span> from Supabase billing</td><td><span class="chip c-tbc">TBC</span></td></tr>
             <tr><td>Code and automated tests</td><td>GitHub and GitHub Actions</td><td><span class="chip c-live">Active</span></td><td><span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td></tr>
-            <tr><td>Translation</td><td>LibreTranslate, self-hosted</td><td><span class="chip c-setup">Local only</span></td><td>No licence fee; runs on our own hosting</td><td>None</td></tr>
+            <tr><td>Translation</td><td>LibreTranslate, self-hosted on Lightsail</td><td><span class="chip c-live">Running</span></td><td>Included in AWS compute; exact cost TBC</td><td>Monthly AWS bill</td></tr>
           </tbody>
         </table>
       </div>
@@ -438,7 +438,7 @@
         <span><span class="chip c-draft">Draft</span> placeholder text, not approved</span>
         <span><span class="chip c-setup">Login</span> staff or supplier only</span>
       </div>
-      <p>No page is public until byponyo.com is connected, so "Live" means it goes public as it is on launch day.</p>
+      <p>The storefront is live at byponyo.com. Status indicates the route's feature/access state; it does not mean every page has had a full content or workflow audit.</p>
       <div class="scroll">
         <table class="grid pages">
           <thead><tr><th>Page</th><th>Status</th><th>What it is</th></tr></thead>
@@ -459,8 +459,8 @@
             <tr><td><code>/cart</code> <code>/checkout</code></td><td><span class="chip c-off">Hidden</span></td><td>Shopping cart and payment. Off until payments are approved.</td></tr>
             <tr><td><code>/account</code> and its login, register, verify-email, forgot-password, reset-password and addresses pages; <code>/orders</code></td><td><span class="chip c-off">Hidden</span></td><td>Customer accounts and order history. Off.</td></tr>
             <tr><td><code>/blogs/news</code> <code>/blogs/journal</code> and their articles</td><td><span class="chip c-off">Hidden</span></td><td>Journal and news. Off.</td></tr>
-            <tr><td><code>/admin-portal</code></td><td><span class="chip c-setup">Login</span></td><td>Ponyo staff with the admin role. Planned address: admin.byponyo.com.</td></tr>
-            <tr><td><code>/supplier-portal</code></td><td><span class="chip c-setup">Login</span></td><td>Approved suppliers. Planned address: suppliers.byponyo.com.</td></tr>
+            <tr><td><code>/admin-portal</code></td><td><span class="chip c-setup">Login</span></td><td>Ponyo staff with the admin role at admin.byponyo.com.</td></tr>
+            <tr><td><code>/supplier-portal</code></td><td><span class="chip c-setup">Login</span></td><td>Approved suppliers at suppliers.byponyo.com.</td></tr>
           </tbody>
         </table>
       </div>
@@ -469,7 +469,7 @@
 
     <section class="part" id="p5" aria-labelledby="h5">
       <h2 id="h5"><span class="num">5</span>Where data is stored, and whether it can be exported</h2>
-      <p>All records sit in one PostgreSQL database. Today that is the local preview database with a sample catalog; the planned production database is the Supabase project. A developer can export the whole database at any time with a standard database dump.</p>
+      <p>Production records are stored in the Supabase Tokyo PostgreSQL database. An authorized operator can export the database with a standard PostgreSQL dump; customer data must be handled under the approved access and retention policy.</p>
       <div class="scroll">
         <table class="grid">
           <thead><tr><th>Data</th><th>Stored in</th><th>Export from the Admin Portal</th></tr></thead>
@@ -493,13 +493,12 @@
           <thead><tr><th>What</th><th>Backup</th><th>How often</th><th>Restore tested</th></tr></thead>
           <tbody>
             <tr><td>Code and catalog images</td><td>GitHub repository, full history</td><td>Every push</td><td>Not formally</td></tr>
-            <tr><td>Database, local preview</td><td>None. Data sits in one Docker volume on the developer machine.</td><td>Never</td><td>No</td></tr>
-            <tr><td>Database, production (Supabase)</td><td>Depends on the Supabase plan <span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td><td>No</td></tr>
+            <tr><td>Database, production (Supabase Tokyo)</td><td>One manual pre-migration dump was validated; scheduled backups depend on the Supabase plan <span class="chip c-tbc">TBC</span></td><td>Manual snapshot only; schedule TBC</td><td>No restore drill recorded</td></tr>
             <tr><td>Uploaded photos (Supabase Storage)</td><td>None confirmed <span class="chip c-tbc">TBC</span></td><td><span class="chip c-tbc">TBC</span></td><td>No</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="answer"><b>Short answer:</b> no scheduled database backup runs today, and a restore has never been tested. Before launch: switch on daily database backups, restore one into a separate copy, and record the date, duration and result here.</p>
+      <p class="answer"><b>Short answer:</b> a manual database dump was validated, but scheduled backups and restore have not been verified. Confirm the backup policy, restore into an isolated copy, and record the date, duration and result before relying on recovery.</p>
     </section>
 
     <section class="part" id="p7" aria-labelledby="h7">
@@ -510,8 +509,8 @@
           <ol>
             <li>Developer changes the code and tests it on the local copy.</li>
             <li>Code is pushed to GitHub; back-end tests run automatically.</li>
-            <li>Vercel builds and publishes the pages from GitHub (set up; byponyo.com not connected yet).</li>
-            <li>Back end to AWS: no release step exists yet, because it is not deployed.</li>
+            <li>GitHub Actions runs checks; it does not publish to production.</li>
+            <li>An authorized operator connects to Lightsail by SSH, pulls the reviewed commit, and rebuilds/restarts the Docker Compose services.</li>
           </ol>
         </div>
         <div>
@@ -523,19 +522,19 @@
           </ol>
         </div>
       </div>
-      <p class="answer"><b>Test copy separate from live?</b> Partly. The local copy has its own database, and Vercel can build preview links. There is no permanent test site with its own database yet.<br><b>Who can publish?</b> Code: whoever has write access to GitHub and Vercel <span class="chip c-tbc">names TBC</span>. Products: any account with the admin role <span class="chip c-tbc">names TBC</span>.</p>
+      <p class="answer"><b>Test copy separate from live?</b> Local development is separate, but there is no permanent staging site/database. <b>Who can publish?</b> Code: authorized GitHub contributors plus Lightsail access; named release owner TBC. Products: accounts with the admin role.</p>
     </section>
 
     <section class="part" id="p8" aria-labelledby="h8">
       <h2 id="h8"><span class="num">8</span>How a product gets added today</h2>
       <ol>
-        <li><b>Supplier</b> logs in to the Supplier Portal and submits the product: name, description, materials, size, cost, capacity, minimum order, lead time and 1 to 4 photos.</li>
-        <li><b>Admin</b> approves or rejects it in the Admin Portal. Approval creates the product unpublished, with retail price = approved cost + 20%.</li>
-        <li><b>Admin</b> clicks Publish. The system creates the Japanese and Korean text first and blocks publishing if translation fails.</li>
-        <li>The product appears in the shop for reservation or interest sign-up. Checkout is a separate switch and stays off.</li>
+        <li><b>Supplier</b> submits the product draft, details and photos through the Supplier Portal.</li>
+        <li><b>Admin</b> reviews and approves or rejects the submission. Approval creates an unpublished product with its default variant, supplier offer and inventory.</li>
+        <li><b>Admin</b> publishes the product after required Japanese and Korean translations are available.</li>
+        <li>The product can appear for reservation or interest sign-up. Checkout and payment remain off.</li>
       </ol>
-      <p class="detail">A new maker first applies at <code>/for-makers</code>, is accepted, completes onboarding and gets a supplier login. This happens once per maker. Admins cannot create a product from scratch; the products in the current build are sample items loaded by a developer and must be replaced before launch.</p>
-      <p class="answer"><b>How long does one take?</b> Not measured yet <span class="chip c-tbc">TBC</span>. One pilot product will be timed from supplier submission to published page and the result recorded here.</p>
+      <p class="detail">A new maker first applies at <code>/for-makers</code>, is accepted, completes onboarding and receives supplier access. Supplier submissions stay unpublished until Admin approval and a separate publication action. Retail price is approved wholesale cost +20%.</p>
+      <p class="answer"><b>How long does one take?</b> Not measured yet <span class="chip c-tbc">TBC</span>. Time one supplier submission through review, translation and publication.</p>
       <p class="detail">Detail: <a href="#fig4">Figure 4</a> (maker onboarding), <a href="#fig5">Figure 5</a> (product submission and publishing), <a href="#fig10">Figure 10</a> (cost and capacity changes).</p>
     </section>
 
@@ -543,10 +542,9 @@
       <h2 id="hopen">Still to confirm</h2>
       <ol>
         <li>Monthly cost and renewal date for every <span class="chip c-tbc">TBC</span> in section 3, from the vendor billing pages.</li>
-        <li>Production database: Supabase is the current plan, while the AWS setup files also define an AWS database. One must be chosen.</li>
-        <li>Connecting byponyo.com: who moves DNS (Hostinger or Cloudflare), and when.</li>
-        <li>Backup schedule and the first restore test (section 6).</li>
-        <li>Names of the people who can release code and who hold the admin role (section 7).</li>
+        <li>Monthly cost and renewal date for AWS Lightsail, Supabase, Hostinger, email and other vendors.</li>
+        <li>Supabase backup schedule, storage coverage and the first isolated restore test (section 6).</li>
+        <li>Names of the people who can release code and who hold admin access (section 7).</li>
         <li>Measured time to add one product (section 8).</li>
       </ol>
     </section>
@@ -557,13 +555,14 @@
         <thead><tr><th>Date</th><th>What changed</th></tr></thead>
         <tbody>
           <tr><td>24 Nov 2026</td><td>First one-page version, with the overview diagram and Figures 1 to 15.</td></tr>
+          <tr><td>27 Nov 2026</td><td>Updated production hosting, DNS/TLS, data location, manual release process, admin/supplier domains, product intake, and backup status.</td></tr>
         </tbody>
       </table>
     </section>
 
     <div class="appendix-head" id="figures">
       <h2>Detailed diagrams</h2>
-      <p>Figures 1 to 15 show each flow in detail. Figures 7, 9, 11 and 12 describe features that are built but switched off. Figure 15 shows the AWS plan in the setup files, which has not been applied; the current hosting plan is in sections 1 and 3.</p>
+      <p>Figures 1 to 15 show each flow in detail. Figures 7, 9, 11 and 12 describe features that are built but switched off. Figure 15 compares current Lightsail production with a future AWS reference architecture; only the Lightsail side is live.</p>
     </div>
 
     <section class="diagram" data-file="ponyo-architecture-figure-1.png" aria-labelledby="fig1">
@@ -916,26 +915,26 @@
       <div class="diagram-heading"><h3 id="fig15"><span class="diagram-number">Figure 15.</span>Deployment architecture</h3><button class="download" type="button">Download PNG</button></div>
       <svg viewBox="0 0 1400 590" role="img" aria-labelledby="title15 desc15" xmlns="http://www.w3.org/2000/svg">
         <title id="title15">Ponyo deployment architecture</title>
-        <desc id="desc15">Local Docker Compose and AWS target environments with Next.js, FastAPI, PostgreSQL, Redis, LibreTranslate, Cloudflare Tunnel, load balancing, ECS Fargate, Aurora, S3, CloudFront, event queues, logging, and alerting.</desc>
+        <desc id="desc15">Current production runs Next.js, FastAPI, Redis, LibreTranslate, and Caddy on AWS Lightsail Tokyo with PostgreSQL in Supabase Tokyo. A separate panel shows an unapplied future AWS reference architecture with ECS Fargate, Aurora, S3, CloudFront, event queues, logging, and alerting.</desc>
         <defs>
           <marker id="arrow15" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#333"/></marker>
           <style>rect{fill:#fff!important}.b{stroke:#555;stroke-width:1.4;rx:7}.t{font:700 15px Arial;fill:#222}.s{font:12px Arial;fill:#333}.n{font:10px Arial;fill:#555}.a{fill:none;stroke:#444;stroke-width:1.5;marker-end:url(#arrow15)}.d{stroke-dasharray:6 5}</style>
         </defs>
         <rect width="1400" height="590" fill="#fff"/>
-        <text class="t" x="24" y="27">A · LOCAL PREVIEW</text>
+        <text class="t" x="24" y="27">A · CURRENT PRODUCTION</text>
 
         <rect class="b" x="24" y="48" width="510" height="388"/>
-        <text class="t" x="44" y="76">Docker Compose · developer machine</text>
+        <text class="t" x="44" y="76">AWS Lightsail Tokyo · Docker Compose</text>
         <rect class="b" x="48" y="98" width="218" height="82"/><text class="t" x="64" y="127">Next.js frontend</text><text class="s" x="64" y="151">Port 3000 · storefront / portals</text><text class="n" x="64" y="169">Three portal surfaces in one frontend</text>
-        <rect class="b" x="292" y="98" width="218" height="82"/><text class="t" x="308" y="127">FastAPI backend</text><text class="s" x="308" y="151">Port 8000 · /v1 API</text><text class="n" x="308" y="169">Migrations + demo seed at startup</text>
-        <rect class="b" x="48" y="210" width="218" height="78"/><text class="t" x="64" y="239">PostgreSQL</text><text class="s" x="64" y="263">Named persistent volume</text><text class="n" x="64" y="280">Local application data</text>
-        <rect class="b" x="292" y="210" width="218" height="78"/><text class="t" x="308" y="239">Redis</text><text class="s" x="308" y="263">Rate limits / runtime</text><text class="n" x="308" y="280">Local container</text>
+        <rect class="b" x="292" y="98" width="218" height="82"/><text class="t" x="308" y="127">FastAPI backend</text><text class="s" x="308" y="151">Port 8000 · /v1 API</text><text class="n" x="308" y="169">Production config · no demo seed</text>
+        <rect class="b" x="48" y="210" width="218" height="78"/><text class="t" x="64" y="239">Supabase PostgreSQL</text><text class="s" x="64" y="263">Tokyo production project</text><text class="n" x="64" y="280">Managed database · external</text>
+        <rect class="b" x="292" y="210" width="218" height="78"/><text class="t" x="308" y="239">Redis</text><text class="s" x="308" y="263">Rate limits / runtime</text><text class="n" x="308" y="280">Compose service</text>
         <rect class="b" x="48" y="318" width="218" height="78"/><text class="t" x="64" y="347">LibreTranslate</text><text class="s" x="64" y="371">Internal Compose service</text><text class="n" x="64" y="388">Product text translations</text>
-        <rect class="b" x="292" y="318" width="218" height="78"/><text class="t" x="308" y="347">Cloudflare Quick Tunnel</text><text class="s" x="308" y="371">Temporary HTTPS preview URL</text>
+        <rect class="b" x="292" y="318" width="218" height="78"/><text class="t" x="308" y="347">Caddy reverse proxy</text><text class="s" x="308" y="371">HTTPS · www redirects to apex</text>
         <path class="a" d="M266 139H292"/><path class="a" d="M401 180V195H157V210"/><path class="a" d="M401 180V210"/><path class="a" d="M292 357H266V180"/>
         <text class="n" x="275" y="130">API</text><text class="n" x="410" y="199">DB / Redis</text>
 
-        <text class="t" x="570" y="27">B · AWS TARGET ARCHITECTURE</text>
+        <text class="t" x="570" y="27">B · FUTURE AWS REFERENCE · NOT DEPLOYED</text>
         <rect class="b" x="570" y="48" width="806" height="388"/>
         <rect class="b" x="592" y="73" width="300" height="72"/><text class="t" x="610" y="101">Next.js storefront</text><text class="s" x="610" y="125">Frontend hosting</text><text class="n" x="610" y="140">Admin / supplier portals</text>
         <rect class="b" x="960" y="73" width="390" height="72"/><text class="t" x="978" y="101">Internet · api.byponyo.com</text><text class="s" x="978" y="125">Route 53 + ACM certificate</text><text class="n" x="978" y="140">Public HTTPS API entry point</text>

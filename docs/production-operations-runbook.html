@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ponyo Production Operations Runbook</title>
+  <style>
+    :root {
+      --ink: #252525;
+      --muted: #4c5f72;
+      --accent: #244e78;
+      --accent-dark: #183b5d;
+      --line: #c3d1de;
+      --wash: #f5f8fb;
+      --warning: #8a2c0d;
+      --warning-wash: #fff4ed;
+      --ok: #1f6b45;
+      --ok-wash: #eef8f2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #eef2f6;
+      color: var(--ink);
+      font: 14px/1.55 Arial, Helvetica, sans-serif;
+    }
+
+    main {
+      width: min(940px, calc(100% - 36px));
+      margin: 28px auto;
+      padding: 38px 46px 44px;
+      background: #fff;
+      box-shadow: 0 3px 18px #183b5d18;
+    }
+
+    h1, h2, h3 { color: var(--accent-dark); }
+    h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+    h1 { margin: 0 0 5px; font-size: 32px; line-height: 1.2; }
+    h2 { margin: 0 0 11px; font-size: 22px; line-height: 1.25; }
+    h3 { margin: 16px 0 6px; font-size: 14px; }
+    p { margin: 0 0 9px; }
+    ul, ol { margin: 5px 0 12px; padding-left: 22px; }
+    li { margin: 3px 0; }
+    a { color: var(--accent); }
+    code { padding: 1px 4px; background: #f1f4f7; border-radius: 2px; font: 0.92em Consolas, "Courier New", monospace; overflow-wrap: anywhere; }
+
+    .doc-head { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid var(--accent); }
+    .doc-head .subtitle { margin: 0; color: var(--muted); font-size: 15px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 5px 22px; margin-top: 11px; color: #333; font-size: 12px; }
+    .status { margin-top: 14px; padding: 12px 15px; border-left: 4px solid var(--ok); background: var(--ok-wash); }
+    .status strong { color: var(--ok); }
+    .callout { margin: 13px 0; padding: 11px 14px; border-left: 4px solid var(--warning); background: var(--warning-wash); }
+    .callout strong { color: var(--warning); }
+    .section { margin: 0 0 21px; }
+    .section-number { margin-right: 7px; color: var(--accent); font: 700 13px Arial, Helvetica, sans-serif; }
+    .pill-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin: 10px 0 15px; }
+    .pill { padding: 9px 11px; border: 1px solid var(--line); }
+    .pill b { display: block; margin-bottom: 2px; color: var(--accent-dark); }
+    .step-label { font-weight: 700; }
+    pre {
+      margin: 8px 0 12px;
+      padding: 11px 13px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      border: 1px solid #d5dee7;
+      background: #f7f9fb;
+      color: #202a33;
+      font: 10px/1.45 Consolas, "Courier New", monospace;
+    }
+    .expected { padding: 9px 12px; background: var(--wash); }
+    .small { color: var(--muted); font-size: 12px; }
+    .related { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+    footer { margin-top: 22px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+
+    @media (max-width: 700px) {
+      main { width: 100%; margin: 0; padding: 24px 20px; }
+      .pill-row { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      @page { size: A4; margin: 13mm 14mm 15mm; }
+      body { background: #fff; font-size: 10.5px; }
+      main { width: 100%; margin: 0; padding: 0; box-shadow: none; }
+      h1 { font-size: 27px; }
+      h2 { font-size: 19px; break-after: avoid; }
+      .doc-head { margin-bottom: 13px; padding-bottom: 10px; }
+      .section { margin-bottom: 14px; }
+      .status, .callout, .pill, pre, .expected { break-inside: avoid; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      li { margin: 2px 0; }
+      pre { font-size: 9px; }
+      a { color: var(--accent-dark); text-decoration: none; }
+      footer { margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="doc-head">
+      <h1>Ponyo Production Operations Runbook</h1>
+      <p class="subtitle">A practical guide to admin access, safe releases, and post-deployment checks.</p>
+      <div class="meta">
+        <span><b>Verified:</b> 27 November 2026</span>
+        <span><b>Production:</b> Lightsail Tokyo · Docker Compose</span>
+        <span><b>Audience:</b> authorized Ponyo operators</span>
+      </div>
+      <div class="status">
+        <strong>Production is live.</strong> The storefront and API passed HTTP 200 smoke checks. Supabase Tokyo hosts the production database. Releases are manual; payment processing and scheduled-backup/restore readiness remain unverified.
+      </div>
+    </header>
+
+    <section class="section" aria-labelledby="guardrails">
+      <h2 id="guardrails">Operating guardrails</h2>
+      <div class="callout">
+        <strong>Protect credentials and customer data.</strong> Never put passwords, tokens, private keys, `.env.prod` contents, or customer data in this document, chat, or shared command output. Keep this runbook only in an access-controlled repository or Drive folder.
+      </div>
+      <div class="pill-row">
+        <div class="pill"><b>Manual deployment</b>GitHub Actions runs checks but does not deploy to Lightsail.</div>
+        <div class="pill"><b>Production database</b>Supabase Tokyo. Do not migrate or change production data without an approved plan and a validated backup.</div>
+        <div class="pill"><b>Payments disabled</b>Stripe and checkout remain off. Do not accept real payments or enable checkout before approval and testing.</div>
+        <div class="pill"><b>Recovery not verified</b>A manual database dump was validated; scheduled backups and a restore drill are not verified.</div>
+      </div>
+      <p>Production runs on Lightsail instance <code>ponyo-prod-tokyo</code> at <code>13.112.48.83</code>. The root domain and its <code>admin</code>, <code>suppliers</code>, and <code>api</code> subdomains point to this address. <code>www.byponyo.com</code> redirects to <code>https://byponyo.com/</code>. Caddy serves HTTPS.</p>
+      <p>Before the next release, confirm the repository's <code>Caddyfile</code> contains the same <code>www</code> redirect already applied on the server, so a later deployment does not lose it.</p>
+    </section>
+
+    <section class="section" aria-labelledby="admin">
+      <h2 id="admin"><span class="section-number">1</span>Creating an admin account</h2>
+      <h3>First admin</h3>
+      <p>Public registration cannot create an admin. If no admin can sign in, bootstrap the first account from an SSH session on Lightsail. The command prompts for a hidden password; it does not place the password in the command arguments or `.env.prod`.</p>
+      <p>Replace the email and first name with the authorized person's details. The example uses Ponyo's operations account:</p>
+      <pre><code>cd ~/ponyo
+sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml run --rm --no-deps \
+  -e INITIAL_ADMIN_EMAIL="hello@byponyo.com" \
+  -e INITIAL_ADMIN_FIRST_NAME="admin" \
+  api python -c 'import asyncio, getpass, os; os.environ["INITIAL_ADMIN_PASSWORD"] = getpass.getpass("Set admin password (hidden input): "); from app.seed import seed_initial_admin; created = asyncio.run(seed_initial_admin()); print("Admin created." if created else "An admin with this email already exists; password unchanged.")'</code></pre>
+      <p>Password requirements: 8–128 characters, including at least one number and one symbol. Enter it only when the hidden <code>getpass</code> prompt appears. Never send or record the password.</p>
+      <ul>
+        <li>If the command reports <b>Admin created</b>, sign in at <a href="https://admin.byponyo.com/admin-portal">admin.byponyo.com/admin-portal</a>.</li>
+        <li>If the email already exists, the seed does not change that account's password. Do not rerun it expecting a reset.</li>
+        <li>If the email belongs to a non-admin account, the seed stops with an error. Do not change roles with SQL; have the operations owner verify the identity and account.</li>
+        <li>If the account exists, its password is unknown, and no other admin is available, stop and use an owner-approved account-recovery process. Do not reset the database or edit password hashes manually.</li>
+      </ul>
+      <h3>Additional admins</h3>
+      <ol>
+        <li>Sign in and open <b>Admin accounts</b> in the Admin Portal.</li>
+        <li>Enter the new admin's name, email, and temporary password.</li>
+        <li>Share the temporary password through an approved private channel, not a group chat. Ask the recipient to change it after signing in if password changes are available.</li>
+        <li>Remove admin access when it is no longer needed. The portal protects the current account and the last admin to reduce lockout risk.</li>
+      </ol>
+      <p class="small">Grant access only to authorized people. Customer and supplier accounts cannot sign in as admins.</p>
+    </section>
+
+    <section class="section" aria-labelledby="release">
+      <h2 id="release"><span class="section-number">2</span>Releasing code changes</h2>
+      <h3>Before a release</h3>
+      <ol>
+        <li>Make the change locally, run relevant tests, and request review under the team's process.</li>
+        <li>After approval, commit and push to GitHub branch <code>main</code>. A push alone does <b>not</b> change production.</li>
+        <li>Review database migrations, configuration changes, and DNS/provider changes separately.</li>
+        <li>SSH to Lightsail and inspect the server repository before pulling:</li>
+      </ol>
+      <pre><code>cd ~/ponyo
+git status --short --branch</code></pre>
+      <p>If there are local changes, understand them before pulling or overwriting anything. This is especially important for <code>Caddyfile</code>: the <code>www</code> redirect was applied directly on the server and must also be retained in the repository.</p>
+
+      <h3>Routine release without a database migration</h3>
+      <p>Only after the server branch is clean and the approved changes are available on GitHub <code>main</code>:</p>
+      <pre><code>git pull --ff-only origin main
+sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml up -d --build
+sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml ps</code></pre>
+      <div class="callout"><strong>Never use</strong> <code>docker compose down -v</code>, delete volumes, or run <code>git reset --hard</code> as deployment steps.</div>
+
+      <h3>Release includes an Alembic migration</h3>
+      <p>Do not use the routine release steps by themselves. Before migrating:</p>
+      <ol>
+        <li>Review the migration and its impact on production data.</li>
+        <li>Confirm a recent database backup is validated and recovery is approved.</li>
+        <li>Schedule the release window and confirm the current Alembic revision and available heads.</li>
+        <li>Build the API image with the migration, then run the migration only after approval:</li>
+      </ol>
+      <pre><code>sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml run --rm --no-deps --build api alembic upgrade head</code></pre>
+      <p>If a migration fails, do not rerun it, edit its revision, or restore a backup spontaneously. Preserve a redacted error and contact the operations owner.</p>
+
+      <h3>Caddyfile-only change</h3>
+      <p>The server file is mounted into the Caddy container. Validate before reloading:</p>
+      <pre><code>sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile</code></pre>
+      <p>Do not reload if validation fails. A code release does not require changing nameservers or email records.</p>
+    </section>
+
+    <section class="section" aria-labelledby="checks">
+      <h2 id="checks"><span class="section-number">3</span>Post-release checks</h2>
+      <p>Check service health and public endpoints:</p>
+      <pre><code>sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml ps
+curl -sS -o /dev/null -w 'Site HTTP %{http_code}\n' https://byponyo.com/
+curl -sS -o /dev/null -w 'API HTTP %{http_code}\n' https://api.byponyo.com/v1/health
+curl -sS -o /dev/null -w 'WWW HTTP %{http_code} -> %{redirect_url}\n' https://www.byponyo.com/</code></pre>
+      <div class="expected"><b>Expected:</b> relevant containers show healthy; site and API return HTTP 200; <code>www</code> returns HTTP 301 to <code>https://byponyo.com/</code>.</div>
+      <p>Then run browser smoke checks for:</p>
+      <ul>
+        <li>Homepage and product detail page.</li>
+        <li>Admin sign-in and dashboard access.</li>
+        <li>Supplier sign-in using an approved test account.</li>
+        <li>Reservation/interest flow without completing a payment.</li>
+        <li>Verification or password-reset email only if production SMTP delivery has been confirmed.</li>
+      </ul>
+      <p>Review logs if a check fails. Share only redacted excerpts:</p>
+      <pre><code>sudo docker compose --env-file backend/.env.prod -f docker-compose.prod.yml logs --tail=80 api frontend caddy</code></pre>
+      <p>Never share `.env.prod`, passwords, session tokens, customer addresses, or raw logs in chat or public tickets. Record the released commit, check results, and non-sensitive errors.</p>
+      <div class="callout"><strong>If a check fails, stop further changes.</strong> Do not rerun migrations, delete volumes, or attempt a restore until the backup and impact are confirmed.</div>
+    </section>
+
+    <section class="section" aria-labelledby="followups">
+      <h2 id="followups">Open operational items</h2>
+      <ul>
+        <li><b>Backups:</b> confirm the owner, schedule, and location of automatic Supabase Tokyo backups. Run an isolated restore drill and record its date, duration, and result. Until then, recovery is unverified.</li>
+        <li><b>Staging and releases:</b> there is no permanent staging environment or automatic deployment. Consider establishing staging and an approval/rollback procedure before routine releases.</li>
+        <li><b>Payments:</b> keep Stripe disabled until credentials, webhooks, refunds, reconciliation, tax/shipping, and business approval have been tested.</li>
+        <li><b>Email and user journeys:</b> verify production email delivery and customer/admin/supplier flows on the live domains. A healthy HTTP status does not prove every business flow is ready.</li>
+        <li><b>Blueprint:</b> update vendor costs, access owners, renewal dates, backup/restore policy, and release approvers in the <a href="./site-blueprint.html">site blueprint</a>.</li>
+      </ul>
+    </section>
+
+    <div class="related">
+      <b>Related documents</b>
+      <p><a href="../backend/README.md">Backend README</a> · <a href="./post-build-launch-checklist.md">Post-build launch checklist</a> · <a href="./operations-reliability.md">Operations reliability</a> · <a href="./payment-gateway.md">Payment gateway</a></p>
+      <p class="small">This is an operational guide, not a substitute for an approved recovery plan or access-control policy.</p>
+    </div>
+    <footer>Ponyo · Production operations · English edition · Snapshot: 27 November 2026</footer>
+  </main>
+</body>
+</html>

@@ -1,10 +1,13 @@
 # Ponyo site blueprint
 
-> **One-page version with all diagrams:** [site-blueprint.html](./site-blueprint.html) (24 November 2026). Where the two differ, the one-pager is newer.
+> **One-page version with all diagrams:** [site-blueprint.html](./site-blueprint.html) (updated 27 November 2026).
 
-**Snapshot:** 22 November 2026 · **Status:** repo-verified; local API, email authentication, and private maker-photo storage checks passed; production/vendor details remain TBC  
-**Drive:** This file is ready to copy to the shared Drive. Drive folder/link and document owner are TBC; this workspace has no Drive connection.  
-**Scope:** Current code and planned architecture, not proof that a production site or cloud service is deployed.
+**Snapshot:** 27 November 2026 · **Status:** storefront and API are live on AWS Lightsail Tokyo; site/API HTTPS and the `www` redirect were smoke-tested.
+
+**Production update:** Releases are manual Docker Compose deployments; no automatic deploy or persistent staging environment is documented. The production database is Supabase Tokyo. Stripe remains off. A manual database dump was validated, but scheduled backups and a restore test are not verified. See the [production operations runbook](./production-operations-runbook.md).
+
+**Drive:** This file is ready to copy to the shared Drive. Drive folder/link and document owner are TBC; this workspace has no Drive connection.
+**Scope:** Repository-verified architecture plus production checks reported on 27 November. Vendor costs, renewal dates, backup policy, and restore readiness still require confirmation.
 
 ## 1. How the site fits together
 
@@ -15,7 +18,7 @@ flowchart LR
   Supplier["Approved supplier"] --> Web
   Web --> API["FastAPI /v1 API"]
   Web --> Assets["Product images in repo /public"]
-  API --> DB[("PostgreSQL")]
+  API --> DB[("Supabase Tokyo PostgreSQL")]
   API --> PhotoStore["Supabase Storage; private maker application photos"]
   API --> Cache[("Redis")]
   API --> Translate["LibreTranslate"]
@@ -23,12 +26,15 @@ flowchart LR
   API -. "future; commerce currently off" .-> Stripe["Stripe"]
   API --> Reports["First-party Admin analytics"]
   Reports --> DB
-  Local["Local Docker Compose preview"] -. "current verified runtime" .-> Web
-  Plan["AWS Terraform target; not applied"] -. "planned hosting" .-> API
-  Plan -.-> DB
+  Domain["Hostinger DNS · byponyo.com"] --> Web
+  Web -. "HTTPS / Caddy" .-> API
+  Lightsail["AWS Lightsail Tokyo · Docker Compose"] --> Web
+  Lightsail --> API
+  Dev["Local development"] -. "separate; no persistent staging" .-> Web
+  Plan["Future AWS Terraform reference; not applied"] -.-> API
 ```
 
-The public storefront, backend API, database, and admin portal are custom Ponyo code in one repository. `src/ponyo-shopify` is a visual reference only; Shopify is not the runtime shop. The local Compose stack includes PostgreSQL, Redis, LibreTranslate, API, frontend, and a temporary Cloudflare tunnel. The AWS Terraform files describe a future deployment, but have **not** been applied.
+The storefront, backend API and portals are custom Ponyo code in one repository. `src/ponyo-shopify` is a visual reference only; Shopify is not the runtime shop. Production frontend, API, Caddy, Redis and LibreTranslate run in Docker Compose on Lightsail Tokyo; PostgreSQL is hosted by Supabase Tokyo. The AWS Terraform files describe a separate future architecture and have **not** been applied.
 
 ## 2. What it is built on, and why
 
@@ -36,12 +42,12 @@ The public storefront, backend API, database, and admin portal are custom Ponyo 
 | --- | --- | --- |
 | Visitor pages and portals | Next.js 16, React 19, TypeScript | Custom storefront and protected admin/supplier experiences; not a ready-made shop platform. |
 | Backend | FastAPI (Python), SQLAlchemy, Alembic | Custom typed API, business rules, and versioned relational schema; deployable separately from the frontend. |
-| Data and cache | PostgreSQL; Redis | Relational product, reservation, account, and order data; Redis supports rate limiting and related runtime needs. Local Compose is verified; production cloud database is planned, not deployed. |
+| Data and cache | Supabase Tokyo PostgreSQL; Redis on Lightsail | Relational product, reservation, account, and order data; Redis supports rate limiting and related runtime needs. Production database and app host are live. |
 | Payments | Stripe integration in code | Hosted checkout and payment operations are implemented, but checkout/payment are feature-disabled pending launch decisions and testing. |
 | Email | SMTP sending, IMAP inbox sync | Local SMTP authentication and read-only IMAP access passed for transactional mail and the `hello`, `support`, and `partners` inboxes on 22 November. No test message was sent; production sender verification, delivery, cost, and DNS authentication remain unverified. |
-| Images | Product assets in `public/` and image URLs in product records; maker application photos in a private Supabase Storage bucket | The current local API verified the private bucket, temporary upload, and signed preview. Production configuration, costs, backup, and restore remain unverified. S3 + CloudFront for catalog images remains only in the unapplied AWS plan. |
+| Images | Product assets in `public/` and Supabase Storage buckets | Product and private maker-application images use Supabase Storage; confirm production retention and backup coverage. S3 + CloudFront remains only in the unapplied AWS plan. |
 | Analytics | First-party Admin analytics | Calculated from Ponyo database records; no external analytics product is configured in the repo. |
-| Translations | next-intl UI translations; LibreTranslate service for product text | App-owned UI strings and a self-hostable translation service; production translation hosting is not established. |
+| Translations | next-intl UI translations; LibreTranslate on Lightsail | App-owned UI strings and self-hosted product text translation in production. |
 | CI | GitHub Actions backend workflow | Runs backend tests and offline PostgreSQL migration SQL generation; no production deployment workflow is present in the repo. |
 
 ## 3. Outside services, cost, and renewal
@@ -50,16 +56,16 @@ No vendor invoices, account billing pages, or renewal dates are stored in the re
 
 | Service / purpose | Evidence and status | Monthly cost | Renewal / billing date |
 | --- | --- | --- | --- |
-| Domain: `byponyo.com` | Domain is referenced by the project; registrar and live DNS ownership are not established here. | TBC | TBC (likely registrar renewal cycle; confirm) |
-| Website/API hosting | Local Docker preview is documented. AWS ECS/Aurora/Redis/ALB plan is not applied; actual live host is TBC. | TBC; AWS plan has variable billable resources if deployed | TBC; AWS billing cycle/account to confirm |
+| Domain: `byponyo.com` | Hostinger manages domain/DNS; production records point to Lightsail and HTTPS is active. | TBC from Hostinger billing | TBC from Hostinger account |
+| Website/API hosting | AWS Lightsail Tokyo; Docker Compose, Caddy, frontend and API are live. | TBC from AWS billing | Monthly AWS billing; exact date TBC |
 | Stripe payments | Integration exists in code; commerce is off. Account plan/rates are not in repo. | No fixed monthly amount documented; transaction fees/rates TBC | No renewal date documented; confirm account terms |
-| SMTP/IMAP email | SMTP/IMAP authentication passed locally for configured mailboxes; no test email was sent. Confirm actual production provider, sender verification, and delivery. | TBC | TBC |
+| SMTP/IMAP email | Hostinger mailboxes; logins tested, but production sending and delivery test not recorded. | TBC | TBC |
 | Contact and maker forms | First-party Ponyo API and database; no external form vendor identified. | No separate vendor fee identified; hosting cost is above | N/A separately |
 | Newsletter | Subscriber records are first-party in the database. A marketing-email provider/consumer is not configured. | No separate vendor identified; sending provider TBC before campaigns | TBC if a provider is selected |
 | Analytics | First-party Admin reports; no external analytics vendor identified. | No separate vendor fee identified | N/A separately |
-| Image storage/CDN | Current assets are repo-managed. Planned S3/CloudFront is not deployed. | TBC only if AWS storage/CDN is activated | AWS monthly billing if activated; date TBC |
-| Supabase Storage (maker application photos) | Current local project/private bucket and a temporary upload/signed read were verified. Production project, retention, plan, and backup coverage remain TBC. | TBC from Supabase account | TBC from Supabase account |
-| LibreTranslate | Runs as a local Compose service; production host is TBC. | No separate SaaS fee identified; compute cost depends on hosting | N/A for local container |
+| Image storage/CDN | Repository assets and Supabase Storage are used; no CDN confirmed. | TBC from Supabase billing | TBC from Supabase account |
+| Supabase database and storage | Production database is Supabase Tokyo; storage holds product and private application photos. | TBC from Supabase account | TBC from Supabase account |
+| LibreTranslate | Self-hosted in the production Compose stack. | Included in AWS compute; exact cost TBC | Monthly AWS billing |
 | GitHub Actions | Backend CI workflow exists; organization billing/usage plan is not in repo. | TBC | TBC |
 | Cloudflare Quick Tunnel | Temporary local-preview tunnel only; not production hosting. | Account/plan cost TBC | Not a production renewal |
 
@@ -84,11 +90,11 @@ No vendor invoices, account billing pages, or renewal dates are stored in the re
 | `/account`, `/account/login`, `/account/register`, `/account/verify-email`, `/account/forgot-password`, `/account/reset-password`, `/account/addresses`, `/orders` | Hidden | Customer-account feature flag is off. |
 | `/blogs/[handle]`, `/blogs/[handle]/[article]` | Hidden | Plush Journal feature flag is off. |
 | `/admin-portal` | Restricted | Admin-role access required; not a visitor page. |
-| `/supplier-portal` | Restricted | Supplier-role access required; supplier subdomain/DNS/HTTPS are not established by this repo. |
+| `/supplier-portal` | Restricted | Supplier-role access required at `suppliers.byponyo.com`. |
 
 ## 5. Data location and export
 
-The app's current local preview uses PostgreSQL in a Docker named volume. The production database target in Terraform is Aurora PostgreSQL, but it is not deployed. Browser-local cart/wishlist preview data is separate from server records.
+Production server records are stored in the Supabase Tokyo PostgreSQL database. An authorized operator can export the database with a standard PostgreSQL dump. Browser-local cart/wishlist data is separate from server records.
 
 | Data | Stored in | Export / current limitation |
 | --- | --- | --- |
@@ -100,19 +106,18 @@ The app's current local preview uses PostgreSQL in a Docker named volume. The pr
 
 ## 6. Backups and restore
 
-- **Local preview:** PostgreSQL data persists in a Docker named volume; no scheduled backup is defined in Compose.
-- **Planned AWS:** Terraform configures Aurora point-in-time recovery with a 14-day default retention if deployed.
-- **Maker photos:** Supabase Storage backup/retention and restore behavior are not verified; confirm coverage and test retrieval independently from the PostgreSQL backup.
+- **Production database:** One manual pre-migration dump was validated; scheduled backups depend on the Supabase plan and have not been verified.
+- **Uploaded photos:** Supabase Storage backup/retention and restore behavior are not verified; confirm coverage and test retrieval independently from the PostgreSQL backup.
 - **Restore test:** No restore drill is recorded as completed. Automated retention is not proof of a tested restore.
-- **Before launch:** confirm the actual production backup policy, RPO/RTO, access, and run a restore into an isolated environment; record date, recovery point, duration, and result.
+- **Operational follow-up:** confirm the production backup policy, RPO/RTO and access; run a restore into an isolated environment and record date, recovery point, duration, and result.
 
 ## 7. How a change reaches the site
 
-- **Code:** changes are made in the GitHub repository. The backend GitHub Actions workflow runs tests and generates PostgreSQL migration SQL; it does not deploy. No frontend or production deploy workflow is documented.
+- **Code:** changes are made in GitHub. GitHub Actions runs backend checks but does not deploy. An authorized operator connects to Lightsail by SSH, pulls the reviewed commit and rebuilds/restarts Docker Compose.
 - **Local preview:** `docker compose up --build -d` builds/runs the local stack. The optional Cloudflare Quick Tunnel is temporary and is not a staging environment.
 - **Test copy:** no separate, persistent staging site/database is documented. Treat this as **not confirmed / not available until verified**, not as a safe production-like test environment.
-- **Production publish authority:** hosting-account deploy permissions and the person who can release code are TBC. Admin-role users can publish/unpublish existing products in the admin portal; that is separate from deploying a code change.
-- **Release checklist:** confirm a staging copy, run frontend/backend checks and migrations against the intended database, review the change, then deploy using a documented authorized release process. Do not apply the unapplied AWS plan without account, budget, domain, and deployment review.
+- **Production publish authority:** authorized GitHub contributors and Lightsail access can release code; the named release owner is TBC. Admin-role users can publish/unpublish products separately.
+- **Release checklist:** review the change, run available checks, verify migrations against the intended database, then deploy using the [production operations runbook](./production-operations-runbook.md). There is no permanent staging copy.
 
 ## 8. How a product is added today
 
@@ -120,7 +125,7 @@ The partner path is **Maker application → acceptance and onboarding invitation
 
 Admin product approval creates an unpublished product, default variant, supplier offer, and inventory record. New partner products have checkout disabled by default: Admin can publish a preview, then separately enable checkout once availability and operations are ready. The Admin publication action checks Japanese and Korean translations before making the product visible. Supplier cost/capacity changes continue to require Ponyo approval; retail price uses approved wholesale cost +20%. New supplier product images use the separate `SUPABASE_PRODUCT_IMAGES_BUCKET`; provision it as a public Supabase Storage bucket and keep the service-role key backend-only. Maker-application photos remain in their private bucket.
 
-**Before launch:** configure and verify the public product-image bucket, SMTP delivery of both onboarding invitations, token expiry and activation, product translation support, and the database migration. Checkout/payment availability remains governed by the existing product and checkout configuration; product publication alone is not proof that payment is enabled.
+**Operational follow-up:** verify production product-image bucket permissions and backup coverage, test SMTP delivery of onboarding invitations, and confirm token expiry and activation behavior. Checkout/payment remains off; product publication alone does not enable payment.
 
 **Time per product:** no measured turnaround is recorded. Time one complete pilot from supplier draft through review, translation, and publication before setting an estimate.
 

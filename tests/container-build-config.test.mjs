@@ -45,6 +45,8 @@ test("production Compose keeps app services private and disables preview feature
 
 test("Caddy serves the configured storefront and API domains over automatic HTTPS", () => {
 	assert.match(caddyfile, /\{\$SITE_DOMAIN\}/);
+	assert.match(caddyfile, /www\.\{\$SITE_DOMAIN\}/);
+	assert.match(caddyfile, /redir https:\/\/\{\$SITE_DOMAIN\}\{uri\} permanent/);
 	assert.match(caddyfile, /\{\$ADMIN_DOMAIN\}/);
 	assert.match(caddyfile, /\{\$SUPPLIER_DOMAIN\}/);
 	assert.match(caddyfile, /\{\$API_DOMAIN\}/);
